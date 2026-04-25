@@ -15,6 +15,13 @@ import {
 const currentYear = new Date().getFullYear();
 const author = pkg.author?.name ?? pkg.author;
 const productName = pkg.productName;
+const hasMacSigningCredentials = Boolean(
+	process.env.CSC_LINK &&
+		process.env.CSC_KEY_PASSWORD &&
+		process.env.APPLE_ID &&
+		process.env.APPLE_APP_SPECIFIC_PASSWORD &&
+		process.env.APPLE_TEAM_ID,
+);
 const macIconPath = join(pkg.resources, "build/icons/icon.icns");
 const linuxIconPath = join(pkg.resources, "build/icons");
 const winIconPath = join(pkg.resources, "build/icons/icon.ico");
@@ -100,14 +107,16 @@ const config: Configuration = {
 		...(existsSync(macIconPath) ? { icon: macIconPath } : {}),
 		category: "public.app-category.utilities",
 		target: "default",
-		hardenedRuntime: true,
+		identity: hasMacSigningCredentials ? undefined : null,
+		hardenedRuntime: hasMacSigningCredentials,
 		gatekeeperAssess: false,
-		notarize: true,
-		entitlements: join(pkg.resources, "build/entitlements.mac.plist"),
-		entitlementsInherit: join(
-			pkg.resources,
-			"build/entitlements.mac.inherit.plist",
-		),
+		notarize: hasMacSigningCredentials,
+		entitlements: hasMacSigningCredentials
+			? join(pkg.resources, "build/entitlements.mac.plist")
+			: undefined,
+		entitlementsInherit: hasMacSigningCredentials
+			? join(pkg.resources, "build/entitlements.mac.inherit.plist")
+			: undefined,
 		extendInfo: {
 			CFBundleName: productName,
 			CFBundleDisplayName: productName,
