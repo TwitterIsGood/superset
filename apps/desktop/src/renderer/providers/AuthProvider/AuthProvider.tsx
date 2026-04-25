@@ -1,6 +1,5 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { authClient, setAuthToken, setJwt } from "renderer/lib/auth-client";
-import { SupersetLogo } from "renderer/routes/sign-in/components/SupersetLogo/SupersetLogo";
 import { electronTrpc } from "../../lib/electron-trpc";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -104,14 +103,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		const interval = setInterval(refreshJwt, 50 * 60 * 1000);
 		return () => clearInterval(interval);
 	}, [isHydrated]);
-
-	if (!isHydrated) {
-		return (
-			<div className="flex h-screen w-screen items-center justify-center bg-background">
-				<SupersetLogo className="h-8 w-auto animate-pulse opacity-80" />
-			</div>
-		);
-	}
 
 	return <>{children}</>;
 }

@@ -56,6 +56,7 @@ export function OrganizationDropdown({
 	);
 
 	const userEmail = session?.user?.email;
+	const isSignedIn = !!session?.user;
 
 	async function handleSignOut(): Promise<void> {
 		await authClient.signOut();
@@ -67,7 +68,7 @@ export function OrganizationDropdown({
 	}
 
 	const userName = session?.user?.name;
-	const displayName = activeOrganization?.name ?? userName ?? "Organization";
+	const displayName = activeOrganization?.name ?? userName ?? "Local workspace";
 
 	const triggerButton =
 		variant === "collapsed" ? (
@@ -133,13 +134,15 @@ export function OrganizationDropdown({
 						<DropdownMenuShortcut>{settingsHotkey}</DropdownMenuShortcut>
 					)}
 				</DropdownMenuItem>
-				<DropdownMenuItem
-					onSelect={() => navigate({ to: "/settings/organization" })}
-				>
-					<FiUsers className="h-4 w-4" />
-					<span>Manage members</span>
-				</DropdownMenuItem>
-				{organizations && organizations.length > 1 && (
+				{isSignedIn && (
+					<DropdownMenuItem
+						onSelect={() => navigate({ to: "/settings/organization" })}
+					>
+						<FiUsers className="h-4 w-4" />
+						<span>Manage members</span>
+					</DropdownMenuItem>
+				)}
+				{isSignedIn && organizations && organizations.length > 1 && (
 					<DropdownMenuSub>
 						<DropdownMenuSubTrigger className="gap-2">
 							<span>Switch organization</span>
@@ -220,13 +223,15 @@ export function OrganizationDropdown({
 					</DropdownMenuSubContent>
 				</DropdownMenuSub>
 
-				<DropdownMenuSeparator />
-
-				{/* Account */}
-				<DropdownMenuItem onSelect={handleSignOut} className="gap-2">
-					<HiOutlineArrowRightOnRectangle className="h-4 w-4" />
-					<span>Log out</span>
-				</DropdownMenuItem>
+				{isSignedIn && (
+					<>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem onSelect={handleSignOut} className="gap-2">
+							<HiOutlineArrowRightOnRectangle className="h-4 w-4" />
+							<span>Log out</span>
+						</DropdownMenuItem>
+					</>
+				)}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

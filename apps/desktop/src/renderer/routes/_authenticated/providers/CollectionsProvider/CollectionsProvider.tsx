@@ -6,7 +6,6 @@ import {
 	useEffect,
 	useState,
 } from "react";
-import { env } from "renderer/env.renderer";
 import { authClient } from "renderer/lib/auth-client";
 import { MOCK_ORG_ID } from "shared/constants";
 import { getCollections, preloadCollections } from "./collections";
@@ -32,9 +31,8 @@ export function preloadActiveOrganizationCollections(
 export function CollectionsProvider({ children }: { children: ReactNode }) {
 	const { data: session, refetch: refetchSession } = authClient.useSession();
 	const [isSwitching, setIsSwitching] = useState(false);
-	const activeOrganizationId = env.SKIP_ENV_VALIDATION
-		? MOCK_ORG_ID
-		: session?.session?.activeOrganizationId;
+	const activeOrganizationId =
+		session?.session?.activeOrganizationId ?? MOCK_ORG_ID;
 
 	const switchOrganization = useCallback(
 		async (organizationId: string) => {

@@ -15,6 +15,11 @@ import { createFilesystemRouter } from "./filesystem";
 import { createHostServiceCoordinatorRouter } from "./host-service-coordinator";
 import { createMenuRouter } from "./menu";
 import { createMigrationRouter } from "./migration";
+import {
+	createModelProvidersRouter,
+	createModelProxyRouter,
+	createWorkspaceModelSettingsRouter,
+} from "./model-proxy";
 import { createNotificationsRouter } from "./notifications";
 import { createPermissionsRouter } from "./permissions";
 import { createPortsRouter } from "./ports";
@@ -55,6 +60,9 @@ export const createAppRouter = (getWindow: () => BrowserWindow | null) => {
 		ringtone: createRingtoneRouter(getWindow),
 		hostServiceCoordinator: createHostServiceCoordinatorRouter(),
 		migration: createMigrationRouter(),
+		modelProviders: createModelProvidersRouter(),
+		modelProxy: createModelProxyRouter(),
+		workspaceModelSettings: createWorkspaceModelSettingsRouter(),
 	});
 };
 

@@ -31,6 +31,7 @@ import { resolveDevWorkspaceName } from "./lib/dev-workspace-name";
 import { setWorkspaceDockIcon } from "./lib/dock-icon";
 import { loadWebviewBrowserExtension } from "./lib/extensions";
 import { getHostServiceCoordinator } from "./lib/host-service-coordinator";
+import { modelProxyService } from "lib/trpc/routers/model-proxy/service";
 import { localDb } from "./lib/local-db";
 import { requestLocalNetworkAccess } from "./lib/local-network-permission";
 import { ensureProjectIconsDir, getProjectIconPath } from "./lib/project-icons";
@@ -345,6 +346,9 @@ if (!gotTheLock) {
 		setWorkspaceDockIcon();
 		initSentry();
 		await initAppState();
+		await modelProxyService.start().catch((error) => {
+			console.error("[main] Failed to start model proxy:", error);
+		});
 
 		await loadWebviewBrowserExtension();
 
