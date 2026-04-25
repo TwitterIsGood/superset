@@ -73,6 +73,12 @@ const externalizedRuntimeModules: ExternalizedRuntimeModule[] = [
 		],
 		asarUnpackGlobs: ["**/node_modules/@libsql/**/*"],
 	},
+	{
+		specifier: "undici",
+		materialize: ["undici"],
+		packagedCopies: [copyWholeModule("undici")],
+		asarUnpackGlobs: [],
+	},
 ];
 
 const packagedSupportModules = [
