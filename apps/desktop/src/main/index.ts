@@ -45,7 +45,9 @@ import { MainWindow } from "./windows/main";
 
 console.log("[main] Local database ready:", !!localDb);
 const IS_DEV = process.env.NODE_ENV === "development";
-const IS_CANARY = app.getName().toLowerCase().includes("canary");
+const IS_CANARY = [app.getName(), process.execPath, process.resourcesPath].some(
+	(value) => value.toLowerCase().includes("superset canary"),
+);
 
 if (IS_CANARY && !IS_DEV) {
 	app.setPath("userData", `${app.getPath("userData")} Canary`);
