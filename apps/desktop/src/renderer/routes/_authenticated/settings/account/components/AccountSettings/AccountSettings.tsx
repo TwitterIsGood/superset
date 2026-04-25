@@ -37,6 +37,7 @@ export function AccountSettings({ visibleItems }: AccountSettingsProps) {
 
 	const { data: session } = authClient.useSession();
 	const currentUserId = session?.user?.id;
+	const isSignedIn = !!currentUserId;
 	const collections = useCollections();
 
 	const [nameValue, setNameValue] = useState("");
@@ -111,7 +112,17 @@ export function AccountSettings({ visibleItems }: AccountSettingsProps) {
 			</div>
 
 			<div className="space-y-8">
-				{showProfile && (
+				{!isSignedIn && showProfile && (
+					<Card>
+						<CardContent>
+							<p className="text-sm text-muted-foreground">
+								You're using Superset Desktop locally without a Superset
+								account.
+							</p>
+						</CardContent>
+					</Card>
+				)}
+				{isSignedIn && showProfile && (
 					<div>
 						<h3 className="text-sm font-medium mb-4">Profile</h3>
 						{isLoading ? (
@@ -182,7 +193,7 @@ export function AccountSettings({ visibleItems }: AccountSettingsProps) {
 					</div>
 				)}
 
-				{showSignOut && (
+				{isSignedIn && showSignOut && (
 					<div className={showProfile ? "pt-6 border-t" : ""}>
 						<h3 className="text-sm font-medium mb-2">Sign Out</h3>
 						<p className="text-sm text-muted-foreground mb-4">

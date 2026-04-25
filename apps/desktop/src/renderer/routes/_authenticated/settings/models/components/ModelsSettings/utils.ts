@@ -148,3 +148,28 @@ export function getProviderAction(
 	}
 	return { kind: "connect" };
 }
+
+export function formatProxyUrlForDisplay(proxyUrl: string): string {
+	try {
+		const parsed = new URL(proxyUrl);
+		if (parsed.password) parsed.password = "***";
+		return parsed.toString();
+	} catch (error) {
+		if (error instanceof Error) return proxyUrl;
+		return proxyUrl;
+	}
+}
+
+export function normalizeModelIds(modelIds: string[]): string[] {
+	return Array.from(
+		new Set(modelIds.map((modelId) => modelId.trim()).filter(Boolean)),
+	);
+}
+
+export function addModelId(modelIds: string[], modelId: string): string[] {
+	return normalizeModelIds([...modelIds, modelId]);
+}
+
+export function removeModelId(modelIds: string[], modelId: string): string[] {
+	return modelIds.filter((item) => item !== modelId);
+}

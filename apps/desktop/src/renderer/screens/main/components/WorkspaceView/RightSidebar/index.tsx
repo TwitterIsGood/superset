@@ -6,6 +6,7 @@ import {
 	LuExpand,
 	LuFile,
 	LuGitCompareArrows,
+	LuSettings2,
 	LuShrink,
 	LuX,
 } from "react-icons/lu";
@@ -23,6 +24,7 @@ import { useScrollContext } from "../ChangesContent";
 import { ChangesView } from "./ChangesView";
 import { FilesView } from "./FilesView";
 import { getSidebarHeaderTabButtonClassName } from "./headerTabStyles";
+import { ModelsPanel } from "./ModelsPanel";
 
 function TabButton({
 	isActive,
@@ -177,6 +179,13 @@ export function RightSidebar() {
 						label="Files"
 						compact={compactTabs}
 					/>
+					<TabButton
+						isActive={rightSidebarTab === RightSidebarTab.Settings}
+						onClick={() => setRightSidebarTab(RightSidebarTab.Settings)}
+						icon={<LuSettings2 className="size-3.5" />}
+						label="Settings"
+						compact={compactTabs}
+					/>
 				</div>
 				<div className="flex-1" />
 				<div className="flex items-center h-10 pr-2 gap-0.5">
@@ -236,12 +245,22 @@ export function RightSidebar() {
 			)}
 			<div
 				className={
-					rightSidebarTab === RightSidebarTab.Changes && showChangesTab
-						? "hidden"
-						: "flex-1 min-h-0 flex flex-col overflow-hidden"
+					rightSidebarTab === RightSidebarTab.Files ||
+					(rightSidebarTab === RightSidebarTab.Changes && !showChangesTab)
+						? "flex-1 min-h-0 flex flex-col overflow-hidden"
+						: "hidden"
 				}
 			>
 				<FilesView />
+			</div>
+			<div
+				className={
+					rightSidebarTab === RightSidebarTab.Settings
+						? "flex-1 min-h-0 flex flex-col overflow-hidden"
+						: "hidden"
+				}
+			>
+				<ModelsPanel workspaceId={workspaceId} />
 			</div>
 		</aside>
 	);

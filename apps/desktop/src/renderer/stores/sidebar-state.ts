@@ -9,6 +9,16 @@ export enum SidebarMode {
 export enum RightSidebarTab {
 	Changes = "changes",
 	Files = "files",
+	Settings = "settings",
+}
+
+type PersistedRightSidebarTab = RightSidebarTab | "models";
+
+function normalizeRightSidebarTab(
+	tab: PersistedRightSidebarTab | undefined,
+): RightSidebarTab | undefined {
+	if (tab === "models") return RightSidebarTab.Settings;
+	return tab;
 }
 
 export const DEFAULT_SIDEBAR_WIDTH = 250;
