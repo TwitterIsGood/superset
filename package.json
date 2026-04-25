@@ -46,6 +46,7 @@
 		"tooling/*"
 	],
 	"overrides": {
+		"@mastra/core": "1.26.0-alpha.3",
 		"axios": "1.14.0"
 	},
 	"trustedDependencies": [
