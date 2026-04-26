@@ -1,6 +1,13 @@
 import { Badge } from "@superset/ui/badge";
 import { Button } from "@superset/ui/button";
 import { Input } from "@superset/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@superset/ui/select";
 import { toast } from "@superset/ui/sonner";
 import { Switch } from "@superset/ui/switch";
 import { useEffect, useState } from "react";
@@ -10,6 +17,7 @@ import type { ModelProviderProtocol } from "shared/model-proxy";
 import type { SettingItemId } from "../../../utils/settings-search";
 import {
 	addModelId,
+	canFetchDraftModels,
 	formatProxyUrlForDisplay,
 	normalizeModelIds,
 	removeModelId,
@@ -43,27 +51,44 @@ const EMPTY_FORM: ProviderForm = {
 export function ModelsSettings(_props: ModelsSettingsProps) {
 	const trpcUtils = electronTrpc.useUtils();
 	const { data: providers = [] } = electronTrpc.modelProviders.list.useQuery();
-	const { data: proxyStatus } = electronTrpc.modelProxy.status.useQuery(undefined, {
-		refetchInterval: 5000,
-	});
+	const { data: proxyStatus } = electronTrpc.modelProxy.status.useQuery(
+		undefined,
+		{
+			refetchInterval: 5000,
+		},
+	);
 	const [form, setForm] = useState<ProviderForm>(EMPTY_FORM);
 	const [newModelId, setNewModelId] = useState("");
 	const saveMutation = electronTrpc.modelProviders.create.useMutation();
 	const updateMutation = electronTrpc.modelProviders.update.useMutation();
 	const deleteMutation = electronTrpc.modelProviders.delete.useMutation();
 	const testMutation = electronTrpc.modelProviders.test.useMutation();
-	const fetchModelsMutation = electronTrpc.modelProviders.fetchModels.useMutation();
+	const fetchModelsMutation =
+		electronTrpc.modelProviders.fetchModels.useMutation();
+	const fetchDraftModelsMutation =
+		electronTrpc.modelProviders.fetchModelsFromDraft.useMutation();
 	const restartProxyMutation = electronTrpc.modelProxy.restart.useMutation();
 	const isEditingProvider = Boolean(form.id);
-	const editingProvider = form.id ? providers.find((provider) => provider.id === form.id) : undefined;
-	const hasRequiredProviderFields = form.name.trim().length > 0 && form.baseUrl.trim().length > 0;
-	const isProviderMutationPending = saveMutation.isPending || updateMutation.isPending;
+	const editingProvider = form.id
+		? providers.find((provider) => provider.id === form.id)
+		: undefined;
+	const hasRequiredProviderFields =
+		form.name.trim().length > 0 && form.baseUrl.trim().length > 0;
+	const isProviderMutationPending =
+		saveMutation.isPending || updateMutation.isPending;
+	const canFetchDraft = canFetchDraftModels({
+		baseUrl: form.baseUrl,
+		secret: form.secret,
+		hasSavedSecret: Boolean(editingProvider?.hasSecret),
+		isPending: fetchDraftModelsMutation.isPending,
+	});
 	const formModelIds = normalizeModelIds(form.models);
 	const savedModelIds = editingProvider
 		? normalizeModelIds(editingProvider.models.map((model) => model.id))
 		: [];
 	const hasModelDraftChanges =
-		formModelIds.length !== savedModelIds.length || formModelIds.some((modelId, index) => modelId !== savedModelIds[index]);
+		formModelIds.length !== savedModelIds.length ||
+		formModelIds.some((modelId, index) => modelId !== savedModelIds[index]);
 	const hasProviderDraftChanges = Boolean(
 		editingProvider &&
 			(form.name !== editingProvider.name ||
@@ -77,7 +102,8 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 	const canSubmitProvider =
 		hasRequiredProviderFields &&
 		!isProviderMutationPending &&
-		(!isEditingProvider || (Boolean(editingProvider) && hasProviderDraftChanges));
+		(!isEditingProvider ||
+			(Boolean(editingProvider) && hasProviderDraftChanges));
 
 	useEffect(() => {
 		if (!form.id) return;
@@ -140,7 +166,9 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 			await refresh();
 			toast.success("Provider saved");
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Failed to save provider");
+			toast.error(
+				error instanceof Error ? error.message : "Failed to save provider",
+			);
 		}
 	};
 
@@ -149,7 +177,8 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 			<div className="mb-8">
 				<h2 className="text-xl font-semibold">Models</h2>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Manage local model providers and the Anthropic-compatible workspace proxy.
+					Manage local model providers and the Anthropic-compatible workspace
+					proxy.
 				</p>
 			</div>
 
@@ -167,7 +196,8 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 								{proxyStatus?.baseUrl ?? "Proxy URL unavailable"}
 							</p>
 							<p className="mt-1 text-xs text-muted-foreground">
-								{proxyStatus?.enabledProviderCount ?? 0} enabled providers, {proxyStatus?.aggregatedModelCount ?? 0} models
+								{proxyStatus?.enabledProviderCount ?? 0} enabled providers,{" "}
+								{proxyStatus?.aggregatedModelCount ?? 0} models
 							</p>
 						</div>
 						<Button
@@ -182,7 +212,9 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 						</Button>
 					</div>
 					{proxyStatus?.lastError ? (
-						<p className="mt-2 text-xs text-destructive">{proxyStatus.lastError}</p>
+						<p className="mt-2 text-xs text-destructive">
+							{proxyStatus.lastError}
+						</p>
 					) : null}
 				</section>
 
@@ -194,37 +226,59 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 							</div>
 						) : (
 							providers.map((provider) => (
-								<div key={provider.id} className="rounded-xl border bg-card p-4">
+								<div
+									key={provider.id}
+									className="rounded-xl border bg-card p-4"
+								>
 									<div className="flex items-start justify-between gap-3">
 										<div>
 											<div className="flex items-center gap-2">
 												<h3 className="font-semibold">{provider.name}</h3>
 												<Badge variant="outline">{provider.protocol}</Badge>
-												<Badge variant={provider.enabled ? "default" : "secondary"}>
+												<Badge
+													variant={provider.enabled ? "default" : "secondary"}
+												>
 													{provider.enabled ? "Enabled" : "Disabled"}
 												</Badge>
 											</div>
-											<p className="mt-1 font-mono text-xs text-muted-foreground">{provider.baseUrl}</p>
-										{provider.proxyUrl ? (
 											<p className="mt-1 font-mono text-xs text-muted-foreground">
-												Proxy: {formatProxyUrlForDisplay(provider.proxyUrl)}
+												{provider.baseUrl}
 											</p>
-										) : null}
-										<p className="mt-1 text-xs text-muted-foreground">
-												{provider.hasSecret ? "API key saved" : "No API key saved"} · {provider.models.length} models
+											{provider.proxyUrl ? (
+												<p className="mt-1 font-mono text-xs text-muted-foreground">
+													Proxy: {formatProxyUrlForDisplay(provider.proxyUrl)}
+												</p>
+											) : null}
+											<p className="mt-1 text-xs text-muted-foreground">
+												{provider.hasSecret
+													? "API key saved"
+													: "No API key saved"}{" "}
+												· {provider.models.length} models
 											</p>
 										</div>
 										<div className="flex gap-2">
-											<Button variant="outline" size="sm" onClick={() => editProvider(provider.id)}>Edit</Button>
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => editProvider(provider.id)}
+											>
+												Edit
+											</Button>
 											<Button
 												variant="outline"
 												size="sm"
 												onClick={async () => {
 													try {
-														const result = await testMutation.mutateAsync({ id: provider.id });
+														const result = await testMutation.mutateAsync({
+															id: provider.id,
+														});
 														toast.success(result.message);
 													} catch (error) {
-														toast.error(error instanceof Error ? error.message : "Provider test failed");
+														toast.error(
+															error instanceof Error
+																? error.message
+																: "Provider test failed",
+														);
 													}
 												}}
 											>
@@ -235,11 +289,17 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 												size="sm"
 												onClick={async () => {
 													try {
-														await fetchModelsMutation.mutateAsync({ id: provider.id });
+														await fetchModelsMutation.mutateAsync({
+															id: provider.id,
+														});
 														await refresh();
 														toast.success("Models fetched");
 													} catch (error) {
-														toast.error(error instanceof Error ? error.message : "Fetch failed");
+														toast.error(
+															error instanceof Error
+																? error.message
+																: "Fetch failed",
+														);
 													}
 												}}
 											>
@@ -270,41 +330,94 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 						}}
 					>
 						<div className="flex items-center justify-between gap-2">
-							<h3 className="font-semibold">{isEditingProvider ? "Edit provider" : "Add provider"}</h3>
+							<h3 className="font-semibold">
+								{isEditingProvider ? "Edit provider" : "Add provider"}
+							</h3>
 							{isEditingProvider ? (
-								<Button type="button" variant="outline" size="sm" onClick={clearForm}>Cancel edit</Button>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={clearForm}
+								>
+									Cancel edit
+								</Button>
 							) : null}
 						</div>
-						<Input placeholder="Provider name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-						<select
-							className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+						<Input
+							placeholder="Provider name"
+							value={form.name}
+							onChange={(event) =>
+								setForm({ ...form, name: event.target.value })
+							}
+						/>
+						<Select
 							value={form.protocol}
-							onChange={(event) => setForm({ ...form, protocol: event.target.value as ModelProviderProtocol })}
+							onValueChange={(protocol) =>
+								setForm({
+									...form,
+									protocol: protocol as ModelProviderProtocol,
+								})
+							}
 						>
-							<option value="anthropic">Anthropic</option>
-							<option value="openai">OpenAI-compatible</option>
-						</select>
-						<Input placeholder="Base URL, e.g. https://api.example.com" value={form.baseUrl} onChange={(event) => setForm({ ...form, baseUrl: event.target.value })} />
+							<SelectTrigger className="w-full">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="anthropic">Anthropic</SelectItem>
+								<SelectItem value="openai">OpenAI-compatible</SelectItem>
+							</SelectContent>
+						</Select>
+						<Input
+							placeholder="Base URL, e.g. https://api.example.com"
+							value={form.baseUrl}
+							onChange={(event) =>
+								setForm({ ...form, baseUrl: event.target.value })
+							}
+						/>
 						<div className="space-y-1">
 							<Input
 								placeholder="Proxy URL (optional), e.g. http://127.0.0.1:7890"
 								value={form.proxyUrl}
-								onChange={(event) => setForm({ ...form, proxyUrl: event.target.value })}
+								onChange={(event) =>
+									setForm({ ...form, proxyUrl: event.target.value })
+								}
 							/>
 							<p className="text-xs text-muted-foreground">
-								One HTTP proxy URL is used for this provider's upstream requests, including HTTPS providers.
+								One HTTP proxy URL is used for this provider's upstream
+								requests, including HTTPS providers.
 							</p>
 						</div>
-						<Input type="password" placeholder={form.id ? "API key saved; enter a new value to replace" : "API key"} value={form.secret} onChange={(event) => setForm({ ...form, secret: event.target.value })} />
+						<Input
+							type="password"
+							placeholder={
+								form.id
+									? "API key saved; enter a new value to replace"
+									: "API key"
+							}
+							value={form.secret}
+							onChange={(event) =>
+								setForm({ ...form, secret: event.target.value })
+							}
+						/>
 						<div className="flex items-center justify-between gap-3 rounded-md border p-3">
 							<div className="space-y-0.5">
-								<label htmlFor="provider-enabled-switch" className="text-sm font-medium">Enabled</label>
-								<p className="text-xs text-muted-foreground">Use this provider in the local model proxy.</p>
+								<label
+									htmlFor="provider-enabled-switch"
+									className="text-sm font-medium"
+								>
+									Enabled
+								</label>
+								<p className="text-xs text-muted-foreground">
+									Use this provider in the local model proxy.
+								</p>
 							</div>
 							<Switch
 								id="provider-enabled-switch"
 								checked={form.enabled}
-								onCheckedChange={(checked) => setForm({ ...form, enabled: checked })}
+								onCheckedChange={(checked) =>
+									setForm({ ...form, enabled: checked })
+								}
 							/>
 						</div>
 						<div className="space-y-2">
@@ -312,12 +425,21 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 							{form.models.length > 0 ? (
 								<div className="flex flex-wrap gap-2">
 									{form.models.map((model) => (
-										<Badge key={model} variant="secondary" className="gap-1 font-mono">
+										<Badge
+											key={model}
+											variant="secondary"
+											className="gap-1 font-mono"
+										>
 											<span>{model}</span>
 											<button
 												type="button"
 												className="rounded-full opacity-70 hover:opacity-100"
-												onClick={() => setForm({ ...form, models: removeModelId(form.models, model) })}
+												onClick={() =>
+													setForm({
+														...form,
+														models: removeModelId(form.models, model),
+													})
+												}
 												aria-label={`Remove ${model}`}
 											>
 												<LuX className="size-3" />
@@ -327,7 +449,8 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 								</div>
 							) : (
 								<p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-									No model IDs added yet. Add model IDs manually or fetch them from the provider.
+									No model IDs added yet. Add model IDs manually or fetch them
+									from the provider.
 								</p>
 							)}
 							<div className="flex gap-2">
@@ -341,7 +464,46 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 										addModelToForm();
 									}}
 								/>
-								<Button type="button" variant="outline" onClick={addModelToForm}>Add</Button>
+								<Button
+									type="button"
+									variant="outline"
+									onClick={addModelToForm}
+								>
+									Add
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={!canFetchDraft}
+									onClick={async () => {
+										try {
+											const models = await fetchDraftModelsMutation.mutateAsync(
+												{
+													id: form.id,
+													protocol: form.protocol,
+													baseUrl: form.baseUrl,
+													proxyUrl: form.proxyUrl || undefined,
+													secret: form.secret || undefined,
+												},
+											);
+											setForm((current) => ({
+												...current,
+												models: models.map((m) => m.id),
+											}));
+											setNewModelId("");
+											toast.success(`Fetched ${models.length} models`);
+										} catch (error) {
+											toast.error(
+												error instanceof Error ? error.message : "Fetch failed",
+											);
+										}
+									}}
+								>
+									{fetchDraftModelsMutation.isPending
+										? "Fetching..."
+										: "Fetch models"}
+								</Button>
 							</div>
 						</div>
 						<div className="flex gap-2">
@@ -349,11 +511,17 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 								{isEditingProvider ? "Update provider" : "Add provider"}
 							</Button>
 							{isEditingProvider ? null : (
-								<Button type="button" variant="outline" onClick={clearForm}>Clear draft</Button>
+								<Button type="button" variant="outline" onClick={clearForm}>
+									Clear draft
+								</Button>
 							)}
 						</div>
-						{isEditingProvider && editingProvider && !hasProviderDraftChanges ? (
-							<p className="text-xs text-muted-foreground">Make a change to update this provider.</p>
+						{isEditingProvider &&
+						editingProvider &&
+						!hasProviderDraftChanges ? (
+							<p className="text-xs text-muted-foreground">
+								Make a change to update this provider.
+							</p>
 						) : null}
 					</form>
 				</section>

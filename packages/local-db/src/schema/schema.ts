@@ -2,6 +2,7 @@ import {
 	index,
 	integer,
 	primaryKey,
+	real,
 	sqliteTable,
 	text,
 } from "drizzle-orm/sqlite-core";
@@ -272,6 +273,12 @@ export type SelectV1MigrationState = typeof v1MigrationState.$inferSelect;
 // =============================================================================
 
 export type TaskPriority = "urgent" | "high" | "medium" | "low" | "none";
+export type TaskStatusType =
+	| "backlog"
+	| "unstarted"
+	| "started"
+	| "completed"
+	| "canceled";
 export type IntegrationProvider = "linear";
 
 /**
@@ -348,7 +355,36 @@ export type InsertOrganizationMember = typeof organizationMembers.$inferInsert;
 export type SelectOrganizationMember = typeof organizationMembers.$inferSelect;
 
 /**
- * Tasks table - synced from cloud
+ * Task statuses table - synced from cloud or seeded locally
+ */
+export const taskStatuses = sqliteTable(
+	"task_statuses",
+	{
+		id: text("id").primaryKey(),
+		organization_id: text("organization_id")
+			.notNull()
+			.references(() => organizations.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		color: text("color").notNull(),
+		type: text("type").notNull().$type<TaskStatusType>(),
+		position: real("position").notNull(),
+		progress_percent: real("progress_percent"),
+		external_provider: text("external_provider").$type<IntegrationProvider>(),
+		external_id: text("external_id"),
+		created_at: text("created_at").notNull(),
+		updated_at: text("updated_at").notNull(),
+	},
+	(table) => [
+		index("task_statuses_organization_id_idx").on(table.organization_id),
+		index("task_statuses_type_idx").on(table.type),
+	],
+);
+
+export type InsertTaskStatus = typeof taskStatuses.$inferInsert;
+export type SelectTaskStatus = typeof taskStatuses.$inferSelect;
+
+/**
+ * Tasks table - synced from cloud or persisted locally
  */
 export const tasks = sqliteTable(
 	"tasks",
@@ -359,8 +395,9 @@ export const tasks = sqliteTable(
 		description: text("description"),
 		status: text("status").notNull(),
 		status_color: text("status_color"),
-		status_type: text("status_type"),
+		status_type: text("status_type").$type<TaskStatusType>(),
 		status_position: integer("status_position"),
+		status_id: text("status_id").references(() => taskStatuses.id),
 		priority: text("priority").notNull().$type<TaskPriority>(),
 		organization_id: text("organization_id")
 			.notNull()
@@ -369,6 +406,9 @@ export const tasks = sqliteTable(
 		assignee_id: text("assignee_id").references(() => users.id, {
 			onDelete: "set null",
 		}),
+		assignee_external_id: text("assignee_external_id"),
+		assignee_display_name: text("assignee_display_name"),
+		assignee_avatar_url: text("assignee_avatar_url"),
 		creator_id: text("creator_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
@@ -393,8 +433,12 @@ export const tasks = sqliteTable(
 		index("tasks_slug_idx").on(table.slug),
 		index("tasks_organization_id_idx").on(table.organization_id),
 		index("tasks_assignee_id_idx").on(table.assignee_id),
+		index("tasks_creator_id_idx").on(table.creator_id),
 		index("tasks_status_idx").on(table.status),
+		index("tasks_status_id_idx").on(table.status_id),
 		index("tasks_created_at_idx").on(table.created_at),
+		index("tasks_external_provider_idx").on(table.external_provider),
+		index("tasks_assignee_external_id_idx").on(table.assignee_external_id),
 	],
 );
 

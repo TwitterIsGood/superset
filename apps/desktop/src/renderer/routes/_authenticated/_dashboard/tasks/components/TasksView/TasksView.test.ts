@@ -60,4 +60,58 @@ describe("Run in Workspace selection wiring (#2641)", () => {
 		// Must render RunInWorkspacePopover
 		expect(source).toContain("RunInWorkspacePopover");
 	});
+
+	test("TasksView does not block the Tasks page on Linear connection checks", () => {
+		const source = readComponent("TasksView.tsx");
+
+		expect(source).not.toContain("isLoading: isCheckingLinear");
+		expect(source).not.toContain("isCheckingLinear ?");
+		expect(source).toContain("isReady: isLinearCheckReady");
+		expect(source).toContain("showLinearCTA");
+	});
+
+	test("Tasks table and board do not block indefinitely on live query loading", () => {
+		const tableSource = readComponent(
+			"components/TableContent/TableContent.tsx",
+		);
+		const boardSource = readComponent(
+			"components/BoardContent/BoardContent.tsx",
+		);
+		const tableHookSource = readComponent(
+			"hooks/useTasksTable/useTasksTable.tsx",
+		);
+		const dataHookSource = readComponent("hooks/useTasksData/useTasksData.tsx");
+
+		expect(tableSource).not.toContain("<Spinner");
+		expect(boardSource).not.toContain("<Spinner");
+		expect(tableHookSource).not.toContain("isLoading");
+		expect(dataHookSource).not.toContain("isLoading");
+	});
+
+	test("agent task prompts are written back to local Tasks after completion", () => {
+		const rendererLibDir = join(TASKS_VIEW_DIR, "../../../../../../lib");
+		const adapterSource = readFileSync(
+			join(
+				rendererLibDir,
+				"agent-session-orchestrator/adapters/terminal-adapter.ts",
+			),
+			"utf-8",
+		);
+		const layoutSource = readFileSync(
+			join(TASKS_VIEW_DIR, "../../../../layout.tsx"),
+			"utf-8",
+		);
+		const writebackSource = readFileSync(
+			join(rendererLibDir, "tasks/task-agent-writeback.ts"),
+			"utf-8",
+		);
+
+		expect(adapterSource).toContain("registerTaskAgentWriteback");
+		expect(layoutSource).toContain("syncTaskAgentWritebackOnStop");
+		expect(writebackSource).toContain("tasksLocal.update.mutate");
+		expect(writebackSource).toContain('event.eventType !== "Stop"');
+		expect(writebackSource).toContain('return "completed";');
+		expect(writebackSource).toContain("initialStatusType");
+		expect(writebackSource).toContain("taskWritebacksByPaneId.delete");
+	});
 });

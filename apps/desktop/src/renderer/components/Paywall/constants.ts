@@ -2,7 +2,6 @@ import type { IconType } from "react-icons";
 import {
 	HiCloud,
 	HiDevicePhoneMobile,
-	HiOutlineClipboardDocumentList,
 	HiOutlinePuzzlePiece,
 	HiUsers,
 } from "react-icons/hi2";
@@ -10,7 +9,6 @@ import {
 export const GATED_FEATURES = {
 	INVITE_MEMBERS: "invite-members",
 	INTEGRATIONS: "integrations",
-	TASKS: "tasks",
 	CLOUD_WORKSPACES: "cloud-workspaces",
 	MOBILE_APP: "mobile-app",
 } as const;
@@ -47,15 +45,6 @@ export const PRO_FEATURES: ProFeature[] = [
 		gradientColors: ["#7c3aed", "#6d28d9", "#4c1d95", "#1a1a2e"],
 	},
 	{
-		id: "tasks",
-		title: "Tasks",
-		description:
-			"Track and manage tasks synced from Linear. Stay on top of your work without leaving Superset.",
-		icon: HiOutlineClipboardDocumentList,
-		iconColor: "text-emerald-500",
-		gradientColors: ["#047857", "#065f46", "#064e3b", "#1a1a2e"],
-	},
-	{
 		id: "cloud-workspaces",
 		title: "Cloud Workspaces",
 		description:
@@ -81,7 +70,6 @@ export const PRO_FEATURES: ProFeature[] = [
 export const FEATURE_ID_MAP: Record<GatedFeature, string> = {
 	[GATED_FEATURES.INVITE_MEMBERS]: "team-collaboration",
 	[GATED_FEATURES.INTEGRATIONS]: "integrations",
-	[GATED_FEATURES.TASKS]: "tasks",
 	[GATED_FEATURES.CLOUD_WORKSPACES]: "cloud-workspaces",
 	[GATED_FEATURES.MOBILE_APP]: "mobile-app",
 };

@@ -7,13 +7,11 @@ import { PRO_FEATURES } from "../../constants";
 import { CloudWorkspacesDemo } from "./components/CloudWorkspacesDemo";
 import { IntegrationsDemo } from "./components/IntegrationsDemo";
 import { MobileAppDemo } from "./components/MobileAppDemo";
-import { TasksDemo } from "./components/TasksDemo";
 import { TeamCollaborationDemo } from "./components/TeamCollaborationDemo";
 
 const DEMO_COMPONENTS: Record<string, ComponentType> = {
 	"team-collaboration": TeamCollaborationDemo,
 	integrations: IntegrationsDemo,
-	tasks: TasksDemo,
 	"cloud-workspaces": CloudWorkspacesDemo,
 	"mobile-app": MobileAppDemo,
 };

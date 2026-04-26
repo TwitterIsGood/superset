@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { publicProcedure, router } from "../..";
 import { aggregateModels } from "./aggregation";
-import { fetchProviderModels, modelProxyService, testProvider } from "./service";
+import {
+	fetchProviderModels,
+	fetchProviderModelsFromDraft,
+	modelProxyService,
+	testProvider,
+} from "./service";
 import {
 	deleteProvider,
 	listProvidersForProxy,
@@ -11,10 +16,17 @@ import {
 } from "./storage";
 import {
 	readWorkspaceModelSettings,
-	saveWorkspaceModelSettings,
+	saveProjectModelSettings,
 } from "./workspace-settings";
 
 const protocolSchema = z.union([z.literal("anthropic"), z.literal("openai")]);
+const fetchDraftModelsInputSchema = z.object({
+	id: z.string().optional(),
+	protocol: protocolSchema,
+	baseUrl: z.string().min(1),
+	proxyUrl: z.string().optional(),
+	secret: z.string().optional(),
+});
 const providerInputSchema = z.object({
 	id: z.string().optional(),
 	name: z.string().min(1),
@@ -29,12 +41,12 @@ const providerInputSchema = z.object({
 export const createModelProvidersRouter = () =>
 	router({
 		list: publicProcedure.query(() => listStoredProviders()),
-		create: publicProcedure.input(providerInputSchema).mutation(({ input }) =>
-			upsertProvider(input),
-		),
-		update: publicProcedure.input(providerInputSchema.extend({ id: z.string() })).mutation(({ input }) =>
-			upsertProvider(input),
-		),
+		create: publicProcedure
+			.input(providerInputSchema)
+			.mutation(({ input }) => upsertProvider(input)),
+		update: publicProcedure
+			.input(providerInputSchema.extend({ id: z.string() }))
+			.mutation(({ input }) => upsertProvider(input)),
 		delete: publicProcedure
 			.input(z.object({ id: z.string() }))
 			.mutation(({ input }) => deleteProvider(input.id)),
@@ -47,6 +59,9 @@ export const createModelProvidersRouter = () =>
 				const models = await fetchProviderModels(input.id);
 				return replaceProviderModels(input.id, models);
 			}),
+		fetchModelsFromDraft: publicProcedure
+			.input(fetchDraftModelsInputSchema)
+			.mutation(({ input }) => fetchProviderModelsFromDraft(input)),
 		listAggregatedModels: publicProcedure.query(async () => {
 			const providers = await listProvidersForProxy();
 			return aggregateModels(
@@ -80,9 +95,10 @@ export const createWorkspaceModelSettingsRouter = () =>
 			)
 			.mutation(async ({ input }) => {
 				const status = await modelProxyService.status();
-				const baseUrl = status.baseUrl ?? (await modelProxyService.start()).baseUrl;
+				const baseUrl =
+					status.baseUrl ?? (await modelProxyService.start()).baseUrl;
 				if (!baseUrl) throw new Error("Model proxy is not running");
-				return saveWorkspaceModelSettings({
+				return saveProjectModelSettings({
 					...input,
 					baseUrl,
 					token: modelProxyService.getToken(),

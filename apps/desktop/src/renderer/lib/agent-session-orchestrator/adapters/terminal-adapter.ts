@@ -1,4 +1,5 @@
 import type { AgentLaunchRequest } from "@superset/shared/agent-launch";
+import { registerTaskAgentWriteback } from "renderer/lib/tasks/task-agent-writeback";
 import { launchCommandInPane } from "renderer/lib/terminal/launch-command";
 import type { AgentSessionLaunchContext, LaunchResultPayload } from "../types";
 
@@ -235,6 +236,12 @@ export async function launchTerminalAdapter(
 				write: context.write,
 				noExecute,
 			});
+			registerTaskAgentWriteback({
+				paneId: newPaneId,
+				workspaceId,
+				taskPromptContent: request.terminal.taskPromptContent,
+				taskPromptFileName: request.terminal.taskPromptFileName,
+			});
 		} catch (error) {
 			tabs.removePane(newPaneId);
 			throw error;
@@ -275,6 +282,12 @@ export async function launchTerminalAdapter(
 			createOrAttach: context.createOrAttach,
 			write: context.write,
 			noExecute,
+		});
+		registerTaskAgentWriteback({
+			paneId,
+			workspaceId,
+			taskPromptContent: request.terminal.taskPromptContent,
+			taskPromptFileName: request.terminal.taskPromptFileName,
 		});
 	} catch (error) {
 		tabs.removePane(paneId);

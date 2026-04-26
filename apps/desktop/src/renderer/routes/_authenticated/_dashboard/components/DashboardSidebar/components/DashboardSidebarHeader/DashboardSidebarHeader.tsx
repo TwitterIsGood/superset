@@ -19,7 +19,6 @@ import {
 	LuLayers,
 	LuPlus,
 } from "react-icons/lu";
-import { GATED_FEATURES, usePaywall } from "renderer/components/Paywall";
 import { useCurrentPlan } from "renderer/hooks/useCurrentPlan";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import { useFolderFirstImport } from "renderer/routes/_authenticated/_dashboard/components/AddRepositoryModals/hooks/useFolderFirstImport";
@@ -49,7 +48,6 @@ export function DashboardSidebarHeader({
 	const shortcutText = useHotkeyDisplay("NEW_WORKSPACE").text;
 	const navigate = useNavigate();
 	const matchRoute = useMatchRoute();
-	const { gateFeature } = usePaywall();
 	const isWorkspacesListOpen = !!matchRoute({ to: "/v2-workspaces" });
 	const isTasksOpen = !!matchRoute({ to: "/tasks", fuzzy: true });
 	const isAutomationsOpen = !!matchRoute({ to: "/automations", fuzzy: true });
@@ -75,13 +73,11 @@ export function DashboardSidebarHeader({
 	};
 
 	const handleTasksClick = () => {
-		gateFeature(GATED_FEATURES.TASKS, () => {
-			const search: Record<string, string> = {};
-			if (lastTab !== "all") search.tab = lastTab;
-			if (lastAssignee) search.assignee = lastAssignee;
-			if (lastSearch) search.search = lastSearch;
-			navigate({ to: "/tasks", search });
-		});
+		const search: Record<string, string> = {};
+		if (lastTab !== "all") search.tab = lastTab;
+		if (lastAssignee) search.assignee = lastAssignee;
+		if (lastSearch) search.search = lastSearch;
+		navigate({ to: "/tasks", search });
 	};
 
 	if (isCollapsed) {

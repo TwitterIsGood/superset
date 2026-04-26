@@ -5,7 +5,10 @@ const providers = [
 	{
 		id: "a",
 		enabled: true,
-		models: [{ id: "shared", providerId: "a" }, { id: "only-a", providerId: "a" }],
+		models: [
+			{ id: "shared", providerId: "a" },
+			{ id: "only-a", providerId: "a" },
+		],
 	},
 	{
 		id: "b",

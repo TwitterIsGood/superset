@@ -1,5 +1,5 @@
-import { authClient } from "@superset/auth/client";
 import type { TaskPriority } from "@superset/db/enums";
+import type { SelectTaskStatus } from "@superset/db/schema";
 import { Button } from "@superset/ui/button";
 import {
 	Dialog,
@@ -19,6 +19,7 @@ import { HiChevronRight, HiOutlinePaperClip, HiXMark } from "react-icons/hi2";
 import { MarkdownEditor } from "renderer/components/MarkdownEditor";
 import { PLATFORM } from "renderer/hotkeys";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
+import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { compareStatusesForDropdown } from "../../../../utils/sorting";
 import type { TabValue } from "../../TasksTopBar";
@@ -42,7 +43,6 @@ export function CreateTaskDialog({
 	assigneeFilter,
 }: CreateTaskDialogProps) {
 	const collections = useCollections();
-	const { data: session } = authClient.useSession();
 	const navigate = useNavigate();
 	const modKey = PLATFORM === "mac" ? "⌘" : "Ctrl";
 	const titleInputRef = useRef<HTMLInputElement>(null);
@@ -52,6 +52,10 @@ export function CreateTaskDialog({
 	const [priority, setPriority] = useState<TaskPriority>("none");
 	const [assigneeId, setAssigneeId] = useState<string | null>(null);
 	const [isCreating, setIsCreating] = useState(false);
+	const [seededStatuses, setSeededStatuses] = useState<SelectTaskStatus[]>([]);
+	const ensureStatusesRequestRef = useRef<Promise<SelectTaskStatus[]> | null>(
+		null,
+	);
 
 	const { data: statusData } = useLiveQuery(
 		(q) =>
@@ -76,9 +80,12 @@ export function CreateTaskDialog({
 		[collections],
 	);
 
-	const statuses = useMemo(() => statusData ?? [], [statusData]);
+	const statuses = useMemo(
+		() => (statusData?.length ? statusData : seededStatuses),
+		[seededStatuses, statusData],
+	);
 	const users = useMemo(() => userData ?? [], [userData]);
-	const activeOrganizationId = session?.session?.activeOrganizationId ?? null;
+	const activeOrganizationId = collections.activeOrganizationId;
 	const organizationLabel = useMemo(() => {
 		const organization = organizationData?.find(
 			(org) => org.id === activeOrganizationId,
@@ -94,6 +101,33 @@ export function CreateTaskDialog({
 			null
 		);
 	}, [statuses]);
+
+	useEffect(() => {
+		if (!open || statusData?.length || ensureStatusesRequestRef.current) {
+			return;
+		}
+
+		const ensureStatusesRequest =
+			collections.tasksMode === "cloud"
+				? apiTrpcClient.task.ensureDefaultStatuses.mutate()
+				: electronTrpcClient.tasksLocal.ensureDefaultStatuses.mutate({
+						organizationId: activeOrganizationId,
+					});
+		ensureStatusesRequestRef.current = ensureStatusesRequest;
+
+		ensureStatusesRequest
+			.then((defaultStatuses) => {
+				setSeededStatuses(defaultStatuses);
+			})
+			.catch((error) => {
+				console.warn("Failed to ensure default task statuses", error);
+			})
+			.finally(() => {
+				if (ensureStatusesRequestRef.current === ensureStatusesRequest) {
+					ensureStatusesRequestRef.current = null;
+				}
+			});
+	}, [activeOrganizationId, collections.tasksMode, open, statusData]);
 
 	useEffect(() => {
 		if (open && statusId === null && defaultStatusId) {
@@ -125,13 +159,19 @@ export function CreateTaskDialog({
 		setIsCreating(true);
 
 		try {
-			const result = await apiTrpcClient.task.createFromUi.mutate({
+			const createInput = {
 				title: title.trim(),
 				description: description.trim() || null,
 				statusId,
 				priority,
 				assigneeId,
-			});
+			};
+			const result =
+				collections.tasksMode === "cloud"
+					? await apiTrpcClient.task.createFromUi.mutate(createInput)
+					: await electronTrpcClient.tasksLocal.createFromUi.mutate(
+							createInput,
+						);
 
 			if (!result.task) {
 				throw new Error("Task creation returned no task");

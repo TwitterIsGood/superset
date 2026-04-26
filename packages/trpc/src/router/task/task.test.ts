@@ -115,6 +115,7 @@ mock.module("@superset/db/schema", () => ({
 	taskStatuses: {
 		id: "task_statuses.id",
 		organizationId: "task_statuses.organizationId",
+		position: "task_statuses.position",
 	},
 	tasks: {
 		assigneeId: "tasks.assigneeId",
@@ -359,6 +360,26 @@ describe("task router authorization", () => {
 		);
 		expect(txState.mocks.updateMock).not.toHaveBeenCalled();
 		expect(syncTaskMock).not.toHaveBeenCalled();
+	});
+
+	it("ensures default statuses and returns active organization statuses", async () => {
+		const statuses = [
+			{
+				id: "status-backlog",
+				name: "Backlog",
+				organizationId: ORGANIZATION_ID,
+			},
+			{ id: "status-todo", name: "Todo", organizationId: ORGANIZATION_ID },
+		];
+		dbSelectResults.push(statuses);
+
+		const caller = createCaller(createContext());
+		const result = await caller.task.ensureDefaultStatuses();
+
+		expect(seedDefaultStatusesMock).toHaveBeenCalledWith(ORGANIZATION_ID, {
+			transaction: transactionMock,
+		});
+		expect(result).toEqual(statuses);
 	});
 
 	it("rejects status changes that point at another organization", async () => {

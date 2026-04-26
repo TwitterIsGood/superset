@@ -173,3 +173,16 @@ export function addModelId(modelIds: string[], modelId: string): string[] {
 export function removeModelId(modelIds: string[], modelId: string): string[] {
 	return modelIds.filter((item) => item !== modelId);
 }
+
+export function canFetchDraftModels(params: {
+	baseUrl: string;
+	secret: string;
+	hasSavedSecret: boolean;
+	isPending: boolean;
+}): boolean {
+	if (params.isPending) return false;
+	if (!params.baseUrl.trim()) return false;
+	if (params.secret.trim()) return true;
+	if (params.hasSavedSecret) return true;
+	return false;
+}

@@ -12,6 +12,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { MarkdownEditor } from "renderer/components/MarkdownEditor";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
+import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { Route as TasksLayoutRoute } from "../layout";
 import { ActivitySection } from "./components/ActivitySection";
@@ -91,11 +92,23 @@ function TaskDetailPage() {
 		};
 	}, [taskData]);
 	const taskFallbackQuery = useQuery({
-		queryKey: ["task-detail-fallback", taskId, isUuidTaskId ? "id" : "slug"],
-		queryFn: () =>
-			isUuidTaskId
-				? apiTrpcClient.task.byId.query(taskId)
-				: apiTrpcClient.task.bySlug.query(taskId),
+		queryKey: [
+			"task-detail-fallback",
+			collections.tasksMode,
+			taskId,
+			isUuidTaskId ? "id" : "slug",
+		],
+		queryFn: () => {
+			if (collections.tasksMode === "cloud") {
+				return isUuidTaskId
+					? apiTrpcClient.task.byId.query(taskId)
+					: apiTrpcClient.task.bySlug.query(taskId);
+			}
+
+			return isUuidTaskId
+				? electronTrpcClient.tasksLocal.byId.query(taskId)
+				: electronTrpcClient.tasksLocal.bySlug.query(taskId);
+		},
 		enabled: !task,
 		retry: false,
 	});

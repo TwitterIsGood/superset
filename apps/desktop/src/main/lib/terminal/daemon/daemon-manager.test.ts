@@ -195,9 +195,10 @@ mock.module("main/lib/local-db", () => ({
 	},
 }));
 
-mock.module("@superset/local-db", () => ({
-	workspaces: { id: "id" },
-}));
+mock.module("@superset/local-db", async () => {
+	const schema = await import("@superset/local-db/schema");
+	return { ...schema, workspaces: schema.workspaces };
+});
 
 mock.module("../port-manager", () => ({
 	portManager: {

@@ -16,14 +16,22 @@ export function mergeWorkspaceModelSettings(
 	replacedInvalidJson: boolean;
 	replacedNonObjectEnv: boolean;
 	preservedEnvKeys: string[];
-	currentModels: { haikuModel?: string; sonnetModel?: string; opusModel?: string };
+	currentModels: {
+		haikuModel?: string;
+		sonnetModel?: string;
+		opusModel?: string;
+	};
 } {
 	let root: Record<string, unknown> = {};
 	let replacedInvalidJson = false;
 	if (existingText?.trim()) {
 		try {
 			const parsed = JSON.parse(existingText) as unknown;
-			if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+			if (
+				typeof parsed === "object" &&
+				parsed !== null &&
+				!Array.isArray(parsed)
+			) {
 				root = parsed as Record<string, unknown>;
 			} else {
 				replacedInvalidJson = true;
@@ -35,7 +43,9 @@ export function mergeWorkspaceModelSettings(
 	const existingEnv = root.env;
 	const replacedNonObjectEnv =
 		existingEnv !== undefined &&
-		(typeof existingEnv !== "object" || existingEnv === null || Array.isArray(existingEnv));
+		(typeof existingEnv !== "object" ||
+			existingEnv === null ||
+			Array.isArray(existingEnv));
 	const nextEnv: Record<string, unknown> = replacedNonObjectEnv
 		? {}
 		: { ...((existingEnv as Record<string, unknown> | undefined) ?? {}) };

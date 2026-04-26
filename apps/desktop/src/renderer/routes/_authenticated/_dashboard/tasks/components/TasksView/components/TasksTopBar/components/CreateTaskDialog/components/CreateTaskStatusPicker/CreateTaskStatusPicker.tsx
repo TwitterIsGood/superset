@@ -43,7 +43,6 @@ export function CreateTaskStatusPicker({
 				<button
 					type="button"
 					className="flex h-9 items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-3 text-sm transition-colors hover:bg-muted/60"
-					disabled={sortedStatuses.length === 0}
 				>
 					{currentStatus ? (
 						<>
@@ -61,15 +60,19 @@ export function CreateTaskStatusPicker({
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="w-52 p-1">
-				<StatusMenuItems
-					statuses={sortedStatuses}
-					currentStatusId={value ?? ""}
-					onSelect={(status) => {
-						onChange(status.id);
-						setOpen(false);
-					}}
-					MenuItem={DropdownMenuItem}
-				/>
+				{sortedStatuses.length === 0 ? (
+					<DropdownMenuItem disabled>No statuses available</DropdownMenuItem>
+				) : (
+					<StatusMenuItems
+						statuses={sortedStatuses}
+						currentStatusId={value ?? ""}
+						onSelect={(status) => {
+							onChange(status.id);
+							setOpen(false);
+						}}
+						MenuItem={DropdownMenuItem}
+					/>
+				)}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

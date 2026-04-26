@@ -1,16 +1,30 @@
+import { execSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import type { AddressInfo } from "node:net";
+import {
+	createServer,
+	type IncomingMessage,
+	type ServerResponse,
+} from "node:http";
+import type {
+	FetchProviderModelsInput,
+	ModelProviderModel,
+	ModelProviderProtocol,
+	ModelProxyStatus,
+} from "shared/model-proxy";
 import { ProxyAgent } from "undici";
-import type { ModelProviderModel, ModelProxyStatus } from "shared/model-proxy";
 import { aggregateModels, ModelRoundRobinRouter } from "./aggregation";
-import { type StoredModelProvider, listProvidersForProxy } from "./storage";
+import { listProvidersForProxy, type StoredModelProvider } from "./storage";
 
 type ProviderWithSecret = StoredModelProvider & { secret?: string };
 
 const HOST = "127.0.0.1";
+const PROXY_PORT = 39127;
 
-function jsonResponse(response: ServerResponse, status: number, body: unknown): void {
+function jsonResponse(
+	response: ServerResponse,
+	status: number,
+	body: unknown,
+): void {
 	response.writeHead(status, { "content-type": "application/json" });
 	response.end(JSON.stringify(body));
 }
@@ -56,7 +70,10 @@ export function createProviderFetchOptions(params: {
 	};
 }
 
-function getHeaderValue(headers: IncomingMessage["headers"], name: string): string {
+function getHeaderValue(
+	headers: IncomingMessage["headers"],
+	name: string,
+): string {
 	const value = headers[name.toLowerCase()];
 	return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -69,6 +86,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function killPortHolder(port: number): void {
+	try {
+		const pids = execSync(`lsof -tiTCP:${port} -sTCP:LISTEN`, {
+			encoding: "utf-8",
+			stdio: ["pipe", "pipe", "pipe"],
+		})
+			.split("\n")
+			.map((pid) => Number.parseInt(pid.trim(), 10))
+			.filter(Number.isFinite);
+		for (const pid of pids) {
+			process.kill(pid, "SIGKILL");
+		}
+	} catch {
+		// lsof returns non-zero if nothing found — port is free
+	}
+}
+
 export class ModelProxyService {
 	private server: ReturnType<typeof createServer> | null = null;
 	private port: number | null = null;
@@ -78,6 +112,7 @@ export class ModelProxyService {
 
 	async start(): Promise<ModelProxyStatus> {
 		if (this.server?.listening && this.port) return this.status();
+		killPortHolder(PROXY_PORT);
 		this.server = createServer((request, response) => {
 			void this.handleRequest(request, response).catch((error) => {
 				this.lastError = error instanceof Error ? error.message : String(error);
@@ -86,9 +121,9 @@ export class ModelProxyService {
 		});
 		await new Promise<void>((resolve, reject) => {
 			this.server?.once("error", reject);
-			this.server?.listen(0, HOST, () => resolve());
+			this.server?.listen(PROXY_PORT, HOST, () => resolve());
 		});
-		this.port = (this.server.address() as AddressInfo).port;
+		this.port = PROXY_PORT;
 		return this.status();
 	}
 
@@ -126,14 +161,17 @@ export class ModelProxyService {
 			baseUrl: this.getBaseUrl(),
 			port: this.port,
 			tokenConfigured: this.token.length > 0,
-			enabledProviderCount: providers.filter((provider) => provider.enabled).length,
+			enabledProviderCount: providers.filter((provider) => provider.enabled)
+				.length,
 			aggregatedModelCount: aggregateModels(summaries).length,
 			lastError: this.lastError,
 		};
 	}
 
 	private isAuthorized(request: IncomingMessage): boolean {
-		const auth = extractBearer(getHeaderValue(request.headers, "authorization"));
+		const auth = extractBearer(
+			getHeaderValue(request.headers, "authorization"),
+		);
 		const anthropicKey = getHeaderValue(request.headers, "x-api-key");
 		return auth === this.token || anthropicKey === this.token;
 	}
@@ -146,7 +184,10 @@ export class ModelProxyService {
 			jsonResponse(response, 401, { error: { message: "Unauthorized" } });
 			return;
 		}
-		const url = new URL(request.url ?? "/", this.getBaseUrl() ?? `http://${HOST}`);
+		const url = new URL(
+			request.url ?? "/",
+			this.getBaseUrl() ?? `http://${HOST}`,
+		);
 		if (request.method === "GET" && url.pathname === "/v1/models") {
 			const providers = (await listProvidersForProxy()).map((provider) => ({
 				...provider,
@@ -216,7 +257,8 @@ export class ModelProxyService {
 			}),
 		);
 		response.writeHead(upstream.status, {
-			"content-type": upstream.headers.get("content-type") ?? "application/json",
+			"content-type":
+				upstream.headers.get("content-type") ?? "application/json",
 		});
 		response.end(await upstream.text());
 	}
@@ -252,14 +294,19 @@ export class ModelProxyService {
 		);
 		const text = await upstream.text();
 		if (!upstream.ok) {
-			response.writeHead(upstream.status, { "content-type": "application/json" });
+			response.writeHead(upstream.status, {
+				"content-type": "application/json",
+			});
 			response.end(text);
 			return;
 		}
 		const parsed = JSON.parse(text) as unknown;
 		const content = extractOpenAIContent(parsed);
 		jsonResponse(response, 200, {
-			id: isRecord(parsed) && typeof parsed.id === "string" ? parsed.id : "msg_proxy",
+			id:
+				isRecord(parsed) && typeof parsed.id === "string"
+					? parsed.id
+					: "msg_proxy",
 			type: "message",
 			role: "assistant",
 			model: anthropicBody.model,
@@ -316,25 +363,47 @@ export const modelProxyService = new ModelProxyService();
 export async function fetchProviderModels(
 	providerId: string,
 ): Promise<ModelProviderModel[]> {
-	const provider = (await listProvidersForProxy()).find((item) => item.id === providerId);
+	const provider = (await listProvidersForProxy()).find(
+		(item) => item.id === providerId,
+	);
 	if (!provider) throw new Error(`Provider ${providerId} not found`);
 	if (!provider.secret) throw new Error("Provider API key is required");
-	const endpoint = provider.protocol === "openai" ? "/v1/models" : "/v1/models";
+	return fetchProviderModelsFromConnection({
+		providerId: provider.id,
+		protocol: provider.protocol,
+		baseUrl: provider.baseUrl,
+		proxyUrl: provider.proxyUrl,
+		secret: provider.secret,
+	});
+}
+
+async function fetchProviderModelsFromConnection(params: {
+	providerId: string;
+	protocol: ModelProviderProtocol;
+	baseUrl: string;
+	proxyUrl?: string;
+	secret: string;
+}): Promise<ModelProviderModel[]> {
+	const endpoint = params.protocol === "openai" ? "/v1/models" : "/v1/models";
 	const response = await fetch(
-		appendPath(provider.baseUrl, endpoint),
+		appendPath(params.baseUrl, endpoint),
 		createProviderFetchOptions({
-			proxyUrl: provider.proxyUrl,
+			proxyUrl: params.proxyUrl,
 			init: {
 				headers:
-					provider.protocol === "openai"
-						? { authorization: `Bearer ${provider.secret}` }
-						: { "x-api-key": provider.secret, "anthropic-version": "2023-06-01" },
+					params.protocol === "openai"
+						? { authorization: `Bearer ${params.secret}` }
+						: {
+								"x-api-key": params.secret,
+								"anthropic-version": "2023-06-01",
+							},
 			},
 		}),
 	);
 	if (!response.ok) throw new Error(`Fetch models failed: ${response.status}`);
 	const parsed = (await response.json()) as unknown;
-	const data = isRecord(parsed) && Array.isArray(parsed.data) ? parsed.data : [];
+	const data =
+		isRecord(parsed) && Array.isArray(parsed.data) ? parsed.data : [];
 	const now = new Date().toISOString();
 	return data
 		.map((item): string | null => {
@@ -343,10 +412,67 @@ export async function fetchProviderModels(
 			return null;
 		})
 		.filter((id): id is string => !!id)
-		.map((id) => ({ id, providerId, lastFetchedAt: now }));
+		.map((id) => ({ id, providerId: params.providerId, lastFetchedAt: now }));
 }
 
-export async function testProvider(providerId: string): Promise<{ ok: boolean; message: string }> {
+/**
+ * Resolve the connection details for a draft fetch.
+ * If the draft secret is blank and an id is provided, fall back to the saved provider's secret.
+ * Returns the connection params or throws if no usable secret is available.
+ */
+export function resolveDraftProviderConnection(
+	input: FetchProviderModelsInput,
+	savedProviders: Array<{ id: string; secret?: string }>,
+): {
+	providerId: string;
+	protocol: FetchProviderModelsInput["protocol"];
+	baseUrl: string;
+	proxyUrl?: string;
+	secret: string;
+} {
+	const baseUrl = input.baseUrl.trim();
+	const proxyUrl = input.proxyUrl?.trim() || undefined;
+	const secret = input.secret?.trim();
+
+	if (!baseUrl) throw new Error("Base URL is required");
+
+	if (secret) {
+		return {
+			providerId: input.id ?? "draft",
+			protocol: input.protocol,
+			baseUrl,
+			proxyUrl,
+			secret,
+		};
+	}
+
+	if (input.id) {
+		const saved = savedProviders.find((p) => p.id === input.id);
+		if (saved?.secret) {
+			return {
+				providerId: input.id,
+				protocol: input.protocol,
+				baseUrl,
+				proxyUrl,
+				secret: saved.secret,
+			};
+		}
+	}
+
+	throw new Error("Provider API key is required");
+}
+
+export async function fetchProviderModelsFromDraft(
+	input: FetchProviderModelsInput,
+): Promise<ModelProviderModel[]> {
+	const providers = await listProvidersForProxy();
+	const connection = resolveDraftProviderConnection(input, providers);
+	return fetchProviderModelsFromConnection(connection);
+}
+
+export async function testProvider(
+	providerId: string,
+): Promise<{ ok: boolean; message: string }> {
 	const models = await fetchProviderModels(providerId);
 	return { ok: true, message: `Fetched ${models.length} models` };
 }

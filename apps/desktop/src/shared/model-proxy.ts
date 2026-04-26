@@ -31,6 +31,14 @@ export interface UpsertModelProviderInput {
 	models?: string[];
 }
 
+export interface FetchProviderModelsInput {
+	id?: string;
+	protocol: ModelProviderProtocol;
+	baseUrl: string;
+	proxyUrl?: string;
+	secret?: string;
+}
+
 export interface ModelProxyStatus {
 	running: boolean;
 	baseUrl: string | null;
