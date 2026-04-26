@@ -13,6 +13,7 @@ type TaskAgentWriteback = {
 	workspaceId: string;
 	taskId: string;
 	taskPromptFileName: string;
+	initialStatusType: TaskStatusType | null;
 };
 
 const taskWritebacksByPaneId = new Map<string, TaskAgentWriteback>();
@@ -130,6 +131,7 @@ export function registerTaskAgentWriteback({
 		workspaceId,
 		taskId,
 		taskPromptFileName: safePromptFileName,
+		initialStatusType: parseStatusType(taskPromptContent),
 	});
 
 	void updateLocalTaskStatus({ taskId, statusType: "started" }).catch(
@@ -151,17 +153,18 @@ export async function syncTaskAgentWritebackOnStop(
 	if (!writeback) return;
 	if (event.workspaceId && event.workspaceId !== writeback.workspaceId) return;
 
-	const content = await readTaskPromptFile(writeback);
-	if (!content) return;
+	try {
+		const content = await readTaskPromptFile(writeback);
+		if (!content) return;
 
-	const statusType = parseStatusType(content);
-	if (!statusType) return;
+		const statusType = parseStatusType(content);
+		if (!statusType || statusType === writeback.initialStatusType) return;
 
-	const updated = await updateLocalTaskStatus({
-		taskId: writeback.taskId,
-		statusType,
-	});
-	if (updated && statusType === "completed") {
+		await updateLocalTaskStatus({
+			taskId: writeback.taskId,
+			statusType,
+		});
+	} finally {
 		taskWritebacksByPaneId.delete(event.paneId);
 	}
 }

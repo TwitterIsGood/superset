@@ -111,5 +111,7 @@ describe("Run in Workspace selection wiring (#2641)", () => {
 		expect(writebackSource).toContain("tasksLocal.update.mutate");
 		expect(writebackSource).toContain('event.eventType !== "Stop"');
 		expect(writebackSource).toContain('return "completed";');
+		expect(writebackSource).toContain("initialStatusType");
+		expect(writebackSource).toContain("taskWritebacksByPaneId.delete");
 	});
 });

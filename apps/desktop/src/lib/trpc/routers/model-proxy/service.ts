@@ -88,12 +88,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function killPortHolder(port: number): void {
 	try {
-		const pid = execSync(`lsof -ti :${port}`, {
+		const pids = execSync(`lsof -tiTCP:${port} -sTCP:LISTEN`, {
 			encoding: "utf-8",
 			stdio: ["pipe", "pipe", "pipe"],
-		}).trim();
-		if (pid) {
-			process.kill(Number.parseInt(pid, 10), "SIGKILL");
+		})
+			.split("\n")
+			.map((pid) => Number.parseInt(pid.trim(), 10))
+			.filter(Number.isFinite);
+		for (const pid of pids) {
+			process.kill(pid, "SIGKILL");
 		}
 	} catch {
 		// lsof returns non-zero if nothing found — port is free

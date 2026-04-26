@@ -147,7 +147,11 @@ async function writeModelSettingsToRoot(
 		createdSettingsFile = true;
 	}
 	const merged = mergeWorkspaceModelSettings(existingText, env);
-	await fs.writeFile(settingsPath, merged.text, "utf8");
+	await fs.writeFile(settingsPath, merged.text, {
+		encoding: "utf8",
+		mode: 0o600,
+	});
+	await fs.chmod(settingsPath, 0o600);
 	return {
 		settingsPath,
 		createdClaudeDirectory,
