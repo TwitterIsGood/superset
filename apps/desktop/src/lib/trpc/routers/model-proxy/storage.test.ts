@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { promises as fs } from "node:fs";
-import { MODEL_PROVIDERS_STORAGE_PATH, listStoredProviders, upsertProvider } from "./storage";
+import {
+	listStoredProviders,
+	MODEL_PROVIDERS_STORAGE_PATH,
+	upsertProvider,
+} from "./storage";
 
 describe("model provider storage", () => {
 	afterEach(async () => {
@@ -36,7 +40,9 @@ describe("model provider storage", () => {
 		});
 
 		expect(provider.proxyUrl).toBe("http://127.0.0.1:7890");
-		expect((await listStoredProviders())[0]?.proxyUrl).toBe("http://127.0.0.1:7890");
+		expect((await listStoredProviders())[0]?.proxyUrl).toBe(
+			"http://127.0.0.1:7890",
+		);
 
 		const updated = await upsertProvider({
 			id: provider.id,

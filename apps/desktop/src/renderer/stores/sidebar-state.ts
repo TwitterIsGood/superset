@@ -14,7 +14,7 @@ export enum RightSidebarTab {
 
 type PersistedRightSidebarTab = RightSidebarTab | "models";
 
-function normalizeRightSidebarTab(
+function _normalizeRightSidebarTab(
 	tab: PersistedRightSidebarTab | undefined,
 ): RightSidebarTab | undefined {
 	if (tab === "models") return RightSidebarTab.Settings;

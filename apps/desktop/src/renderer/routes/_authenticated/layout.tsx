@@ -14,6 +14,7 @@ import { useIsV2CloudEnabled } from "renderer/hooks/useIsV2CloudEnabled";
 import { migrateHotkeyOverrides } from "renderer/hotkeys/migrate";
 import { dragDropManager } from "renderer/lib/dnd";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { syncTaskAgentWritebackOnStop } from "renderer/lib/tasks/task-agent-writeback";
 import { showWorkspaceAutoNameWarningToast } from "renderer/lib/workspaces/showWorkspaceAutoNameWarningToast";
 import { InitGitDialog } from "renderer/react-query/projects/InitGitDialog";
 import { DashboardNewWorkspaceModal } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal";
@@ -59,6 +60,15 @@ function AuthenticatedLayout() {
 	// Update workspace-run pane state on terminal exit
 	electronTrpc.notifications.subscribe.useSubscription(undefined, {
 		onData: (event) => {
+			if (event.type === NOTIFICATION_EVENTS.AGENT_LIFECYCLE && event.data) {
+				void syncTaskAgentWritebackOnStop(event.data).catch((error) => {
+					console.error(
+						"[task-agent-writeback] Failed to sync task writeback:",
+						error,
+					);
+				});
+			}
+
 			if (
 				event.type === NOTIFICATION_EVENTS.FOCUS_V2_NOTIFICATION_SOURCE &&
 				event.data

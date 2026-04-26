@@ -9,7 +9,8 @@ export function ModelsPanel({ workspaceId }: { workspaceId?: string }) {
 	const navigate = useNavigate();
 	const trpcUtils = electronTrpc.useUtils();
 	const { data: proxyStatus } = electronTrpc.modelProxy.status.useQuery();
-	const { data: models = [] } = electronTrpc.modelProviders.listAggregatedModels.useQuery();
+	const { data: models = [] } =
+		electronTrpc.modelProviders.listAggregatedModels.useQuery();
 	const { data: settings } = electronTrpc.workspaceModelSettings.read.useQuery(
 		{ workspaceId: workspaceId ?? "" },
 		{ enabled: !!workspaceId },
@@ -24,7 +25,12 @@ export function ModelsPanel({ workspaceId }: { workspaceId?: string }) {
 		setHaikuModel(settings?.haikuModel || defaultModel);
 		setSonnetModel(settings?.sonnetModel || defaultModel);
 		setOpusModel(settings?.opusModel || defaultModel);
-	}, [settings?.haikuModel, settings?.sonnetModel, settings?.opusModel, defaultModel]);
+	}, [
+		settings?.haikuModel,
+		settings?.sonnetModel,
+		settings?.opusModel,
+		defaultModel,
+	]);
 
 	const modelOptions = useMemo(() => models.map((model) => model.id), [models]);
 	const savedHaikuModel = settings?.haikuModel || defaultModel;
@@ -40,7 +46,8 @@ export function ModelsPanel({ workspaceId }: { workspaceId?: string }) {
 		!!sonnetModel &&
 		!!opusModel &&
 		hasModelSettingsChanges;
-	const proxyReady = proxyStatus?.running && proxyStatus.tokenConfigured && proxyStatus.baseUrl;
+	const proxyReady =
+		proxyStatus?.running && proxyStatus.tokenConfigured && proxyStatus.baseUrl;
 
 	const openModelsSettings = () => {
 		void navigate({ to: "/settings/models" });
@@ -59,9 +66,12 @@ export function ModelsPanel({ workspaceId }: { workspaceId?: string }) {
 				{modelOptions.length === 0 ? (
 					<div className="space-y-3 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
 						<div>
-							<p className="font-medium text-foreground">No model providers configured</p>
+							<p className="font-medium text-foreground">
+								No model providers configured
+							</p>
 							<p className="mt-1">
-								Add a provider in Settings &gt; Models, then fetch or manually add model IDs.
+								Add a provider in Settings &gt; Models, then fetch or manually
+								add model IDs.
 							</p>
 						</div>
 						<Button type="button" size="sm" onClick={openModelsSettings}>
@@ -78,9 +88,19 @@ export function ModelsPanel({ workspaceId }: { workspaceId?: string }) {
 						</div>
 						{!proxyReady ? (
 							<div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
-								<p className="font-medium">Local model service is not initialized.</p>
-								<p>Open Settings &gt; Models to check providers and restart the service.</p>
-								<Button type="button" size="sm" variant="outline" onClick={openModelsSettings}>
+								<p className="font-medium">
+									Local model service is not initialized.
+								</p>
+								<p>
+									Open Settings &gt; Models to check providers and restart the
+									service.
+								</p>
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									onClick={openModelsSettings}
+								>
 									Open Settings &gt; Models
 								</Button>
 							</div>
@@ -117,10 +137,16 @@ export function ModelsPanel({ workspaceId }: { workspaceId?: string }) {
 										sonnetModel,
 										opusModel,
 									});
-									await trpcUtils.workspaceModelSettings.read.invalidate({ workspaceId });
+									await trpcUtils.workspaceModelSettings.read.invalidate({
+										workspaceId,
+									});
 									toast.success("Model settings saved");
 								} catch (error) {
-									toast.error(error instanceof Error ? error.message : "Failed to save workspace models");
+									toast.error(
+										error instanceof Error
+											? error.message
+											: "Failed to save workspace models",
+									);
 								}
 							}}
 						>

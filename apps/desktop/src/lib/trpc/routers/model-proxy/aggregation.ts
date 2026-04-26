@@ -1,6 +1,12 @@
-import type { ModelProviderModel, ModelProviderSummary } from "shared/model-proxy";
+import type {
+	ModelProviderModel,
+	ModelProviderSummary,
+} from "shared/model-proxy";
 
-type ProviderWithModels = Pick<ModelProviderSummary, "id" | "enabled" | "models">;
+type ProviderWithModels = Pick<
+	ModelProviderSummary,
+	"id" | "enabled" | "models"
+>;
 
 export function aggregateModels(
 	providers: ProviderWithModels[],
@@ -27,7 +33,8 @@ export class ModelRoundRobinRouter {
 		const candidates = providers
 			.filter(
 				(provider) =>
-					provider.enabled && provider.models.some((model) => model.id === modelId),
+					provider.enabled &&
+					provider.models.some((model) => model.id === modelId),
 			)
 			.map((provider) => provider.id);
 		if (candidates.length === 0) return null;

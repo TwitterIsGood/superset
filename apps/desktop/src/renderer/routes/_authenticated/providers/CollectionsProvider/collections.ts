@@ -28,6 +28,7 @@ import { electricCollectionOptions } from "@tanstack/electric-db-collection";
 import type {
 	Collection,
 	LocalStorageCollectionUtils,
+	SyncConfig,
 } from "@tanstack/react-db";
 import {
 	BasicIndex,
@@ -37,6 +38,7 @@ import {
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client";
 import { env } from "renderer/env.renderer";
 import { getAuthToken, getJwt } from "renderer/lib/auth-client";
+import { electronTrpcClient } from "renderer/lib/trpc-client";
 import superjson from "superjson";
 import { z } from "zod";
 import {
@@ -83,7 +85,11 @@ type IntegrationConnectionDisplay = Omit<
 	"accessToken" | "refreshToken"
 >;
 
+export type TasksDataMode = "local" | "cloud";
+
 export interface OrgCollections {
+	tasksMode: TasksDataMode;
+	activeOrganizationId: string;
 	tasks: Collection<SelectTask>;
 	taskStatuses: Collection<SelectTaskStatus>;
 	projects: Collection<SelectProject>;
@@ -95,6 +101,7 @@ export interface OrgCollections {
 	workspaces: Collection<SelectWorkspace>;
 	members: Collection<SelectMember>;
 	users: Collection<SelectUser>;
+	organizations: Collection<SelectOrganization>;
 	invitations: Collection<SelectInvitation>;
 	agentCommands: Collection<SelectAgentCommand>;
 	integrationConnections: Collection<IntegrationConnectionDisplay>;
@@ -150,11 +157,24 @@ export interface OrgCollections {
 	>;
 }
 
-// Per-org collections cache
+// Per-org and per-mode collections cache
 const collectionsCache = new Map<string, OrgCollections>();
 
-function getCollectionsCacheKey(organizationId: string): string {
-	return organizationId;
+export function getTasksDataMode({
+	activeOrganizationId,
+	jwt,
+}: {
+	activeOrganizationId: string | null | undefined;
+	jwt: string | null | undefined;
+}): TasksDataMode {
+	return activeOrganizationId && jwt ? "cloud" : "local";
+}
+
+function getCollectionsCacheKey(
+	organizationId: string,
+	mode: TasksDataMode,
+): string {
+	return `${mode}:${organizationId}`;
 }
 
 // Singleton API client with dynamic auth headers
@@ -191,7 +211,94 @@ const organizationsCollection = createIndexedCollection(
 	}),
 );
 
-function createOrgCollections(organizationId: string): OrgCollections {
+type LocalRouterCollectionName =
+	| "tasks"
+	| "taskStatuses"
+	| "users"
+	| "organizations"
+	| "integrationConnections";
+
+type LocalCollectionConfig<T extends object> = {
+	id: string;
+	organizationId: string;
+	collection: LocalRouterCollectionName;
+	list: () => Promise<T[]>;
+	getKey: (item: T) => string;
+	onUpdate?: Parameters<typeof createCollection<T>>[0]["onUpdate"];
+	onDelete?: Parameters<typeof createCollection<T>>[0]["onDelete"];
+};
+
+function localCollectionOptions<T extends object>({
+	id,
+	organizationId,
+	collection,
+	list,
+	getKey,
+	onUpdate,
+	onDelete,
+}: LocalCollectionConfig<T>) {
+	const sync: SyncConfig<T> = {
+		rowUpdateMode: "full",
+		sync: ({ begin, write, commit, markReady, truncate }) => {
+			let disposed = false;
+
+			const reload = async () => {
+				const rows = await list();
+				if (disposed) return;
+				begin();
+				truncate();
+				for (const row of rows) {
+					write({ type: "insert", value: row });
+				}
+				commit();
+				markReady();
+			};
+
+			void reload().catch((error) => {
+				console.error(
+					`[local-collections] Failed to load ${collection}`,
+					error,
+				);
+				markReady();
+			});
+
+			const subscription = electronTrpcClient.tasksLocal.subscribe.subscribe(
+				{ organizationId, collection },
+				{
+					onData: () => {
+						void reload().catch((error) => {
+							console.error(
+								`[local-collections] Failed to reload ${collection}`,
+								error,
+							);
+						});
+					},
+					onError: (error) => {
+						console.error(
+							`[local-collections] Subscription error for ${collection}`,
+							error,
+						);
+					},
+				},
+			);
+
+			return () => {
+				disposed = true;
+				subscription.unsubscribe();
+			};
+		},
+	};
+
+	return {
+		id,
+		getKey,
+		sync,
+		onUpdate,
+		onDelete,
+	};
+}
+
+function createCloudOrgCollections(organizationId: string): OrgCollections {
 	const tasks = createIndexedCollection(
 		electricCollectionOptions<SelectTask>({
 			id: `tasks-${organizationId}`,
@@ -628,6 +735,8 @@ function createOrgCollections(organizationId: string): OrgCollections {
 	);
 
 	return {
+		tasksMode: "cloud",
+		activeOrganizationId: organizationId,
 		tasks,
 		taskStatuses,
 		projects,
@@ -639,6 +748,7 @@ function createOrgCollections(organizationId: string): OrgCollections {
 		workspaces,
 		members,
 		users,
+		organizations: organizationsCollection,
 		invitations,
 		agentCommands,
 		integrationConnections,
@@ -659,6 +769,99 @@ function createOrgCollections(organizationId: string): OrgCollections {
 	};
 }
 
+function createLocalOrgCollections(organizationId: string): OrgCollections {
+	const cloudCollections = createCloudOrgCollections(organizationId);
+
+	const tasks = createIndexedCollection(
+		localCollectionOptions<SelectTask>({
+			id: `local-tasks-${organizationId}`,
+			organizationId,
+			collection: "tasks",
+			list: () =>
+				electronTrpcClient.tasksLocal.listTasks.query({ organizationId }),
+			getKey: (item) => item.id,
+			onUpdate: async ({ transaction }) => {
+				const { original, changes } = transaction.mutations[0];
+				const taskChanges = {
+					...changes,
+					labels: changes.labels ?? undefined,
+				};
+				const result = await electronTrpcClient.tasksLocal.update.mutate({
+					id: original.id,
+					changes: taskChanges,
+				});
+				return { txid: result.txid };
+			},
+			onDelete: async ({ transaction }) => {
+				const item = transaction.mutations[0].original;
+				return electronTrpcClient.tasksLocal.delete.mutate(item.id);
+			},
+		}),
+	);
+
+	const taskStatuses = createIndexedCollection(
+		localCollectionOptions<SelectTaskStatus>({
+			id: `local-task-statuses-${organizationId}`,
+			organizationId,
+			collection: "taskStatuses",
+			list: async () => {
+				await electronTrpcClient.tasksLocal.ensureDefaultStatuses.mutate({
+					organizationId,
+				});
+				return electronTrpcClient.tasksLocal.listTaskStatuses.query({
+					organizationId,
+				});
+			},
+			getKey: (item) => item.id,
+		}),
+	);
+
+	const users = createIndexedCollection(
+		localCollectionOptions<SelectUser>({
+			id: `local-users-${organizationId}`,
+			organizationId,
+			collection: "users",
+			list: () =>
+				electronTrpcClient.tasksLocal.listUsers.query({ organizationId }),
+			getKey: (item) => item.id,
+		}),
+	);
+
+	const organizations = createIndexedCollection(
+		localCollectionOptions<SelectOrganization>({
+			id: `local-organizations-${organizationId}`,
+			organizationId,
+			collection: "organizations",
+			list: () => electronTrpcClient.tasksLocal.listOrganizations.query(),
+			getKey: (item) => item.id,
+		}),
+	);
+
+	const integrationConnections = createIndexedCollection(
+		localCollectionOptions<IntegrationConnectionDisplay>({
+			id: `local-integration-connections-${organizationId}`,
+			organizationId,
+			collection: "integrationConnections",
+			list: () =>
+				electronTrpcClient.tasksLocal.listIntegrationConnections.query({
+					organizationId,
+				}),
+			getKey: (item) => item.id,
+		}),
+	);
+
+	return {
+		...cloudCollections,
+		tasksMode: "local",
+		activeOrganizationId: organizationId,
+		tasks,
+		taskStatuses,
+		users,
+		organizations,
+		integrationConnections,
+	};
+}
+
 /**
  * Preload collections for an organization by starting Electric sync.
  * Collections are lazy — they don't fetch data until subscribed or preloaded.
@@ -666,10 +869,17 @@ function createOrgCollections(organizationId: string): OrgCollections {
  */
 export async function preloadCollections(
 	organizationId: string,
+	mode: TasksDataMode = "cloud",
 ): Promise<void> {
-	const collections = getCollections(organizationId);
+	const collections = getCollections(organizationId, mode);
 	const collectionsToPreload = Object.entries(collections)
-		.filter(([name]) => name !== "organizations")
+		.filter(
+			([name, value]) =>
+				name !== "organizations" &&
+				name !== "tasksMode" &&
+				name !== "activeOrganizationId" &&
+				typeof value === "object",
+		)
 		.map(([, collection]) => collection as Collection<object>);
 
 	await Promise.allSettled(
@@ -682,12 +892,19 @@ export async function preloadCollections(
  * Collections are cached per org for instant switching.
  * Auth token is read dynamically via getAuthToken() - no need to pass it.
  */
-export function getCollections(organizationId: string) {
-	const cacheKey = getCollectionsCacheKey(organizationId);
+export function getCollections(
+	organizationId: string,
+	mode: TasksDataMode = "cloud",
+) {
+	const cacheKey = getCollectionsCacheKey(organizationId, mode);
 
-	// Get or create org-specific collections
 	if (!collectionsCache.has(cacheKey)) {
-		collectionsCache.set(cacheKey, createOrgCollections(organizationId));
+		collectionsCache.set(
+			cacheKey,
+			mode === "cloud"
+				? createCloudOrgCollections(organizationId)
+				: createLocalOrgCollections(organizationId),
+		);
 	}
 
 	const orgCollections = collectionsCache.get(cacheKey);
@@ -695,10 +912,7 @@ export function getCollections(organizationId: string) {
 		throw new Error(`Collections not found for org: ${organizationId}`);
 	}
 
-	return {
-		...orgCollections,
-		organizations: organizationsCollection,
-	};
+	return orgCollections;
 }
 
 export type AppCollections = ReturnType<typeof getCollections>;

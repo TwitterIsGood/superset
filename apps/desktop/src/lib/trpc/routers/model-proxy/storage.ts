@@ -2,11 +2,11 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import {
+	ensureSupersetHomeDirExists,
 	SUPERSET_HOME_DIR,
 	SUPERSET_HOME_DIR_MODE,
 	SUPERSET_SENSITIVE_FILE_MODE,
 } from "main/lib/app-environment";
-import { ensureSupersetHomeDirExists } from "main/lib/app-environment";
 import type {
 	ModelProviderModel,
 	ModelProviderProtocol,
@@ -55,7 +55,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseStoredModel(value: unknown, providerId: string): ModelProviderModel | null {
+function parseStoredModel(
+	value: unknown,
+	providerId: string,
+): ModelProviderModel | null {
 	if (!isRecord(value) || typeof value.id !== "string") return null;
 	return {
 		id: value.id,
@@ -88,7 +91,9 @@ function parseStoredProvider(value: unknown): StoredModelProvider | null {
 		proxyUrl: typeof value.proxyUrl === "string" ? value.proxyUrl : undefined,
 		enabled: value.enabled,
 		secretEncrypted:
-			typeof value.secretEncrypted === "string" ? value.secretEncrypted : undefined,
+			typeof value.secretEncrypted === "string"
+				? value.secretEncrypted
+				: undefined,
 		models: Array.isArray(value.models)
 			? value.models
 					.map((model) => parseStoredModel(model, value.id as string))
@@ -110,7 +115,9 @@ async function readData(): Promise<StorageData> {
 		return {
 			providers: parsed.providers
 				.map(parseStoredProvider)
-				.filter((provider): provider is StoredModelProvider => provider !== null),
+				.filter(
+					(provider): provider is StoredModelProvider => provider !== null,
+				),
 		};
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code === "ENOENT") return emptyData();
@@ -129,7 +136,9 @@ async function writeData(data: StorageData): Promise<void> {
 	await fs.chmod(MODEL_PROVIDERS_STORAGE_PATH, SUPERSET_SENSITIVE_FILE_MODE);
 }
 
-export function redactProvider(provider: StoredModelProvider): ModelProviderSummary {
+export function redactProvider(
+	provider: StoredModelProvider,
+): ModelProviderSummary {
 	return {
 		id: provider.id,
 		name: provider.name,
@@ -166,7 +175,9 @@ function normalizeModels(
 	modelIds: string[] | undefined,
 	existingModels: ModelProviderModel[] = [],
 ): ModelProviderModel[] {
-	const existingById = new Map(existingModels.map((model) => [model.id, model]));
+	const existingById = new Map(
+		existingModels.map((model) => [model.id, model]),
+	);
 	const seen = new Set<string>();
 	return (modelIds ?? existingModels.map((model) => model.id))
 		.map((modelId) => modelId.trim())
@@ -217,7 +228,9 @@ export async function upsertProvider(
 	return redactProvider(provider);
 }
 
-export async function deleteProvider(id: string): Promise<{ deleted: boolean }> {
+export async function deleteProvider(
+	id: string,
+): Promise<{ deleted: boolean }> {
 	const data = await readData();
 	const nextProviders = data.providers.filter((provider) => provider.id !== id);
 	const deleted = nextProviders.length !== data.providers.length;
@@ -242,7 +255,11 @@ export async function replaceProviderModels(
 	return redactProvider(provider);
 }
 
-export async function getProviderSecret(providerId: string): Promise<string | null> {
+export async function getProviderSecret(
+	providerId: string,
+): Promise<string | null> {
 	const providers = await listProvidersForProxy();
-	return providers.find((provider) => provider.id === providerId)?.secret ?? null;
+	return (
+		providers.find((provider) => provider.id === providerId)?.secret ?? null
+	);
 }

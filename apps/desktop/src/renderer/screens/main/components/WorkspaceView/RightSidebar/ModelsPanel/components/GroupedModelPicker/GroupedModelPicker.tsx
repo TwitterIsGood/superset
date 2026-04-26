@@ -39,11 +39,11 @@ export function GroupedModelPicker({
 		});
 
 		return () => cancelAnimationFrame(frame);
-	}, [open, value]);
+	}, [open]);
 
 	return (
-		<label className="space-y-1.5 text-sm">
-			<span className="font-medium">{label}</span>
+		<div className="space-y-1.5 text-sm">
+			<div className="font-medium">{label}</div>
 			<Popover open={open} onOpenChange={setOpen}>
 				<PopoverTrigger asChild>
 					<Button
@@ -85,6 +85,6 @@ export function GroupedModelPicker({
 					</Command>
 				</PopoverContent>
 			</Popover>
-		</label>
+		</div>
 	);
 }

@@ -31,12 +31,6 @@ mock.module("@superset/chat/server/desktop", () => ({
 	generateTitleFromMessage: generateTitleFromMessageMock,
 }));
 
-mock.module("drizzle-orm", () => ({
-	and: mock(() => null),
-	eq: mock(() => null),
-	isNull: mock(() => null),
-}));
-
 const selectGetMock = mock((): SelectedWorkspace => null);
 const updateRunMock = mock(() => ({ changes: 1 }));
 const localDbMock = {
@@ -60,16 +54,10 @@ mock.module("main/lib/local-db", () => ({
 	localDb: localDbMock,
 }));
 
-mock.module("@superset/local-db", () => ({
-	workspaces: {
-		id: "id",
-		branch: "branch",
-		name: "name",
-		isUnnamed: "isUnnamed",
-		deletingAt: "deletingAt",
-		updatedAt: "updatedAt",
-	},
-}));
+mock.module("@superset/local-db", async () => {
+	const schema = await import("@superset/local-db/schema");
+	return { workspaces: schema.workspaces };
+});
 
 const {
 	attemptWorkspaceAutoRenameFromPrompt,

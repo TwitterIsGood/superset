@@ -24,7 +24,7 @@ export function groupModelIds(modelIds: string[]): ModelGroup[] {
 		.map(([prefix, models]) => ({
 			prefix,
 			models: models.sort((a, b) =>
-			b.localeCompare(a, undefined, { numeric: true }),
+				b.localeCompare(a, undefined, { numeric: true }),
 			),
 		}))
 		.sort((a, b) => a.prefix.localeCompare(b.prefix));

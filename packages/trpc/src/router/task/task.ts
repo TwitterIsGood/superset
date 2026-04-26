@@ -264,6 +264,18 @@ export const taskRouter = {
 			return result;
 		}),
 
+	ensureDefaultStatuses: protectedProcedure.mutation(async ({ ctx }) => {
+		const organizationId = await requireActiveOrgMembership(ctx);
+
+		await seedDefaultStatuses(organizationId, dbWs);
+
+		return db
+			.select()
+			.from(taskStatuses)
+			.where(eq(taskStatuses.organizationId, organizationId))
+			.orderBy(taskStatuses.position);
+	}),
+
 	createFromUi: protectedProcedure
 		.input(createTaskFromUiSchema)
 		.mutation(async ({ ctx, input }) => {
