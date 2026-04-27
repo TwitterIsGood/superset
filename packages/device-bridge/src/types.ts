@@ -11,6 +11,7 @@ export interface IosDeviceInfo {
 	state: string;
 	isAvailable: boolean;
 	pointScale: number;
+	kind: "simulator" | "device";
 }
 
 export interface DeviceListResult {
@@ -60,11 +61,15 @@ export interface DeviceBridgeOptions {
 	h264Bitrate?: number;
 	streamFps?: number;
 	maxDecodeQueueSize?: number;
+	targetKind?: "simulator" | "device";
 	enableAndroid?: boolean;
 	enableIos?: boolean;
 }
 
 export interface IpcTransport {
-	invoke(channel: string, ...args: any[]): Promise<any>;
-	on(channel: string, callback: (...args: any[]) => void): () => void;
+	invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T>;
+	on<T extends unknown[]>(
+		channel: string,
+		callback: (...args: T) => void,
+	): () => void;
 }

@@ -9,6 +9,7 @@ export enum SidebarMode {
 export enum RightSidebarTab {
 	Changes = "changes",
 	Files = "files",
+	Devices = "devices",
 	Settings = "settings",
 }
 

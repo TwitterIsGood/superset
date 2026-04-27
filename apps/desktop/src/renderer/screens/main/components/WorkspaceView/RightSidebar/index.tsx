@@ -8,6 +8,7 @@ import {
 	LuGitCompareArrows,
 	LuSettings2,
 	LuShrink,
+	LuSmartphone,
 	LuX,
 } from "react-icons/lu";
 import { HotkeyLabel } from "renderer/hotkeys";
@@ -22,6 +23,7 @@ import { toAbsoluteWorkspacePath } from "shared/absolute-paths";
 import type { ChangeCategory, ChangedFile } from "shared/changes-types";
 import { useScrollContext } from "../ChangesContent";
 import { ChangesView } from "./ChangesView";
+import { DevicesPanel } from "./DevicesPanel";
 import { FilesView } from "./FilesView";
 import { getSidebarHeaderTabButtonClassName } from "./headerTabStyles";
 import { ModelsPanel } from "./ModelsPanel";
@@ -180,6 +182,13 @@ export function RightSidebar() {
 						compact={compactTabs}
 					/>
 					<TabButton
+						isActive={rightSidebarTab === RightSidebarTab.Devices}
+						onClick={() => setRightSidebarTab(RightSidebarTab.Devices)}
+						icon={<LuSmartphone className="size-3.5" />}
+						label="Devices"
+						compact={compactTabs}
+					/>
+					<TabButton
 						isActive={rightSidebarTab === RightSidebarTab.Settings}
 						onClick={() => setRightSidebarTab(RightSidebarTab.Settings)}
 						icon={<LuSettings2 className="size-3.5" />}
@@ -252,6 +261,15 @@ export function RightSidebar() {
 				}
 			>
 				<FilesView />
+			</div>
+			<div
+				className={
+					rightSidebarTab === RightSidebarTab.Devices
+						? "flex-1 min-h-0 flex flex-col overflow-hidden"
+						: "hidden"
+				}
+			>
+				<DevicesPanel />
 			</div>
 			<div
 				className={

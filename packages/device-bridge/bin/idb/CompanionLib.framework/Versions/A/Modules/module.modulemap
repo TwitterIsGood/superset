@@ -1,0 +1,11 @@
+framework module CompanionLib {
+  umbrella header "CompanionLib.h"
+  export *
+
+  module * { export * }
+}
+
+module CompanionLib.Swift {
+  header "CompanionLib-Swift.h"
+  requires objc
+}

@@ -1,0 +1,4 @@
+framework module IDBGRPCSwift {
+  header "IDBGRPCSwift-Swift.h"
+  requires objc
+}

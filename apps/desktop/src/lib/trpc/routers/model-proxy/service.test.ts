@@ -1,12 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { MODEL_PROXY_WORKSPACE_TOKEN } from "main/lib/model-proxy-daemon/types";
 import { ProxyAgent } from "undici";
-import { createProviderFetchOptions, ModelProxyService } from "./service";
+import { createProviderFetchOptions } from "./service";
 
-describe("ModelProxyService", () => {
+describe("model proxy daemon token", () => {
 	test("uses the fixed local proxy API key", () => {
-		expect(new ModelProxyService().getToken()).toBe(
-			"superset-local-model-proxy",
-		);
+		expect(MODEL_PROXY_WORKSPACE_TOKEN).toBe("superset-local-model-proxy");
 	});
 });
 

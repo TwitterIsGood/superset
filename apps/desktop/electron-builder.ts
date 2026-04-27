@@ -76,6 +76,16 @@ const config: Configuration = {
 			to: "resources/host-migrations",
 			filter: ["**/*"],
 		},
+		{
+			from: "../../packages/device-bridge/bin",
+			to: "device-bridge/bin",
+			filter: ["**/*"],
+		},
+		{
+			from: "../../packages/device-bridge/proto",
+			to: "device-bridge/proto",
+			filter: ["**/*"],
+		},
 	],
 
 	files: [
