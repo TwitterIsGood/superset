@@ -3,7 +3,9 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export async function screenshot(deviceId?: string): Promise<{ ok: true; dataUrl: string } | { ok: false; error: string }> {
+export async function screenshot(
+	deviceId?: string,
+): Promise<{ ok: true; dataUrl: string } | { ok: false; error: string }> {
 	const args = deviceId
 		? ["-s", deviceId, "exec-out", "screencap", "-p"]
 		: ["exec-out", "screencap", "-p"];
@@ -13,8 +15,12 @@ export async function screenshot(deviceId?: string): Promise<{ ok: true; dataUrl
 			maxBuffer: 1024 * 1024 * 20,
 			encoding: "buffer",
 		});
-		return { ok: true, dataUrl: `data:image/png;base64,${result.stdout.toString("base64")}` };
-	} catch (error: any) {
-		return { ok: false, error: String(error.stderr ?? error.message) };
+		return {
+			ok: true,
+			dataUrl: `data:image/png;base64,${result.stdout.toString("base64")}`,
+		};
+	} catch (error) {
+		const failed = error as Partial<{ stderr: unknown; message: unknown }>;
+		return { ok: false, error: String(failed.stderr ?? failed.message) };
 	}
 }

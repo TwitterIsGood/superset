@@ -17,7 +17,11 @@
 			"default": "./src/preload/index.ts"
 		}
 	},
-	"files": ["bin", "proto", "src"],
+	"files": [
+		"bin",
+		"proto",
+		"src"
+	],
 	"scripts": {
 		"clean": "git clean -xdf .cache .turbo dist node_modules",
 		"typecheck": "tsc --noEmit --emitDeclarationOnly false",

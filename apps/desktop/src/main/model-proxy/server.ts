@@ -3,20 +3,26 @@ import {
 	type IncomingMessage,
 	type ServerResponse,
 } from "node:http";
-import type { ModelProxyStatus } from "shared/model-proxy";
-import { aggregateModels, ModelRoundRobinRouter } from "lib/trpc/routers/model-proxy/aggregation";
+import {
+	aggregateModels,
+	ModelRoundRobinRouter,
+} from "lib/trpc/routers/model-proxy/aggregation";
 import {
 	createProviderFetchOptions,
 	extractOpenAIContent,
 	normalizeOpenAIMessages,
 } from "lib/trpc/routers/model-proxy/service";
-import { listProvidersForProxy, type StoredModelProvider } from "lib/trpc/routers/model-proxy/storage";
+import {
+	listProvidersForProxy,
+	type StoredModelProvider,
+} from "lib/trpc/routers/model-proxy/storage";
 import {
 	MODEL_PROXY_HOST,
 	MODEL_PROXY_PORT,
 	MODEL_PROXY_PROTOCOL_VERSION,
 	type ModelProxyDaemonHealth,
 } from "main/lib/model-proxy-daemon/types";
+import type { ModelProxyStatus } from "shared/model-proxy";
 
 type ProviderWithSecret = StoredModelProvider & { secret?: string };
 
@@ -115,7 +121,8 @@ export class ModelProxyDaemonServer {
 			baseUrl: this.getBaseUrl(),
 			port: MODEL_PROXY_PORT,
 			tokenConfigured: this.workspaceToken.length > 0,
-			enabledProviderCount: providers.filter((provider) => provider.enabled).length,
+			enabledProviderCount: providers.filter((provider) => provider.enabled)
+				.length,
 			aggregatedModelCount: aggregateModels(summaries).length,
 			lastError: this.lastError,
 		};
@@ -135,13 +142,17 @@ export class ModelProxyDaemonServer {
 	}
 
 	private isWorkspaceAuthorized(request: IncomingMessage): boolean {
-		const auth = extractBearer(getHeaderValue(request.headers, "authorization"));
+		const auth = extractBearer(
+			getHeaderValue(request.headers, "authorization"),
+		);
 		const anthropicKey = getHeaderValue(request.headers, "x-api-key");
 		return auth === this.workspaceToken || anthropicKey === this.workspaceToken;
 	}
 
 	private isControlAuthorized(request: IncomingMessage): boolean {
-		const auth = extractBearer(getHeaderValue(request.headers, "authorization"));
+		const auth = extractBearer(
+			getHeaderValue(request.headers, "authorization"),
+		);
 		return auth === this.controlToken;
 	}
 
@@ -232,7 +243,8 @@ export class ModelProxyDaemonServer {
 			}),
 		);
 		response.writeHead(upstream.status, {
-			"content-type": upstream.headers.get("content-type") ?? "application/json",
+			"content-type":
+				upstream.headers.get("content-type") ?? "application/json",
 		});
 		response.end(await upstream.text());
 	}

@@ -1,9 +1,15 @@
 import { spawn } from "node:child_process";
-import { closeSync, existsSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+	closeSync,
+	existsSync,
+	readFileSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { app } from "electron";
-import type { ModelProxyStatus } from "shared/model-proxy";
 import { openRotatingLogFd } from "main/lib/host-service-utils";
+import type { ModelProxyStatus } from "shared/model-proxy";
 import {
 	ensureModelProxyDaemonDir,
 	isProcessAlive,
@@ -117,7 +123,9 @@ export class ModelProxyDaemonManager {
 			removeModelProxyManifest();
 			return emptyStatus();
 		}
-		return emptyStatus("Model proxy daemon is alive but not responding to health checks");
+		return emptyStatus(
+			"Model proxy daemon is alive but not responding to health checks",
+		);
 	}
 
 	async getBaseUrl(): Promise<string | null> {
@@ -248,12 +256,18 @@ export class ModelProxyDaemonManager {
 		try {
 			if (existsSync(lockPath)) {
 				const lockTime = Number.parseInt(readFileSync(lockPath, "utf-8"), 10);
-				if (!Number.isNaN(lockTime) && Date.now() - lockTime < SPAWN_LOCK_TIMEOUT_MS) {
+				if (
+					!Number.isNaN(lockTime) &&
+					Date.now() - lockTime < SPAWN_LOCK_TIMEOUT_MS
+				) {
 					return false;
 				}
 				unlinkSync(lockPath);
 			}
-			writeFileSync(lockPath, String(Date.now()), { encoding: "utf-8", mode: 0o600 });
+			writeFileSync(lockPath, String(Date.now()), {
+				encoding: "utf-8",
+				mode: 0o600,
+			});
 			return true;
 		} catch {
 			return false;

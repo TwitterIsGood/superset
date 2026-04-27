@@ -1,8 +1,8 @@
 import "@sentry/electron/preload";
 
+import { createPreloadApi } from "@superset/device-bridge/preload";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { exposeElectronTRPC } from "trpc-electron/main";
-import { createPreloadApi } from "@superset/device-bridge/preload";
 
 declare const __APP_VERSION__: string;
 

@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { findStartCodes, hasIdrFrame, nalTypeAt } from "./h264-utils";
 
 describe("findStartCodes", () => {
@@ -18,8 +18,7 @@ describe("findStartCodes", () => {
 
 	test("finds multiple start codes", () => {
 		const data = new Uint8Array([
-			0x00, 0x00, 0x00, 0x01, 0x67, 0x42,
-			0x00, 0x00, 0x01, 0x65, 0x88,
+			0x00, 0x00, 0x00, 0x01, 0x67, 0x42, 0x00, 0x00, 0x01, 0x65, 0x88,
 		]);
 		const codes = findStartCodes(data);
 		expect(codes.length).toBe(2);

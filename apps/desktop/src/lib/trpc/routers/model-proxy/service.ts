@@ -10,7 +10,9 @@ function appendPath(baseUrl: string, endpoint: string): string {
 	return `${baseUrl.replace(/\/+$/, "")}${endpoint}`;
 }
 
-type FetchOptionsWithDispatcher = RequestInit & { dispatcher?: ProxyAgent };
+export type FetchOptionsWithDispatcher = RequestInit & {
+	dispatcher?: ProxyAgent;
+};
 
 export function createProviderFetchOptions(params: {
 	proxyUrl?: string;
@@ -103,24 +105,26 @@ async function fetchProviderModelsFromConnection(params: {
 	proxyUrl?: string;
 	secret: string;
 }): Promise<ModelProviderModel[]> {
+	const options = createProviderFetchOptions({
+		proxyUrl: params.proxyUrl,
+		init: {
+			headers:
+				params.protocol === "openai"
+					? { authorization: `Bearer ${params.secret}` }
+					: {
+							"x-api-key": params.secret,
+							"anthropic-version": "2023-06-01",
+						},
+		},
+	});
 	const response = await undiciFetch(
 		appendPath(params.baseUrl, "/v1/models"),
-		createProviderFetchOptions({
-			proxyUrl: params.proxyUrl,
-			init: {
-				headers:
-					params.protocol === "openai"
-						? { authorization: `Bearer ${params.secret}` }
-						: {
-								"x-api-key": params.secret,
-								"anthropic-version": "2023-06-01",
-							},
-			},
-		}) as any,
+		options as Parameters<typeof undiciFetch>[1],
 	);
 	if (!response.ok) throw new Error(`Fetch models failed: ${response.status}`);
 	const parsed = (await response.json()) as unknown;
-	const data = isRecord(parsed) && Array.isArray(parsed.data) ? parsed.data : [];
+	const data =
+		isRecord(parsed) && Array.isArray(parsed.data) ? parsed.data : [];
 	const now = new Date().toISOString();
 	return data
 		.map((item): string | null => {

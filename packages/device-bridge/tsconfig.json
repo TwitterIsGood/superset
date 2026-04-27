@@ -9,5 +9,14 @@
 		"skipLibCheck": true
 	},
 	"include": ["src"],
-	"exclude": ["node_modules", "dist", "src/renderer/h264-decoder.ts", "src/renderer/device-stream.ts", "src/renderer/ipc-client.ts", "src/renderer/*.test.ts", "src/android/*.test.ts", "src/ios/*.test.ts"]
+	"exclude": [
+		"node_modules",
+		"dist",
+		"src/renderer/h264-decoder.ts",
+		"src/renderer/device-stream.ts",
+		"src/renderer/ipc-client.ts",
+		"src/renderer/*.test.ts",
+		"src/android/*.test.ts",
+		"src/ios/*.test.ts"
+	]
 }

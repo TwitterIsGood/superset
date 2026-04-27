@@ -11,7 +11,9 @@
 			"!**/drizzle",
 			"!**/*.template.js",
 			"!**/*.template.sh",
-			"!apps/mobile/uniwind-types.d.ts"
+			"!apps/mobile/uniwind-types.d.ts",
+			"!packages/device-bridge/bin/idb",
+			"!.claude/settings.local.json"
 		]
 	},
 	"formatter": {
