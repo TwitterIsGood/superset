@@ -1,5 +1,7 @@
 # Phase 01: Run Foundation
 
+Status: draft
+
 ## Goal
 
 Make execution state durable enough that Superset can track work beyond “a terminal/chat was launched.”
@@ -61,8 +63,8 @@ Create durable objects for execution:
 
 - `Run`
 - `AgentRun`
-- minimal `ReviewPacket` or review packet placeholder
 - links to task/workspace/chat/terminal
+- optional `reviewPacketId` or run summary placeholder only; the formal ReviewPacket object belongs to Phase 05
 
 ## Current primitives to reuse
 
@@ -94,7 +96,7 @@ v2WorkspaceId nullable
 taskId nullable
 source: task | prompt | chat | mcp | automation | manual
 sourceId nullable
-status: queued | running | waiting | completed | failed | canceled
+status: RunStatus from `../05-canonical-contracts.md`
 summary nullable
 createdByUserId nullable
 startedAt nullable
@@ -120,7 +122,7 @@ agentType nullable
 launchSource
 chatSessionId nullable
 terminalSessionId nullable
-status: queued | launching | running | waiting_for_approval | completed | failed | canceled
+status: AgentRunStatus from `../05-canonical-contracts.md`
 summary nullable
 error nullable
 startedAt nullable
@@ -129,22 +131,16 @@ createdAt
 updatedAt
 ```
 
-### ReviewPacket placeholder
+### Review packet placeholder
 
-Do not overbuild in Phase 01. Store enough to attach future review output.
-
-Potential fields:
+Do not create the formal ReviewPacket schema in Phase 01 unless Phase 05 is being implemented at the same time. Phase 01 should only reserve linkage:
 
 ```text
-id
-organizationId
-runId
-taskId nullable
-status: draft | generated | approved | rejected
-summary nullable
-createdAt
-updatedAt
+run.reviewPacketId nullable
+run.summary nullable
 ```
+
+The formal ReviewPacket object and statuses are defined by `05-canonical-contracts.md` and implemented in Phase 05.
 
 ## Scope
 

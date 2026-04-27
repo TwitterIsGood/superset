@@ -13,42 +13,19 @@ Recommended order:
 5. Add lightweight UI status surface.
 6. Add tests and validation.
 
-## Step 1: Decide persistence location
+## Step 1: Follow canonical persistence
 
-Options:
+Use `05-canonical-contracts.md` as the default persistence decision.
 
-### Option A: Cloud-first
+For Phase 01:
 
-Add tables to `packages/db/src/schema/schema.ts`.
+- `Run` canonical owner: Cloud Postgres.
+- `AgentRun` canonical owner: Cloud Postgres.
+- host-service local DB remains canonical only for physical workspace/terminal runtime facts.
+- desktop local DB may cache/mirror run state only as an explicit sync/offline behavior.
+- purely local draft runs are allowed only for local-only UI actions and must not be exposed through MCP/web/mobile until synced.
 
-Pros:
-
-- cross-device visibility;
-- MCP/API/automation-friendly;
-- easier future web/mobile monitoring.
-
-Cons:
-
-- local-first desktop flows need sync/mirroring or degraded mode.
-
-### Option B: Local-first MVP
-
-Add to `packages/local-db/src/schema/schema.ts`.
-
-Pros:
-
-- desktop MVP faster;
-- works with local-first tasks.
-
-Cons:
-
-- harder to integrate cloud automations/MCP later.
-
-### Recommended
-
-If the current product direction is local-first desktop for tasks, use local-first MVP or dual design. If web/MCP/automation visibility is prioritized, cloud-first is better.
-
-Document the decision before coding.
+Do not re-decide cloud-first vs local-first inside implementation unless this canonical matrix is updated.
 
 ## Step 2: Add schema
 
@@ -57,8 +34,9 @@ Potential tables:
 ```text
 runs
 agentRuns
-reviewPackets
 ```
+
+Do not create formal `reviewPackets` in Phase 01. Reserve nullable linkage/summary fields only if needed.
 
 Minimum columns should include:
 
@@ -80,9 +58,9 @@ Follow DB rules from `AGENTS.md`:
 
 Likely API surfaces:
 
-- cloud tRPC router if cloud-first;
-- desktop tRPC/local router if local-first;
-- host-service route if runs are host-owned.
+- cloud tRPC router for canonical shared Run/AgentRun records;
+- desktop/local helpers only for cache/offline draft behavior;
+- host-service routes only for physical runtime facts and launch/session linkage.
 
 Potential operations:
 
@@ -202,9 +180,15 @@ Use hidden/internal UI first if needed.
 
 Recommended feature flag or setting:
 
-```text
-enableAgentRunTracking
-```
+| Field                   | Value                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Name                    | `enableAgentRunTracking`                                                                                      |
+| Storage location        | shared feature flag/config system used by desktop and cloud API                                               |
+| Default value           | off until schema/API writes are validated in development; on only for opted-in internal builds                |
+| Rollout scope           | organization/project or developer setting, not per-pane only                                                  |
+| UI/API gating           | hide run status UI and skip nonessential AgentRun writes when disabled                                        |
+| Disabled write behavior | do not create shared `Run`/`AgentRun` records for unmanaged launches; existing records remain readable        |
+| Cleanup condition       | remove after all supported launch surfaces create reliable run state and Phase 04 lifecycle mapping is stable |
 
 Remove flag only after launch flows are stable.
 

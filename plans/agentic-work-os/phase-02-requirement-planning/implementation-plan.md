@@ -12,45 +12,17 @@ Recommended sequence:
 4. Add conversion from approved plan steps to tasks.
 5. Wire optional run using existing task/workspace/agent primitives.
 
-## Step 1: Decide persistence MVP
+## Step 1: Follow canonical persistence
 
-Options:
+Use `05-canonical-contracts.md` as the default persistence decision.
 
-### Option A: Full schema now
+For Phase 02:
 
-Add:
+- `Requirement`, `Plan`, `PlanStep`, and `PlanTask` are canonical cloud Postgres objects.
+- desktop local drafts are allowed for offline/unsubmitted planning, but approved/shared plans require canonical cloud records.
+- chat/session artifacts can render or explain a plan, but they are not the product source of truth.
 
-```text
-requirements
-plans
-plan_steps
-plan_tasks
-```
-
-Pros:
-
-- clean long-term design;
-- easier future task graph/chronicle.
-
-Cons:
-
-- more migrations and local/cloud sync decisions.
-
-### Option B: Plan stored as chat/session artifact first
-
-Use existing chat plan UI/runtime and persist minimal JSON somewhere existing.
-
-Pros:
-
-- faster.
-
-Cons:
-
-- risks product state becoming chat transcript.
-
-### Recommended
-
-Use explicit plan schema if Phase 01 run foundation is complete. If not, create a minimal plan table first and defer task graph fields.
+Do not re-decide plan storage inside implementation unless the canonical matrix is updated.
 
 ## Step 2: Schema proposal
 
@@ -63,7 +35,7 @@ planSteps
 planTasks
 ```
 
-If local-first is required, mirror in `packages/local-db/src/schema/schema.ts` or implement local-only first with later sync.
+If offline drafts are required, mirror/cache draft records locally in `packages/local-db/src/schema/schema.ts`; approved/shared plans remain canonical cloud records.
 
 Do not manually edit generated migration files.
 
@@ -89,21 +61,27 @@ getPlan
 listPlans
 ```
 
-Alternative desktop-local router if local-first.
+Optional desktop-local draft router for offline/unsubmitted planning only.
 
 ## Step 4: Planner implementation
 
 Planner can initially be a chat/agent flow that returns structured JSON plus markdown.
 
-Planner prompt/context should include:
+Planner prompt/context should use the `PlannerContextBundle` contract in `05-canonical-contracts.md`.
+
+It may include:
 
 - user requirement;
 - selected project;
-- linked issue/PR/attachments;
-- repo summary if available;
+- linked issue/PR/attachments metadata;
+- repo summary with staleness report;
+- scoped relevant files;
 - current tasks if relevant;
 - current workspace if relevant;
-- standards from policy later.
+- known memories and policy hints later;
+- redaction report and explicit budget.
+
+Planner exploration itself should create an Operation and, when meaningful, a planner AgentRun or equivalent planner-run record.
 
 Output schema:
 
@@ -209,9 +187,15 @@ Start desktop-first.
 
 Possible setting:
 
-```text
-enablePlanningIntake
-```
+| Field                   | Value                                                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Name                    | `enablePlanningIntake`                                                                                           |
+| Storage location        | shared feature flag/config system used by desktop and cloud API                                                  |
+| Default value           | off until Requirement/Plan persistence and approval UI are stable                                                |
+| Rollout scope           | organization/project or developer setting                                                                        |
+| UI/API gating           | hide plan-first intake UI and reject external plan-generation mutations when disabled                            |
+| Disabled write behavior | local draft prompts may still exist as normal chat/input state, but no canonical `Requirement`/`Plan` is created |
+| Cleanup condition       | remove after plan-first intake is the default path for medium/high-risk work                                     |
 
 ## Risks
 

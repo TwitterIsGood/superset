@@ -49,6 +49,7 @@ plans/agentic-work-os/
 ├── 02-reference-repo-learning.md
 ├── 03-current-superset-map.md
 ├── 04-cross-phase-standards.md
+├── 05-canonical-contracts.md
 ├── phase-00-foundation/
 ├── phase-01-run-foundation/
 ├── phase-02-requirement-planning/
@@ -75,8 +76,9 @@ Start with:
 2. `01-product-vision.md`
 3. The phase folder for the work you are about to do
 4. `04-cross-phase-standards.md`
-5. `03-current-superset-map.md` when touching current code
-6. `02-reference-repo-learning.md` when unsure whether to invent a new pattern
+5. `05-canonical-contracts.md` when adding schema/API/status/payload/operation behavior
+6. `03-current-superset-map.md` when touching current code
+7. `02-reference-repo-learning.md` when unsure whether to invent a new pattern
 
 ### For implementation sessions
 
@@ -119,19 +121,23 @@ Use:
 - `02-reference-repo-learning.md`
 - `03-current-superset-map.md`
 - `04-cross-phase-standards.md`
+- `05-canonical-contracts.md`
 
 ## Phase index
 
-| Phase | Goal                            | User-facing effect                                | Internal system change                             |
-| ----- | ------------------------------- | ------------------------------------------------- | -------------------------------------------------- |
-| 00    | Foundation and vocabulary       | Team shares one mental model                      | Terms, objects, indexing, source-of-truth docs     |
-| 01    | Run foundation                  | A task/work request has durable execution state   | Requirement/Run/AgentRun/ReviewPacket skeleton     |
-| 02    | Requirement planning            | One sentence becomes an editable plan             | Planner output, plan approval, plan persistence    |
-| 03    | Task graph + workspace strategy | Superset decides what can run in parallel         | Dependencies, workspace allocation, conflict rules |
-| 04    | Agent run lifecycle             | Users can see what agents are doing/did           | Durable agent run state, artifacts, completion     |
-| 05    | Review + verification           | Users review prepared packets, not raw chaos      | Evidence, test records, reviewer agents, packets   |
-| 06    | Chronicle + memory + policy     | Superset remembers and governs work               | Events, memories, policy snapshots/decisions       |
-| 07    | Automation + MCP surfaces       | External agents and schedules use the same system | MCP/CLI/API tools, operation IDs, automation flows |
+| Phase | Status | Goal                            | User-facing effect                              | Internal system change                             |
+| ----- | ------ | ------------------------------- | ----------------------------------------------- | -------------------------------------------------- |
+| 00    | draft  | Foundation and vocabulary       | Team shares one mental model                    | Terms, objects, indexing, source-of-truth docs     |
+| 01    | draft  | Run foundation                  | A task/work request has durable execution state | Requirement/Run/AgentRun skeleton                  |
+| 02    | draft  | Requirement planning            | One sentence becomes an editable plan           | Planner output, plan approval, plan persistence    |
+| 03    | draft  | Task graph + workspace strategy | Superset decides what can run in parallel       | Dependencies, workspace allocation, conflict rules |
+| 04    | draft  | Agent run lifecycle             | Users can see what agents are doing/did         | Durable agent run state, artifacts, completion     |
+| 05    | draft  | Review + verification           | Users review prepared packets, not raw chaos    | Evidence, test records, reviewer agents, packets   |
+| 06    | draft  | Chronicle + memory + policy     | Superset remembers and governs work             | Events, memories, policy snapshots/decisions       |
+| 07A   | draft  | MCP/API operation surface       | External agents can use stable work objects     | Read/mutation tools, operation IDs, status APIs    |
+| 07B   | draft  | CLI surface                     | Developers can script the same flows            | CLI commands over shared APIs                      |
+| 07C   | draft  | Automation integration          | Recurring/event work produces durable results   | AutomationRun -> Operation/Run linkage             |
+| 07D   | draft  | Web/mobile monitoring           | Users can monitor and approve away from desktop | Plan/run/review/memory approval views              |
 
 ## Core design principle
 

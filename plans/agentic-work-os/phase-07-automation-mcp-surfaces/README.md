@@ -1,16 +1,19 @@
-# Phase 07: Automation, MCP, CLI, Web, and Mobile Surfaces
+# Phase 07: External Surfaces and Automation
+
+Status: draft
 
 ## Goal
 
-Expose the Agentic Work OS through stable surfaces beyond the desktop UI:
+Expose the Agentic Work OS through stable surfaces beyond the desktop UI without turning this into one giant implementation phase.
 
-- MCP tools/resources;
-- CLI commands;
-- scheduled/event-driven automations;
-- web monitoring/intake;
-- mobile lightweight monitoring/intake.
+Phase 07 is a phase family:
 
-This phase makes the internal system composable by external agents and recurring workflows.
+- **07A MCP/API operation surface** — stable tools/resources and async operation status.
+- **07B CLI surface** — developer scripting over the same APIs.
+- **07C Automation integration** — scheduled/event-driven workflows linked to Operation/Run.
+- **07D Web/mobile monitoring and approvals** — lightweight remote visibility and decisions.
+
+Each subphase should be planned and implemented independently.
 
 ## Why this phase exists
 
@@ -107,16 +110,18 @@ list_policy_packs
 
 ## Operation ID rule
 
+Use the Operation model from `05-canonical-contracts.md`.
+
 Long-running tools should return immediately with IDs:
 
 ```text
 operationId
-runId
-planId
-statusUrl or follow-up tool
+runId when semantic work exists
+planId when planning exists
+status follow-up tool
 ```
 
-Do not block MCP calls while multiple workspaces/agents run.
+Do not block MCP calls while multiple workspaces/agents run. `operationId` is not a synonym for `runId`: Operation tracks async orchestration; Run tracks semantic product work.
 
 ## Automation evolution
 
@@ -172,7 +177,15 @@ Do not build complex graph/workspace UI on mobile first.
 
 ## Completion criteria
 
-Phase 07 is complete when external surfaces can use the same durable product objects as desktop:
+Phase 07A is complete when MCP/API can read core objects and start async operations with durable `operationId` status.
+
+Phase 07B is complete when CLI commands wrap the same APIs without duplicating orchestration logic.
+
+Phase 07C is complete when automation runs link to Operation/Run and produce completion/result state beyond `dispatched`.
+
+Phase 07D is complete when web/mobile can monitor and approve plan/run/review/memory decisions without acting as a full workspace UI.
+
+The phase family is complete when external surfaces can use the same durable product objects as desktop:
 
 ```text
 intake -> plan -> run -> review -> timeline/memory/policy

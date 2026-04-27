@@ -1,5 +1,7 @@
 # Phase 03: Task Graph and Workspace Strategy
 
+Status: draft
+
 ## Goal
 
 Turn approved plans into an executable task graph and decide how work should be distributed across workspaces and agents.
@@ -121,7 +123,7 @@ planId
 runId nullable
 name
 strategy: shared_workspace | isolated_workspace | sequential | validation
-status
+status derived from member tasks/runs; not independently persisted
 ```
 
 ### Workspace allocation
@@ -147,7 +149,8 @@ Phase 03 should:
 - propose workspace strategy;
 - let user approve/override strategy;
 - create workspaces according to strategy;
-- launch tasks according to dependency order if Phase 04 exists or via current launch flow if not.
+- launch the first ready group of tasks according to dependency order if Phase 04 exists or via current launch flow if not;
+- record blocked tasks without needing automatic unblock scheduling in the MVP.
 
 ## Non-goals
 
@@ -158,10 +161,12 @@ Phase 03 should:
 
 ## Completion criteria
 
-Phase 03 is complete when Superset can:
+Phase 03 MVP is complete when Superset can:
 
 1. convert an approved plan into linked tasks;
 2. record dependencies among them;
 3. recommend workspace allocation;
 4. create required workspaces;
-5. start safe parallel groups while holding blocked tasks.
+5. start the first ready group while recording blocked tasks.
+
+Automatic detection of completed groups and automatic unblocking of later groups depends on Phase 04/05 lifecycle and verification work.

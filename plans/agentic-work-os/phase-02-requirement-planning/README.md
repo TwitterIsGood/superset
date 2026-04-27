@@ -1,5 +1,7 @@
 # Phase 02: Requirement Planning
 
+Status: draft
+
 ## Goal
 
 Turn a one-line requirement into a structured, editable, approvable plan.
@@ -100,7 +102,7 @@ projectId nullable
 createdByUserId
 source: desktop | web | mcp | cli | slack | automation | chat
 prompt
-status: draft | planning | planned | approved | executing | completed | failed | canceled
+status: RequirementStatus from `../05-canonical-contracts.md`
 createdAt
 updatedAt
 ```
@@ -125,7 +127,7 @@ organizationId
 requirementId nullable
 projectId nullable
 createdByUserId
-status: draft | awaiting_approval | approved | rejected | executing | completed | canceled
+status: PlanStatus from `../05-canonical-contracts.md`
 version
 title
 summary

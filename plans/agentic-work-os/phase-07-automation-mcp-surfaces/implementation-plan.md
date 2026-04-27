@@ -2,11 +2,18 @@
 
 ## Strategy
 
+Treat Phase 07 as four subphases, not one large implementation batch.
+
+- 07A: MCP/API operation surface.
+- 07B: CLI surface.
+- 07C: automation integration.
+- 07D: web/mobile monitoring and approvals.
+
 Expose high-level primitives only after they exist internally.
 
 Do not build `run_plan` MCP before plans/runs exist.
 
-## Step 1: Add read tools first
+## 07A Step 1: Add read tools first
 
 MCP tools/resources:
 
@@ -21,7 +28,7 @@ get_timeline
 
 Read tools are safer and validate object model.
 
-## Step 2: Add planning mutation tools
+## 07A Step 2: Add planning mutation tools
 
 ```text
 create_intake
@@ -33,7 +40,7 @@ create_tasks_from_plan
 
 Each should return durable IDs.
 
-## Step 3: Add execution tools
+## 07A Step 3: Add execution tools
 
 ```text
 run_plan
@@ -43,7 +50,7 @@ request_fixes
 
 These should return run/operation IDs immediately.
 
-## Step 4: Add memory/policy tools cautiously
+## 07A Step 4: Add memory/policy tools cautiously
 
 Start with:
 
@@ -57,7 +64,7 @@ list_policy_packs
 
 Avoid broad policy mutation until UI/audit is stable.
 
-## Step 5: Fix and consolidate existing MCP primitives
+## 07A Step 5: Fix and consolidate existing MCP primitives
 
 Before relying heavily on current MCP workspace creation, validate known risk:
 
@@ -69,7 +76,7 @@ Relevant files:
 - `packages/mcp/src/tools/devices/create-workspace/create-workspace.ts`
 - `apps/desktop/src/renderer/routes/_authenticated/components/AgentHooks/hooks/useCommandWatcher/tools/create-worktree.ts`
 
-## Step 6: CLI commands
+## 07B Step 6: CLI commands
 
 Add CLI only after API/service layer exists.
 
@@ -86,7 +93,7 @@ superset review get
 
 Reuse tRPC/API clients rather than duplicating logic.
 
-## Step 7: Automation integration
+## 07C Step 7: Automation integration
 
 Extend automation from:
 
@@ -108,7 +115,7 @@ Add result lifecycle:
 scheduled -> dispatching -> running -> completed | failed | canceled
 ```
 
-## Step 8: Web monitoring
+## 07D Step 8: Web monitoring
 
 Enable web views for:
 
@@ -119,7 +126,7 @@ Enable web views for:
 
 Do not enable session creation until host/cloud lifecycle is safe.
 
-## Step 9: Mobile monitoring
+## 07D Step 9: Mobile monitoring
 
 Add mobile surfaces only for concise decisions:
 
@@ -131,7 +138,7 @@ Add mobile surfaces only for concise decisions:
 
 Follow mobile structure rules in `apps/mobile/AGENTS.md`.
 
-## Step 10: Tests
+## Step 10: Tests by subphase
 
 MCP tests:
 
