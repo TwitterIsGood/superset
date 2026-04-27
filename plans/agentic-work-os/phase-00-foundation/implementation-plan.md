@@ -25,6 +25,7 @@ README.md
 02-reference-repo-learning.md
 03-current-superset-map.md
 04-cross-phase-standards.md
+05-canonical-contracts.md
 ```
 
 ### Step 3: Create phase folders

@@ -1,5 +1,7 @@
 # Phase 05: Review and Verification
 
+Status: draft
+
 ## Goal
 
 Make Superset prepare human review instead of dumping raw diffs, terminal logs, and chat transcripts on the user.
@@ -94,7 +96,7 @@ organizationId
 runId
 taskId nullable
 planId nullable
-status: draft | generated | needs_changes | approved | rejected
+status: ReviewPacketStatus from `../05-canonical-contracts.md`
 summary
 changedFiles json
 testsRun json

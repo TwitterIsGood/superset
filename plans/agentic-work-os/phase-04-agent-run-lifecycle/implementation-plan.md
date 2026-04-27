@@ -4,9 +4,9 @@
 
 Extend Phase 01 run tracking into a richer lifecycle by consuming existing events first.
 
-## Step 1: Define lifecycle enum
+## Step 1: Implement canonical lifecycle enum
 
-Add shared enum/type, likely in a shared package if used across desktop, host-service, and API.
+Export the canonical `AgentRunStatus` enum from `../05-canonical-contracts.md` into a shared package used across desktop, host-service, and API.
 
 Possible location:
 
@@ -35,6 +35,8 @@ summary nullable
 payload json
 createdAt
 ```
+
+All `payload json` handling must follow `../05-canonical-contracts.md` artifact/payload rules. Raw command output and prompt/context bundles are redacted or local-only by default.
 
 Initial artifact types:
 
@@ -76,10 +78,10 @@ Map:
 Start -> running
 PermissionRequest -> waiting_for_approval
 PendingQuestion -> waiting_for_question
-Stop -> completed_unverified or completed_with_concerns depending hook data
+Stop -> exited_unverified or completed_with_concerns depending hook data
 ```
 
-Do not over-trust stop events if verification is absent.
+Do not over-trust stop events if verification is absent. Do not use `completed_unverified`; canonical status is `exited_unverified`.
 
 ## Step 5: Map chat events
 

@@ -1,10 +1,16 @@
 # Reference Repository Learning
 
-This document records what Superset should learn from three reference repositories:
+This document records what Superset should learn from three reference repositories.
 
-- `/tmp/superpowers`
-- `/tmp/Trellis`
-- `/tmp/OpenChronicle-core`
+Durable upstream references:
+
+| Repo               | Upstream                                 | Analyzed commit                            |
+| ------------------ | ---------------------------------------- | ------------------------------------------ |
+| Superpowers        | `https://github.com/obra/superpowers`    | `6efe32c9e2dd002d0c394e861e0529675d1ab32e` |
+| Trellis            | `https://github.com/mindfold-ai/Trellis` | `b3fe644a0d9a4ae4180cde61d5818d002333465e` |
+| OpenChronicle core | `https://github.com/OpenChronicle/core`  | `95202ef6c7a6f04a08a8abe80bd65219c8d8121d` |
+
+Local `/tmp/...` paths in this document are analysis scratch paths from the original research session, not durable source-of-truth locations.
 
 The goal is not to copy them mechanically. The goal is:
 

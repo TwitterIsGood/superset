@@ -22,7 +22,7 @@ taskExecutionGroups
 workspaceAllocations
 ```
 
-If schema scope is too large, start with `taskDependencies` and a JSON `workspaceStrategy` on plan/run.
+If schema scope is too large, start with `taskDependencies` and a JSON `workspaceStrategy` on plan/run as temporary MVP only. Canonical workspace allocation should move to `workspaceAllocations` before MCP/web/mobile or automation depends on it.
 
 Minimum dependency fields:
 

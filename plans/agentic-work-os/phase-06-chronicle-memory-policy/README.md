@@ -1,5 +1,7 @@
 # Phase 06: Chronicle, Memory, and Policy
 
+Status: draft
+
 ## Goal
 
 Give Superset durable memory, auditability, and behavioral governance without making the user interface heavy.
@@ -116,7 +118,7 @@ actorKind: user | agent | system | automation | integration
 actorId nullable
 eventType
 summary
-payload json
+payload json redacted and size-limited per `05-canonical-contracts.md`
 occurredAt
 ingestedAt
 correlationId nullable
@@ -140,7 +142,7 @@ projectId nullable
 scope: user | organization | project | workspace | task | agent
 kind: preference | convention | decision | warning | summary | fact
 content
-sourceEventIds json
+sourceEventIds json temporary MVP only; long-term use `memoryItemSources` join table
 confidence nullable
 status: candidate | active | rejected | superseded | archived
 createdBy: user | agent | system
@@ -171,7 +173,7 @@ id
 organizationId
 runId nullable
 agentRunId nullable
-policyPackIds json
+policyPackIds json temporary MVP only; long-term use `policySnapshotPacks` join table
 resolvedRules json
 createdAt
 ```
@@ -191,7 +193,7 @@ decision: allow | deny | ask | approved | rejected
 reason
 createdBy: user | policy | system | agent
 createdAt
-payload json
+payload json redacted and size-limited per `05-canonical-contracts.md`
 ```
 
 ## Scope

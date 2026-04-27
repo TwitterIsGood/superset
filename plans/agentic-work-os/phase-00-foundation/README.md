@@ -1,5 +1,7 @@
 # Phase 00: Foundation, Vocabulary, and Source-of-Truth Map
 
+Status: draft
+
 ## Goal
 
 Establish the shared vocabulary, object model, folder/index system, and current-architecture map needed before implementation begins.
@@ -47,6 +49,7 @@ Already represented by the root docs:
 - `02-reference-repo-learning.md`
 - `03-current-superset-map.md`
 - `04-cross-phase-standards.md`
+- `05-canonical-contracts.md`
 
 This phase folder adds:
 

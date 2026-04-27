@@ -84,14 +84,14 @@ Every product-level agent launch should either:
 
 Phase 01 may not reliably know when terminal agents are done. It should record what it can and avoid false confidence.
 
-Use statuses like:
+Use canonical `AgentRunStatus` values from `../05-canonical-contracts.md`, especially:
 
 - `running`
 - `unknown`
 - `exited_unverified`
-- `completed_unverified`
+- `completed_with_concerns`
 
-if needed.
+Do not use `completed_unverified`.
 
 ## Review standards
 

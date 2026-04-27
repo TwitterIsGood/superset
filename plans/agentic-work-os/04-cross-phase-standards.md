@@ -102,7 +102,24 @@ For every new entity, document whether it is:
 - synced/mirrored;
 - derived and not persisted.
 
-Do not assume one DB is enough without documenting why.
+Do not assume one DB is enough without documenting why. Default ownership decisions are defined in `05-canonical-contracts.md`; phase plans must either follow that matrix or explicitly update it.
+
+### Canonical statuses
+
+Do not invent new lifecycle strings inside phase docs or implementation. Use the canonical status enums in `05-canonical-contracts.md` for:
+
+- `RequirementStatus`;
+- `PlanStatus`;
+- `RunStatus`;
+- `AgentRunStatus`;
+- `ReviewPacketStatus`;
+- `AutomationRunStatus`.
+
+If a new state is needed, update `05-canonical-contracts.md` first and then align phase docs.
+
+### Operation model
+
+Long-running external or cross-surface actions use the Operation model defined in `05-canonical-contracts.md`. A Run is semantic work state; an Operation is async API orchestration state. Do not treat `operationId` as an alias for `runId` unless explicitly documented for a local-only shortcut.
 
 ## 3. Agent behavior standards
 
@@ -183,6 +200,17 @@ Examples:
 
 Failed tests and commands should be recorded, not hidden. They inform future debugging and memory.
 
+### Artifact and payload safety
+
+All artifacts and JSON payloads must follow `05-canonical-contracts.md`:
+
+- classify payloads before cloud sync;
+- redact secrets/env/credentials/tokens;
+- avoid storing raw command output in broad chronicle events;
+- keep unsafe raw artifacts local-only unless explicitly exported;
+- set size and retention limits;
+- distinguish audit payloads from user-visible summaries.
+
 ## 5. Chronicle and memory standards
 
 ### Chronicle first, memory later
@@ -256,7 +284,10 @@ Every phase should include:
 For DB changes:
 
 - never manually edit generated Drizzle migration files;
-- modify schema and ask/generate migrations via the documented repo process.
+- modify schema files such as `packages/db/src/schema/schema.ts` or local schema files as appropriate;
+- generate migrations through the repo process: `bunx drizzle-kit generate --name="<sample_name_snake_case>"`;
+- never run production migrations directly;
+- follow the Neon branch and production DB confirmation rules in `AGENTS.md`.
 
 ## 9. Anti-patterns
 

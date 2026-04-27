@@ -1,5 +1,7 @@
 # Phase 04: Agent Run Lifecycle
 
+Status: draft
+
 ## Goal
 
 Make every meaningful agent execution observable, resumable, and linked to product state.
@@ -7,7 +9,7 @@ Make every meaningful agent execution observable, resumable, and linked to produ
 Phase 01 creates the foundation. Phase 04 deepens it into a lifecycle:
 
 ```text
-queued -> launching -> running -> waiting_for_input -> verifying -> completed/failed/canceled
+queued -> launching -> running -> waiting_for_approval/question/plan_response -> verifying -> completed/failed/canceled
 ```
 
 ## Why this phase exists
@@ -30,7 +32,7 @@ Users see agent work as clear status cards:
 
 ```text
 Claude is updating desktop paywall logic.
-Status: waiting for approval to run tests.
+Agent status: waiting for approval to run tests.
 Workspace: remove-task-paywall
 Task: Update desktop gating
 ```
@@ -70,7 +72,9 @@ AgentRun becomes the durable unit of work for:
 
 ## Lifecycle states
 
-Recommended states:
+Use the canonical `AgentRunStatus` enum from `05-canonical-contracts.md`.
+
+Current canonical values:
 
 ```text
 queued
@@ -82,6 +86,7 @@ waiting_for_plan_response
 verifying
 completed
 completed_with_concerns
+exited_unverified
 failed
 canceled
 timeout

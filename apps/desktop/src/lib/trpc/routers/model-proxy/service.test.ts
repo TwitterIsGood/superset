@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { ProxyAgent } from "undici";
-import { createProviderFetchOptions } from "./service";
+import { createProviderFetchOptions, ModelProxyService } from "./service";
+
+describe("ModelProxyService", () => {
+	test("uses the fixed local proxy API key", () => {
+		expect(new ModelProxyService().getToken()).toBe(
+			"superset-local-model-proxy",
+		);
+	});
+});
 
 describe("createProviderFetchOptions", () => {
 	test("returns the original options when no proxy URL is configured", () => {

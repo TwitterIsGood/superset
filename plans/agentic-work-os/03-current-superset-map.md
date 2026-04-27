@@ -415,14 +415,17 @@ Current gap:
 - no completion/result/artifact loop;
 - no plan/task graph integration.
 
-## Key design decisions still needed
+## Key design decisions now anchored by contracts
 
-1. Should `Requirement` be persisted immediately or can Phase 1 use a task/chat/workspace as the intake record?
-2. Should `Plan` be cloud-first, local-first, or runtime-only first?
-3. Are `agent_runs` separate from `automation_runs`, or does one generalize the other?
-4. What is the minimal Review Packet object?
-5. Should chronicle events be cloud, local, or both first?
-6. How does Superset avoid making task UI feel like Jira?
-7. Which agent is the default planner, and is planner a role or a mode?
+`05-canonical-contracts.md` now answers the core persistence and lifecycle questions that were originally open here:
 
-These are answered progressively in the phase docs.
+1. `Requirement` and `Plan` are canonical cloud objects once shared or approved.
+2. `Run`, `AgentRun`, `AutomationRun`, and `Operation` are distinct objects with separate lifecycle meanings.
+3. `ReviewPacket`, `ChronicleEvent`, and `MemoryItem` have canonical ownership and relationship expectations.
+4. Host-service local state remains canonical only for physical/runtime facts such as terminal process state and worktree paths.
+
+Implementation should still verify these contracts against current code before adding schema or API surface. Product-shape questions remain phase-specific:
+
+1. How does Superset keep task UI lightweight instead of Jira-like?
+2. Which agent is the default planner, and is planner a role or a mode?
+3. Which local/offline draft behaviors are worth supporting in each surface?

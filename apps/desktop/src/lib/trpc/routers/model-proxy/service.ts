@@ -1,5 +1,4 @@
 import { execSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
 import {
 	createServer,
 	type IncomingMessage,
@@ -19,6 +18,7 @@ type ProviderWithSecret = StoredModelProvider & { secret?: string };
 
 const HOST = "127.0.0.1";
 const PROXY_PORT = 39127;
+const LOCAL_PROXY_API_KEY = "superset-local-model-proxy";
 
 function jsonResponse(
 	response: ServerResponse,
@@ -106,7 +106,7 @@ function killPortHolder(port: number): void {
 export class ModelProxyService {
 	private server: ReturnType<typeof createServer> | null = null;
 	private port: number | null = null;
-	private token = randomBytes(24).toString("hex");
+	private token = LOCAL_PROXY_API_KEY;
 	private lastError: string | undefined;
 	private router = new ModelRoundRobinRouter();
 

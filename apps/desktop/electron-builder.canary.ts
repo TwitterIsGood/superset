@@ -25,7 +25,7 @@ const config: Configuration = {
 
 	publish: {
 		provider: "github",
-		owner: "superset-sh",
+		owner: "TwitterIsGood",
 		repo: "superset",
 		releaseType: "prerelease",
 	},
