@@ -79,7 +79,12 @@ const config: Configuration = {
 		{
 			from: "../../packages/device-bridge/bin",
 			to: "device-bridge/bin",
-			filter: ["**/*"],
+			filter: [
+				"**/*",
+				"!idb/FBDeviceControl.framework/Frameworks",
+				"!idb/FBSimulatorControl.framework/Frameworks",
+				"!idb/XCTestBootstrap.framework/Frameworks",
+			],
 		},
 		{
 			from: "../../packages/device-bridge/proto",
