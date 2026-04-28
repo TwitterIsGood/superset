@@ -1,7 +1,16 @@
-export { listIosDevices, parseIosDevices } from "./devices";
-export { screenshot } from "./screenshot";
 export { boot } from "./boot";
-export { startIosStream, stopIosStream, type IosStreamState, type IosStreamCallbacks } from "./live";
-export { hidTap, hidSwipe } from "./input";
-export { ensureCompanion, type CompanionConfig } from "./companion";
-export { isIdbAvailable, createCompanionClient, createHidClient } from "./grpc-client";
+export { type CompanionConfig, ensureCompanion } from "./companion";
+export { listIosDevices, parseIosDevices } from "./devices";
+export {
+	createCompanionClient,
+	createHidClient,
+	isIdbAvailable,
+} from "./grpc-client";
+export { hidBack, hidHome, hidSwipe, hidTap } from "./input";
+export {
+	type IosStreamCallbacks,
+	type IosStreamState,
+	startIosStream,
+	stopIosStream,
+} from "./live";
+export { screenshot } from "./screenshot";

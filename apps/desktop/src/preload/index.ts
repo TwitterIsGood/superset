@@ -1,5 +1,6 @@
 import "@sentry/electron/preload";
 
+import { createPreloadApi } from "@superset/device-bridge/preload";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { exposeElectronTRPC } from "trpc-electron/main";
 
@@ -12,6 +13,7 @@ declare global {
 		webUtils: {
 			getPathForFile: (file: File) => string;
 		};
+		deviceBridge: ReturnType<typeof createPreloadApi>;
 	}
 }
 
@@ -66,3 +68,6 @@ contextBridge.exposeInMainWorld("ipcRenderer", ipcRendererAPI);
 contextBridge.exposeInMainWorld("webUtils", {
 	getPathForFile: (file: File) => webUtils.getPathForFile(file),
 });
+
+const deviceBridgeApi = createPreloadApi(ipcRenderer);
+contextBridge.exposeInMainWorld("deviceBridge", deviceBridgeApi);

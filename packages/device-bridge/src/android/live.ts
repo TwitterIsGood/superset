@@ -1,16 +1,23 @@
-import type { StreamConfig, LiveChunkPayload } from "../types";
-import { run, TrackedProcessManager } from "../process-manager";
+import { run, type TrackedProcessManager } from "../process-manager";
+import type { LiveChunkPayload, StreamConfig } from "../types";
 
 function parseWmSize(output: string): { width: number; height: number } | null {
-	const match = output.match(/Physical size:\s*(\d+)x(\d+)/i) || output.match(/Override size:\s*(\d+)x(\d+)/i);
+	const match =
+		output.match(/Physical size:\s*(\d+)x(\d+)/i) ||
+		output.match(/Override size:\s*(\d+)x(\d+)/i);
 	if (!match) return null;
 	return { width: Number(match[1]), height: Number(match[2]) };
 }
 
-export async function getAndroidSize(deviceId?: string): Promise<{ width: number; height: number }> {
-	const args = deviceId ? ["-s", deviceId, "shell", "wm", "size"] : ["shell", "wm", "size"];
+export async function getAndroidSize(
+	deviceId?: string,
+): Promise<{ width: number; height: number }> {
+	const args = deviceId
+		? ["-s", deviceId, "shell", "wm", "size"]
+		: ["shell", "wm", "size"];
 	const result = await run("adb", args, { timeout: 8_000 });
-	if (!result.ok) throw new Error(result.stderr || "Could not read Android screen size");
+	if (!result.ok)
+		throw new Error(result.stderr || "Could not read Android screen size");
 	return parseWmSize(result.stdout) ?? { width: 1080, height: 2400 };
 }
 
@@ -30,20 +37,45 @@ export async function startAndroidStream(
 	const size = await getAndroidSize(deviceId);
 
 	const sizeArgs = deviceId
-		? ["-s", deviceId, "exec-out", "screenrecord", "--output-format=h264", "--bit-rate", String(bitrate), "--size", `${size.width}x${size.height}`, "-"]
-		: ["exec-out", "screenrecord", "--output-format=h264", "--bit-rate", String(bitrate), "--size", `${size.width}x${size.height}`, "-"];
+		? [
+				"-s",
+				deviceId,
+				"exec-out",
+				"screenrecord",
+				"--output-format=h264",
+				"--bit-rate",
+				String(bitrate),
+				"--size",
+				`${size.width}x${size.height}`,
+				"-",
+			]
+		: [
+				"exec-out",
+				"screenrecord",
+				"--output-format=h264",
+				"--bit-rate",
+				String(bitrate),
+				"--size",
+				`${size.width}x${size.height}`,
+				"-",
+			];
 
-	const proc = pm.spawn("adb", sizeArgs as string[], { stdio: ["ignore", "pipe", "pipe"] });
+	const proc = pm.spawn("adb", sizeArgs as string[], {
+		stdio: ["ignore", "pipe", "pipe"],
+	});
 	let stderr = "";
 
-	proc.stdout!.on("data", (data: Buffer) => {
+	proc.stdout?.on("data", (data: Buffer) => {
 		callbacks.onChunk({
-			data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
+			data: data.buffer.slice(
+				data.byteOffset,
+				data.byteOffset + data.byteLength,
+			) as ArrayBuffer,
 			timestamp: Date.now(),
 		});
 	});
 
-	proc.stderr!.on("data", (data: Buffer) => {
+	proc.stderr?.on("data", (data: Buffer) => {
 		stderr += data.toString();
 	});
 
@@ -56,6 +88,8 @@ export async function startAndroidStream(
 
 	return {
 		config: { width: size.width, height: size.height, codec: "h264", fps },
-		stop: () => { if (!proc.killed) proc.kill("SIGINT"); },
+		stop: () => {
+			if (!proc.killed) proc.kill("SIGINT");
+		},
 	};
 }

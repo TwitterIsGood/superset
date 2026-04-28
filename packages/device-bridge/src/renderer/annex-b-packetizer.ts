@@ -1,4 +1,4 @@
-import { findStartCodes, nalTypeAt, type StartCode } from "./h264-utils";
+import { findStartCodes, nalTypeAt } from "./h264-utils";
 
 export class AnnexBPacketizer {
 	private buffer = new Uint8Array(0);
@@ -17,8 +17,10 @@ export class AnnexBPacketizer {
 		if (starts.length < 2) return;
 
 		for (let i = 0; i < starts.length - 1; i++) {
-			const start = starts[i]!;
-			const end = starts[i + 1]!.index;
+			const start = starts[i];
+			const next = starts[i + 1];
+			if (!start || !next) continue;
+			const end = next.index;
 			const nal = this.buffer.slice(start.index, end);
 			const type = nalTypeAt(this.buffer, start);
 			const isSlice = type === 1 || type === 5;
@@ -26,7 +28,8 @@ export class AnnexBPacketizer {
 			this.parts.push(nal);
 			if (isSlice) this.seenSlice = true;
 		}
-		this.buffer = this.buffer.slice(starts[starts.length - 1]!.index);
+		const last = starts[starts.length - 1];
+		if (last) this.buffer = this.buffer.slice(last.index);
 	}
 
 	reset(): void {

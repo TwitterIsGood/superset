@@ -1,0 +1,4 @@
+framework module IDBCompanionUtilities {
+  header "IDBCompanionUtilities-Swift.h"
+  requires objc
+}

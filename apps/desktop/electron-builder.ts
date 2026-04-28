@@ -76,6 +76,21 @@ const config: Configuration = {
 			to: "resources/host-migrations",
 			filter: ["**/*"],
 		},
+		{
+			from: "../../packages/device-bridge/bin",
+			to: "device-bridge/bin",
+			filter: [
+				"**/*",
+				"!idb/FBDeviceControl.framework/Frameworks",
+				"!idb/FBSimulatorControl.framework/Frameworks",
+				"!idb/XCTestBootstrap.framework/Frameworks",
+			],
+		},
+		{
+			from: "../../packages/device-bridge/proto",
+			to: "device-bridge/proto",
+			filter: ["**/*"],
+		},
 	],
 
 	files: [

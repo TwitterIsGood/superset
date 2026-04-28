@@ -17,7 +17,11 @@
 			"default": "./src/preload/index.ts"
 		}
 	},
-	"files": ["proto", "src"],
+	"files": [
+		"bin",
+		"proto",
+		"src"
+	],
 	"scripts": {
 		"clean": "git clean -xdf .cache .turbo dist node_modules",
 		"typecheck": "tsc --noEmit --emitDeclarationOnly false",
@@ -31,6 +35,7 @@
 		"@superset/typescript": "workspace:*",
 		"@types/node": "^24.9.1",
 		"bun-types": "^1.3.1",
+		"electron": "40.8.5",
 		"typescript": "^5.9.3"
 	}
 }

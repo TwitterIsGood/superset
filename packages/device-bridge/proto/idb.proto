@@ -29,7 +29,6 @@ service CompanionService {
   rpc focus(FocusRequest) returns (FocusResponse) {}
   rpc hid(stream HIDEvent) returns (HIDResponse) {}
   rpc open_url(OpenUrlRequest) returns (OpenUrlRequest) {}
-  rpc set_device_orientation(SetDeviceOrientationRequest) returns (SetDeviceOrientationResponse) {};
   rpc set_location(SetLocationRequest) returns (SetLocationResponse) {}
   rpc send_notification(SendNotificationRequest)
       returns (SendNotificationResponse) {}
@@ -40,6 +39,8 @@ service CompanionService {
   rpc revoke(RevokeRequest) returns (RevokeResponse) {}
   rpc clear_keychain(ClearKeychainRequest) returns (ClearKeychainResponse) {}
   rpc contacts_update(ContactsUpdateRequest) returns (ContactsUpdateResponse) {}
+  rpc contacts_clear(ContactsClearRequest) returns (ContactsClearResponse) {}
+  rpc photos_clear(PhotosClearRequest) returns (PhotosClearResponse) {}
   rpc setting(SettingRequest) returns (SettingResponse) {} // Sets settings
   rpc get_setting(GetSettingRequest) returns (GetSettingResponse) {
   } // Gets current setting
@@ -56,7 +57,6 @@ service CompanionService {
   rpc screenshot(ScreenshotRequest) returns (ScreenshotResponse) {}
   rpc video_stream(stream VideoStreamRequest)
       returns (stream VideoStreamResponse) {}
-  rpc framebuffer_stream(stream FramebufferStreamRequest) returns (stream FramebufferStreamResponse) {}
   // Crash Operations
   rpc crash_delete(CrashLogQuery) returns (CrashLogResponse) {}
   rpc crash_list(CrashLogQuery) returns (CrashLogResponse) {}
@@ -316,23 +316,19 @@ message OpenUrlRequest {
 
 message OpenUrlResponse {}
 
-message SetDeviceOrientationRequest {
-  enum DeviceOrientation {
-      PORTRAIT = 0;
-      PORTRAIT_UPSIDE_DOWN = 1;
-      LANDSCAPE_RIGHT = 2;
-      LANDSCAPE_LEFT = 3;
-  }
-  DeviceOrientation device_orientation = 1;
-}
-
-message SetDeviceOrientationResponse {}
-
 message ContactsUpdateRequest {
   Payload payload = 1;
 }
 
 message ContactsUpdateResponse {}
+
+message ContactsClearRequest {}
+
+message ContactsClearResponse {}
+
+message PhotosClearRequest {}
+
+message PhotosClearResponse {}
 
 message TargetDescriptionRequest {
   bool fetch_diagnostics = 1;
@@ -359,7 +355,6 @@ message HIDEvent {
     LOCK = 2;
     SIDE_BUTTON = 3;
     SIRI = 4;
-    SOFT_KEYBOARD = 5;
   }
 
   message HIDButton {
@@ -492,33 +487,6 @@ message VideoStreamResponse {
     bytes log_output = 1;
     Payload payload = 2;
   }
-}
-
-message FramebufferStreamRequest {
-    message CopyFramebuffer {
-        string shared_memory_name = 1;
-        uint64 shared_memory_length = 2;
-    }
-    message Stop {}
-    oneof control {
-        CopyFramebuffer copy_framebuffer = 1;
-        Stop stop = 2;
-    }
-}
-
-message FramebufferInfo {
-    uint32 row_size = 1;
-    uint32 width = 2;
-    uint32 height = 3;
-    uint32 frame_size = 4;
-    string format = 5;
-}
-
-message FramebufferStreamResponse {
-    string shared_memory_name = 1;
-    optional uint64 bytes_written = 2;
-    optional string error = 3;
-    optional FramebufferInfo framebuffer_info = 4;
 }
 
 message LaunchRequest {
@@ -752,9 +720,6 @@ message XctestRunRequest {
   bool wait_for_debugger = 12;
   CodeCoverage code_coverage = 13;
   bool collect_result_bundle = 14;
-  optional bool activate_suspended = 15;
-  optional bool kill_all_running_applications = 16;
-  optional bool disable_xctest_debug_logging = 17;
 }
 
 message XctestRunResponse {

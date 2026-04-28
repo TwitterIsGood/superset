@@ -8,6 +8,7 @@ export interface RunOptions {
 	timeout?: number;
 	maxBuffer?: number;
 	encoding?: BufferEncoding | "buffer";
+	env?: NodeJS.ProcessEnv;
 }
 
 export interface RunResult {
@@ -26,16 +27,26 @@ export async function run(
 		const result = await execFileAsync(command, args, {
 			timeout: options.timeout ?? 15_000,
 			maxBuffer: options.maxBuffer ?? 1024 * 1024 * 8,
-			env: process.env,
+			env: options.env ?? process.env,
 			encoding: options.encoding ?? "utf8",
 		});
-		return { ok: true, stdout: result.stdout as string, stderr: result.stderr as string };
-	} catch (error: any) {
+		return {
+			ok: true,
+			stdout: result.stdout as string,
+			stderr: result.stderr as string,
+		};
+	} catch (error) {
+		const failed = error as Partial<{
+			stdout: unknown;
+			stderr: unknown;
+			message: unknown;
+			code: string;
+		}>;
 		return {
 			ok: false,
-			stdout: String(error.stdout ?? ""),
-			stderr: String(error.stderr ?? error.message),
-			code: error.code,
+			stdout: String(failed.stdout ?? ""),
+			stderr: String(failed.stderr ?? failed.message),
+			code: failed.code,
 		};
 	}
 }

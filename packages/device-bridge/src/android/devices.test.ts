@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { parseAdbDevices } from "./devices";
 
 describe("parseAdbDevices", () => {
@@ -9,8 +9,16 @@ abc123	unauthorized
 `;
 		const devices = parseAdbDevices(output);
 		expect(devices.length).toBe(2);
-		expect(devices[0]).toEqual({ id: "emulator-5554", state: "device", kind: "emulator" });
-		expect(devices[1]).toEqual({ id: "abc123", state: "unauthorized", kind: "device" });
+		expect(devices[0]).toEqual({
+			id: "emulator-5554",
+			state: "device",
+			kind: "emulator",
+		});
+		expect(devices[1]).toEqual({
+			id: "abc123",
+			state: "unauthorized",
+			kind: "device",
+		});
 	});
 
 	test("returns empty for header-only output", () => {

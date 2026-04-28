@@ -16,9 +16,9 @@ import {
 	loadToken,
 	parseAuthDeepLink,
 } from "lib/trpc/routers/auth/utils/auth-functions";
-import { modelProxyService } from "lib/trpc/routers/model-proxy/service";
 import { applyShellEnvToProcess } from "lib/trpc/routers/workspaces/utils/shell-env";
 import { env as mainEnv } from "main/env.main";
+import { modelProxyDaemonManager } from "main/lib/model-proxy-daemon/manager";
 import {
 	DEFAULT_CONFIRM_ON_QUIT,
 	PLATFORM,
@@ -353,8 +353,8 @@ if (!gotTheLock) {
 		setWorkspaceDockIcon();
 		initSentry();
 		await initAppState();
-		await modelProxyService.start().catch((error) => {
-			console.error("[main] Failed to start model proxy:", error);
+		await modelProxyDaemonManager.start().catch((error) => {
+			console.error("[main] Failed to start model proxy daemon:", error);
 		});
 
 		await loadWebviewBrowserExtension();

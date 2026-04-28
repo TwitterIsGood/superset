@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { AnnexBPacketizer } from "./annex-b-packetizer";
 
 function makeNal(type: number, payloadSize: number): Uint8Array {
@@ -27,7 +27,7 @@ describe("AnnexBPacketizer", () => {
 		p.append(new Uint8Array([...sps, ...pps, ...idr1, ...idr2, ...idr3]));
 
 		expect(units.length).toBe(1);
-		expect(units[0]!.length).toBe(sps.length + pps.length + idr1.length);
+		expect(units[0]?.length).toBe(sps.length + pps.length + idr1.length);
 	});
 
 	test("buffers data until enough start codes accumulate", () => {

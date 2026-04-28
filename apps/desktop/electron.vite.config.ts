@@ -111,6 +111,8 @@ export default defineConfig({
 					"git-task-worker": resolve("src/main/git-task-worker.ts"),
 					// Workspace service - local HTTP/tRPC server per org
 					"host-service": resolve("src/main/host-service/index.ts"),
+					// Model proxy daemon process - owns the local Anthropic-compatible proxy
+					"model-proxy": resolve("src/main/model-proxy/index.ts"),
 				},
 				output: {
 					dir: resolve(devPath, "main"),

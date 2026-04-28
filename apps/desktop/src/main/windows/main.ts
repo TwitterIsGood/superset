@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { registerDeviceBridge } from "@superset/device-bridge";
 import { workspaces, worktrees } from "@superset/local-db";
 import { eq } from "drizzle-orm";
 import type { BrowserWindow } from "electron";
@@ -37,6 +38,7 @@ import { getWorkspaceRuntimeRegistry } from "../lib/workspace-runtime";
 
 // Singleton IPC handler to prevent duplicate handlers on window reopen (macOS)
 let ipcHandler: ReturnType<typeof createIPCHandler> | null = null;
+let deviceBridgeDispose: { dispose: () => void } | null = null;
 
 function getWorkspaceNameFromDb(workspaceId: string | undefined): string {
 	if (!workspaceId) return "Workspace";
@@ -64,6 +66,18 @@ let currentWindow: BrowserWindow | null = null;
 
 // Routers receive this getter so they always see the current window, not a stale reference
 const getWindow = () => currentWindow;
+
+function getIdbArtifacts() {
+	const root = app.isPackaged
+		? join(process.resourcesPath, "device-bridge")
+		: join(app.getAppPath(), "../../packages/device-bridge");
+	const idbDir = join(root, "bin/idb");
+	return {
+		protoPath: join(root, "proto/idb.proto"),
+		companionPath: join(idbDir, "idb_companion"),
+		companionFrameworkPath: idbDir,
+	};
+}
 
 // invalidate() alone may not rebuild corrupted GPU layers — a tiny resize
 // forces Chromium to reconstruct the compositor layer tree.
@@ -143,6 +157,11 @@ export async function MainWindow() {
 			windows: [window],
 		});
 	}
+
+	deviceBridgeDispose = registerDeviceBridge(
+		window.webContents,
+		getIdbArtifacts(),
+	);
 
 	const server = notificationsApp.listen(
 		env.DESKTOP_NOTIFICATIONS_PORT,
@@ -317,6 +336,8 @@ export async function MainWindow() {
 		notificationManager.dispose();
 		notificationsEmitter.removeAllListeners();
 		getWorkspaceRuntimeRegistry().getDefault().terminal.detachAllListeners();
+		deviceBridgeDispose?.dispose();
+		deviceBridgeDispose = null;
 		ipcHandler?.detachWindow(window);
 		currentWindow = null;
 	});

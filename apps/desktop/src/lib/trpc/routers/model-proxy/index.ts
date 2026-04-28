@@ -1,10 +1,10 @@
+import { modelProxyDaemonManager } from "main/lib/model-proxy-daemon/manager";
 import { z } from "zod";
 import { publicProcedure, router } from "../..";
 import { aggregateModels } from "./aggregation";
 import {
 	fetchProviderModels,
 	fetchProviderModelsFromDraft,
-	modelProxyService,
 	testProvider,
 } from "./service";
 import {
@@ -75,8 +75,8 @@ export const createModelProvidersRouter = () =>
 
 export const createModelProxyRouter = () =>
 	router({
-		status: publicProcedure.query(() => modelProxyService.status()),
-		restart: publicProcedure.mutation(() => modelProxyService.restart()),
+		status: publicProcedure.query(() => modelProxyDaemonManager.status()),
+		restart: publicProcedure.mutation(() => modelProxyDaemonManager.restart()),
 	});
 
 export const createWorkspaceModelSettingsRouter = () =>
@@ -94,14 +94,12 @@ export const createWorkspaceModelSettingsRouter = () =>
 				}),
 			)
 			.mutation(async ({ input }) => {
-				const status = await modelProxyService.status();
-				const baseUrl =
-					status.baseUrl ?? (await modelProxyService.start()).baseUrl;
-				if (!baseUrl) throw new Error("Model proxy is not running");
+				const status = await modelProxyDaemonManager.ensureRunning();
+				if (!status.baseUrl) throw new Error("Model proxy is not running");
 				return saveProjectModelSettings({
 					...input,
-					baseUrl,
-					token: modelProxyService.getToken(),
+					baseUrl: status.baseUrl,
+					token: modelProxyDaemonManager.getWorkspaceToken(),
 				});
 			}),
 	});

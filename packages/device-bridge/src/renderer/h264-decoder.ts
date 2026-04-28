@@ -24,7 +24,9 @@ export class H264Decoder {
 
 	async configure(config: H264DecoderConfig): Promise<void> {
 		if (typeof VideoDecoder === "undefined") {
-			throw new Error("WebCodecs VideoDecoder is not available in this environment.");
+			throw new Error(
+				"WebCodecs VideoDecoder is not available in this environment.",
+			);
 		}
 
 		const videoConfig = {
@@ -40,7 +42,10 @@ export class H264Decoder {
 			throw new Error("H264 WebCodecs decoding is not supported.");
 		}
 
-		if (this.canvas.width !== config.width || this.canvas.height !== config.height) {
+		if (
+			this.canvas.width !== config.width ||
+			this.canvas.height !== config.height
+		) {
 			this.canvas.width = config.width;
 			this.canvas.height = config.height;
 		}
@@ -51,7 +56,8 @@ export class H264Decoder {
 				this.ctx.drawImage(frame, 0, 0, this.canvas.width, this.canvas.height);
 				frame.close();
 			},
-			error: (error) => config.onStatus?.(`WebCodecs decode error: ${error.message}`),
+			error: (error) =>
+				config.onStatus?.(`WebCodecs decode error: ${error.message}`),
 		});
 
 		this.decoder.configure(support.config ?? videoConfig);
