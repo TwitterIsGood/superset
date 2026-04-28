@@ -1,5 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	closeSync,
+	existsSync,
+	openSync,
+	readFileSync,
+	writeSync,
+} from "node:fs";
 import {
 	ensureModelProxyDaemonDir,
 	modelProxyControlTokenPath,
@@ -11,7 +17,9 @@ import {
 	MODEL_PROXY_HOST,
 	MODEL_PROXY_PORT,
 	MODEL_PROXY_PROTOCOL_VERSION,
+	MODEL_PROXY_SERVICE,
 	MODEL_PROXY_WORKSPACE_TOKEN,
+	modelProxyEndpoint,
 } from "main/lib/model-proxy-daemon/types";
 import { ModelProxyDaemonServer } from "./server";
 
@@ -23,8 +31,21 @@ function readOrCreateControlToken(): string {
 		if (token) return token;
 	}
 	const token = randomBytes(32).toString("base64url");
-	writeFileSync(tokenPath, `${token}\n`, { encoding: "utf-8", mode: 0o600 });
-	return token;
+	try {
+		const tokenFd = openSync(tokenPath, "wx", 0o600);
+		try {
+			writeSync(tokenFd, `${token}\n`);
+		} finally {
+			closeSync(tokenFd);
+		}
+		return token;
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "EEXIST") {
+			const existingToken = readFileSync(tokenPath, "utf-8").trim();
+			if (existingToken) return existingToken;
+		}
+		throw error;
+	}
 }
 
 async function main(): Promise<void> {
@@ -38,11 +59,12 @@ async function main(): Promise<void> {
 	await server.start();
 	writeModelProxyManifest({
 		pid: process.pid,
-		endpoint: `http://${MODEL_PROXY_HOST}:${MODEL_PROXY_PORT}`,
+		endpoint: modelProxyEndpoint(),
 		controlToken,
 		workspaceToken: MODEL_PROXY_WORKSPACE_TOKEN,
 		startedAt,
 		protocolVersion: MODEL_PROXY_PROTOCOL_VERSION,
+		service: MODEL_PROXY_SERVICE,
 	});
 	console.log(
 		`[model-proxy-daemon] listening on ${MODEL_PROXY_HOST}:${MODEL_PROXY_PORT}`,

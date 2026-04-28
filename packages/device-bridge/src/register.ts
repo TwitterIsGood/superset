@@ -27,7 +27,16 @@ import {
 } from "./ios";
 import { CH } from "./ipc-channels";
 import { TrackedProcessManager } from "./process-manager";
-import type { DeviceBridgeOptions } from "./types";
+import type {
+	AndroidDeviceInfo,
+	DeviceBridgeOptions,
+	IosDeviceInfo,
+} from "./types";
+
+type PlatformDeviceList<T> = {
+	devices: T[];
+	error: string | null;
+};
 
 export function registerDeviceBridge(
 	webContents: Electron.WebContents,
@@ -36,6 +45,20 @@ export function registerDeviceBridge(
 	const pm = new TrackedProcessManager();
 	let androidStop: (() => void) | null = null;
 	let iosState: IosStreamState | null = null;
+	let androidDevices: PlatformDeviceList<AndroidDeviceInfo> = {
+		devices: [],
+		error: null,
+	};
+	let iosDevices: PlatformDeviceList<IosDeviceInfo> = {
+		devices: [],
+		error: null,
+	};
+	let androidListPromise: Promise<void> | null = null;
+	let iosListPromise: Promise<void> | null = null;
+
+	let androidLiveSession = 0;
+	let androidLiveDeviceId: string | undefined;
+	let androidRestartTimer: NodeJS.Timeout | null = null;
 
 	const grpcPort = options.grpcPort ?? 10_882;
 
@@ -60,22 +83,99 @@ export function registerDeviceBridge(
 		handlers.push(() => ipcMain.removeHandler(channel));
 	}
 
+	function refreshAndroidDevices() {
+		if (options.enableAndroid === false || androidListPromise) return;
+		androidListPromise = listAndroidDevices()
+			.then((result) => {
+				androidDevices = result;
+			})
+			.finally(() => {
+				androidListPromise = null;
+			});
+	}
+
+	function refreshIosDevices() {
+		if (options.enableIos === false || iosListPromise) return;
+		iosListPromise = listIosDevices(undefined, options)
+			.then((result) => {
+				iosDevices = result;
+			})
+			.finally(() => {
+				iosListPromise = null;
+			});
+	}
+
 	// Devices
 	handle(CH.DEVICES_LIST, async () => {
-		const [adb, ios] = await Promise.all([
-			options.enableAndroid !== false
-				? listAndroidDevices()
-				: { devices: [], error: null },
-			options.enableIos !== false
-				? listIosDevices(undefined, options)
-				: { devices: [], error: null },
-		]);
+		refreshAndroidDevices();
+		refreshIosDevices();
+		if (androidListPromise && iosListPromise) {
+			await Promise.race([androidListPromise, iosListPromise]);
+		} else if (androidListPromise && androidDevices.devices.length === 0) {
+			await androidListPromise;
+		} else if (iosListPromise && iosDevices.devices.length === 0) {
+			await iosListPromise;
+		}
 		return {
-			android: adb.devices,
-			ios: ios.devices,
-			errors: { android: adb.error, ios: ios.error },
+			android: androidDevices.devices,
+			ios: iosDevices.devices,
+			errors: { android: androidDevices.error, ios: iosDevices.error },
 		};
 	});
+
+	async function startAndroidLiveSession(
+		deviceId: string | undefined,
+		session: number,
+	) {
+		const result = await startAndroidStream(
+			pm,
+			deviceId,
+			{
+				onChunk: (chunk) => {
+					if (session === androidLiveSession && !webContents.isDestroyed()) {
+						webContents.send(CH.ANDROID_LIVE_CHUNK, chunk);
+					}
+				},
+				onStatus: (msg) => {
+					if (!webContents.isDestroyed())
+						webContents.send(CH.ANDROID_LIVE_STATUS, msg);
+				},
+				onEnd: () => {
+					if (session !== androidLiveSession) return;
+					androidStop = null;
+					if (androidRestartTimer || webContents.isDestroyed()) return;
+					androidRestartTimer = setTimeout(() => {
+						androidRestartTimer = null;
+						if (session !== androidLiveSession) return;
+						void restartAndroidLiveSession(session);
+					}, 500);
+				},
+			},
+			options.h264Bitrate,
+			options.streamFps,
+		);
+		androidStop = result.stop;
+		return result;
+	}
+
+	async function restartAndroidLiveSession(session: number) {
+		if (!webContents.isDestroyed()) {
+			webContents.send(
+				CH.ANDROID_LIVE_STATUS,
+				"Restarting Android live stream",
+			);
+		}
+		try {
+			await startAndroidLiveSession(androidLiveDeviceId, session);
+		} catch (error) {
+			if (!webContents.isDestroyed()) {
+				webContents.send(
+					CH.ANDROID_LIVE_STATUS,
+					`Android live restart failed: ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
+		}
+	}
 
 	// Android
 	handle(CH.ANDROID_SCREENSHOT, async (_e, deviceId?: string) =>
@@ -121,29 +221,19 @@ export function registerDeviceBridge(
 	);
 
 	handle(CH.ANDROID_LIVE_START, async (_e, deviceId?: string) => {
+		androidLiveSession++;
+		androidLiveDeviceId = deviceId;
+		if (androidRestartTimer) {
+			clearTimeout(androidRestartTimer);
+			androidRestartTimer = null;
+		}
 		androidStop?.();
 		androidStop = null;
 		try {
-			const result = await startAndroidStream(
-				pm,
+			const result = await startAndroidLiveSession(
 				deviceId,
-				{
-					onChunk: (chunk) => {
-						if (!webContents.isDestroyed())
-							webContents.send(CH.ANDROID_LIVE_CHUNK, chunk);
-					},
-					onStatus: (msg) => {
-						if (!webContents.isDestroyed())
-							webContents.send(CH.ANDROID_LIVE_STATUS, msg);
-					},
-					onEnd: () => {
-						androidStop = null;
-					},
-				},
-				options.h264Bitrate,
-				options.streamFps,
+				androidLiveSession,
 			);
-			androidStop = result.stop;
 			return { ok: true, ...result.config };
 		} catch (error) {
 			return {
@@ -154,6 +244,12 @@ export function registerDeviceBridge(
 	});
 
 	handle(CH.ANDROID_LIVE_STOP, async () => {
+		androidLiveSession++;
+		androidLiveDeviceId = undefined;
+		if (androidRestartTimer) {
+			clearTimeout(androidRestartTimer);
+			androidRestartTimer = null;
+		}
 		androidStop?.();
 		androidStop = null;
 		return { ok: true };
@@ -265,12 +361,14 @@ export function registerDeviceBridge(
 	webContents.once("destroyed", () => {
 		androidStop?.();
 		void stopIosStream(iosState);
+		if (androidRestartTimer) clearTimeout(androidRestartTimer);
 		pm.killAll();
 	});
 
 	return {
 		dispose: () => {
 			for (const remove of handlers) remove();
+			if (androidRestartTimer) clearTimeout(androidRestartTimer);
 			androidStop?.();
 			void stopIosStream(iosState);
 			pm.killAll();

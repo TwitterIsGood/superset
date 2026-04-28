@@ -158,10 +158,10 @@ export async function MainWindow() {
 		});
 	}
 
-	deviceBridgeDispose = registerDeviceBridge(
-		window.webContents,
-		getIdbArtifacts(),
-	);
+	deviceBridgeDispose = registerDeviceBridge(window.webContents, {
+		...getIdbArtifacts(),
+		grpcPort: env.DESKTOP_DEVICE_BRIDGE_GRPC_PORT,
+	});
 
 	const server = notificationsApp.listen(
 		env.DESKTOP_NOTIFICATIONS_PORT,

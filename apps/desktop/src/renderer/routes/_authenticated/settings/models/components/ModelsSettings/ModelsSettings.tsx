@@ -13,7 +13,11 @@ import { Switch } from "@superset/ui/switch";
 import { useEffect, useState } from "react";
 import { LuX } from "react-icons/lu";
 import { electronTrpc } from "renderer/lib/electron-trpc";
-import type { ModelProviderProtocol } from "shared/model-proxy";
+import {
+	MODEL_PROXY_PORT,
+	type ModelProviderProtocol,
+	type ModelProxyStatus,
+} from "shared/model-proxy";
 import type { SettingItemId } from "../../../utils/settings-search";
 import {
 	addModelId,
@@ -47,6 +51,35 @@ const EMPTY_FORM: ProviderForm = {
 	enabled: true,
 	models: [],
 };
+
+function getProxyStatusText(status: ModelProxyStatus | undefined): string {
+	if (!status) return "Checking local proxy status...";
+	if (status.baseUrl) return status.baseUrl;
+	switch (status.statusCode) {
+		case "script_missing":
+			return "Daemon script is missing; rebuild the desktop app";
+		case "port_occupied_by_other":
+			return status.lastError?.includes("Identity probe returned HTTP 401")
+				? `Port ${MODEL_PROXY_PORT} is used by a service without the current LocalProxy identity endpoint`
+				: `Port ${MODEL_PROXY_PORT} is used by another local service`;
+		case "port_occupied_by_superset":
+			return "A Superset proxy is running but this app cannot authenticate to it";
+		case "manifest_token_mismatch":
+			return "A Superset proxy rejected this app's control token";
+		case "protocol_mismatch":
+			return "A Superset proxy is running with an incompatible protocol";
+		case "health_unavailable":
+			return "Local proxy is alive but failing health checks";
+		case "spawn_timeout":
+			return "Local proxy did not finish starting";
+		case "starting":
+			return "Local proxy is starting";
+		case "running":
+			return "Local proxy is running";
+		case "stopped":
+			return "Local proxy is not running";
+	}
+}
 
 export function ModelsSettings(_props: ModelsSettingsProps) {
 	const trpcUtils = electronTrpc.useUtils();
@@ -193,7 +226,7 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 								</Badge>
 							</div>
 							<p className="mt-1 font-mono text-xs text-muted-foreground">
-								{proxyStatus?.baseUrl ?? "Proxy URL unavailable"}
+								{getProxyStatusText(proxyStatus)}
 							</p>
 							<p className="mt-1 text-xs text-muted-foreground">
 								{proxyStatus?.enabledProviderCount ?? 0} enabled providers,{" "}
@@ -202,9 +235,13 @@ export function ModelsSettings(_props: ModelsSettingsProps) {
 						</div>
 						<Button
 							onClick={async () => {
-								await restartProxyMutation.mutateAsync();
+								const status = await restartProxyMutation.mutateAsync();
 								await refresh();
-								toast.success("Model proxy restarted");
+								if (status.running) {
+									toast.success("Model proxy restarted");
+									return;
+								}
+								toast.error(status.lastError ?? getProxyStatusText(status));
 							}}
 							disabled={restartProxyMutation.isPending}
 						>

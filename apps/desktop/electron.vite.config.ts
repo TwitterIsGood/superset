@@ -17,8 +17,16 @@ import {
 	htmlEnvTransformPlugin,
 } from "./vite/helpers";
 
+const injectedDesktopPortEnv = {
+	DESKTOP_NOTIFICATIONS_PORT: process.env.DESKTOP_NOTIFICATIONS_PORT,
+	DESKTOP_DEVICE_BRIDGE_GRPC_PORT: process.env.DESKTOP_DEVICE_BRIDGE_GRPC_PORT,
+};
+
 // override: true ensures .env values take precedence over inherited env vars
 config({ path: resolve(__dirname, "../../.env"), override: true, quiet: true });
+for (const [key, value] of Object.entries(injectedDesktopPortEnv)) {
+	if (value !== undefined) process.env[key] = value;
+}
 
 const DEV_SERVER_PORT = Number(process.env.DESKTOP_VITE_PORT);
 
@@ -91,6 +99,9 @@ export default defineConfig({
 			"process.env.DESKTOP_VITE_PORT": defineEnv(process.env.DESKTOP_VITE_PORT),
 			"process.env.DESKTOP_NOTIFICATIONS_PORT": defineEnv(
 				process.env.DESKTOP_NOTIFICATIONS_PORT,
+			),
+			"process.env.DESKTOP_DEVICE_BRIDGE_GRPC_PORT": defineEnv(
+				process.env.DESKTOP_DEVICE_BRIDGE_GRPC_PORT,
 			),
 			"process.env.ELECTRIC_PORT": defineEnv(process.env.ELECTRIC_PORT),
 			"process.env.SUPERSET_WORKSPACE_NAME": defineEnv(
@@ -207,6 +218,9 @@ export default defineConfig({
 			"process.env.DESKTOP_VITE_PORT": defineEnv(process.env.DESKTOP_VITE_PORT),
 			"process.env.DESKTOP_NOTIFICATIONS_PORT": defineEnv(
 				process.env.DESKTOP_NOTIFICATIONS_PORT,
+			),
+			"process.env.DESKTOP_DEVICE_BRIDGE_GRPC_PORT": defineEnv(
+				process.env.DESKTOP_DEVICE_BRIDGE_GRPC_PORT,
 			),
 			"process.env.ELECTRIC_PORT": defineEnv(process.env.ELECTRIC_PORT),
 			"process.env.SUPERSET_WORKSPACE_NAME": defineEnv(

@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { findStartCodes, hasIdrFrame, nalTypeAt } from "./h264-utils";
+import {
+	findStartCodes,
+	hasIdrFrame,
+	hasParameterSet,
+	nalTypeAt,
+} from "./h264-utils";
 
 describe("findStartCodes", () => {
 	test("finds 3-byte start codes", () => {
@@ -53,5 +58,22 @@ describe("hasIdrFrame", () => {
 	test("returns false for no start codes", () => {
 		const data = new Uint8Array([0x01, 0x02, 0x03]);
 		expect(hasIdrFrame(data)).toBe(false);
+	});
+});
+
+describe("hasParameterSet", () => {
+	test("detects SPS and PPS NAL units", () => {
+		expect(hasParameterSet(new Uint8Array([0x00, 0x00, 0x01, 0x67]))).toBe(
+			true,
+		);
+		expect(hasParameterSet(new Uint8Array([0x00, 0x00, 0x01, 0x68]))).toBe(
+			true,
+		);
+	});
+
+	test("returns false when no parameter set is present", () => {
+		expect(hasParameterSet(new Uint8Array([0x00, 0x00, 0x01, 0x65]))).toBe(
+			false,
+		);
 	});
 });

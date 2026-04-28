@@ -95,7 +95,11 @@ export const createWorkspaceModelSettingsRouter = () =>
 			)
 			.mutation(async ({ input }) => {
 				const status = await modelProxyDaemonManager.ensureRunning();
-				if (!status.baseUrl) throw new Error("Model proxy is not running");
+				if (!status.baseUrl) {
+					throw new Error(
+						`Model proxy is not available (${status.statusCode})${status.lastError ? `: ${status.lastError}` : ""}`,
+					);
+				}
 				return saveProjectModelSettings({
 					...input,
 					baseUrl: status.baseUrl,

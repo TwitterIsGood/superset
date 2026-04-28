@@ -18,9 +18,13 @@ import {
 } from "lib/trpc/routers/model-proxy/storage";
 import {
 	MODEL_PROXY_HOST,
+	MODEL_PROXY_IDENTITY_PATH,
 	MODEL_PROXY_PORT,
 	MODEL_PROXY_PROTOCOL_VERSION,
+	MODEL_PROXY_SERVICE,
 	type ModelProxyDaemonHealth,
+	type ModelProxyDaemonIdentity,
+	modelProxyEndpoint,
 } from "main/lib/model-proxy-daemon/types";
 import type { ModelProxyStatus } from "shared/model-proxy";
 
@@ -107,37 +111,39 @@ export class ModelProxyDaemonServer {
 	}
 
 	getBaseUrl(): string {
-		return `http://${MODEL_PROXY_HOST}:${MODEL_PROXY_PORT}`;
+		return modelProxyEndpoint();
 	}
 
-	async status(): Promise<ModelProxyStatus> {
-		const providers = await listProvidersForProxy();
-		const summaries = providers.map((provider) => ({
-			...provider,
-			hasSecret: !!provider.secret,
-		}));
+	status(): ModelProxyStatus {
 		return {
 			running: !!this.server?.listening,
+			statusCode: this.server?.listening ? "running" : "stopped",
 			baseUrl: this.getBaseUrl(),
 			port: MODEL_PROXY_PORT,
 			tokenConfigured: this.workspaceToken.length > 0,
-			enabledProviderCount: providers.filter((provider) => provider.enabled)
-				.length,
-			aggregatedModelCount: aggregateModels(summaries).length,
+			enabledProviderCount: 0,
+			aggregatedModelCount: 0,
 			lastError: this.lastError,
 		};
 	}
 
-	private async health(): Promise<ModelProxyDaemonHealth> {
-		const status = await this.status();
+	private identity(): ModelProxyDaemonIdentity {
+		return {
+			service: MODEL_PROXY_SERVICE,
+			protocolVersion: MODEL_PROXY_PROTOCOL_VERSION,
+			pid: process.pid,
+			startedAt: this.startedAt,
+			port: MODEL_PROXY_PORT,
+		};
+	}
+
+	private health(): ModelProxyDaemonHealth {
 		return {
 			ok: true,
 			pid: process.pid,
 			startedAt: this.startedAt,
 			port: MODEL_PROXY_PORT,
 			protocolVersion: MODEL_PROXY_PROTOCOL_VERSION,
-			enabledProviderCount: status.enabledProviderCount,
-			aggregatedModelCount: status.aggregatedModelCount,
 		};
 	}
 
@@ -161,12 +167,19 @@ export class ModelProxyDaemonServer {
 		response: ServerResponse,
 	): Promise<void> {
 		const url = new URL(request.url ?? "/", this.getBaseUrl());
+		if (
+			request.method === "GET" &&
+			url.pathname === MODEL_PROXY_IDENTITY_PATH
+		) {
+			jsonResponse(response, 200, this.identity());
+			return;
+		}
 		if (request.method === "GET" && url.pathname === "/health") {
 			if (!this.isControlAuthorized(request)) {
 				jsonResponse(response, 401, { error: { message: "Unauthorized" } });
 				return;
 			}
-			jsonResponse(response, 200, await this.health());
+			jsonResponse(response, 200, this.health());
 			return;
 		}
 

@@ -64,14 +64,24 @@ export async function startAndroidStream(
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	let stderr = "";
+	let lastChunkAt = Date.now();
+	let stopped = false;
+	const stallTimer = setInterval(() => {
+		if (stopped) return;
+		const silentFor = Date.now() - lastChunkAt;
+		if (silentFor < 3_000) return;
+		callbacks.onStatus(`Android live stream stalled for ${silentFor}ms`);
+		proc.kill("SIGTERM");
+	}, 1_000);
 
 	proc.stdout?.on("data", (data: Buffer) => {
+		lastChunkAt = Date.now();
 		callbacks.onChunk({
 			data: data.buffer.slice(
 				data.byteOffset,
 				data.byteOffset + data.byteLength,
 			) as ArrayBuffer,
-			timestamp: Date.now(),
+			timestamp: lastChunkAt,
 		});
 	});
 
@@ -79,9 +89,18 @@ export async function startAndroidStream(
 		stderr += data.toString();
 	});
 
-	proc.on("close", (_code, signal) => {
-		if (signal !== "SIGINT" && stderr.trim()) {
-			callbacks.onStatus(stderr.trim());
+	proc.on("close", (code, signal) => {
+		stopped = true;
+		clearInterval(stallTimer);
+		if (signal !== "SIGINT") {
+			const reason = [
+				`Android live stream exited${code === null ? "" : ` with code ${code}`}`,
+				signal ? `signal ${signal}` : null,
+				stderr.trim() || null,
+			]
+				.filter(Boolean)
+				.join(": ");
+			callbacks.onStatus(reason);
 		}
 		callbacks.onEnd();
 	});
@@ -89,6 +108,8 @@ export async function startAndroidStream(
 	return {
 		config: { width: size.width, height: size.height, codec: "h264", fps },
 		stop: () => {
+			stopped = true;
+			clearInterval(stallTimer);
 			if (!proc.killed) proc.kill("SIGINT");
 		},
 	};
