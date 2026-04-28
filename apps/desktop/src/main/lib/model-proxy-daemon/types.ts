@@ -1,7 +1,15 @@
+import { MODEL_PROXY_HOST, MODEL_PROXY_PORT } from "shared/model-proxy";
+
+export { MODEL_PROXY_HOST, MODEL_PROXY_PORT };
+
 export const MODEL_PROXY_PROTOCOL_VERSION = 1;
-export const MODEL_PROXY_HOST = "127.0.0.1";
-export const MODEL_PROXY_PORT = 39127;
+export const MODEL_PROXY_SERVICE = "superset-model-proxy";
+export const MODEL_PROXY_IDENTITY_PATH = "/.well-known/superset-model-proxy";
 export const MODEL_PROXY_WORKSPACE_TOKEN = "superset-local-model-proxy";
+
+export function modelProxyEndpoint(): string {
+	return `http://${MODEL_PROXY_HOST}:${MODEL_PROXY_PORT}`;
+}
 
 export interface ModelProxyDaemonManifest {
 	pid: number;
@@ -10,6 +18,7 @@ export interface ModelProxyDaemonManifest {
 	workspaceToken: string;
 	startedAt: number;
 	protocolVersion: number;
+	service: typeof MODEL_PROXY_SERVICE;
 }
 
 export interface ModelProxyDaemonHealth {
@@ -18,6 +27,12 @@ export interface ModelProxyDaemonHealth {
 	startedAt: number;
 	port: number;
 	protocolVersion: number;
-	enabledProviderCount: number;
-	aggregatedModelCount: number;
+}
+
+export interface ModelProxyDaemonIdentity {
+	service: typeof MODEL_PROXY_SERVICE;
+	protocolVersion: number;
+	pid: number;
+	startedAt: number;
+	port: number;
 }

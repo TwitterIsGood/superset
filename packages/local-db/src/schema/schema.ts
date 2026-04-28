@@ -240,6 +240,48 @@ export const settings = sqliteTable("settings", {
 export type InsertSettings = typeof settings.$inferInsert;
 export type SelectSettings = typeof settings.$inferSelect;
 
+export type LocalModelProviderProtocol = "anthropic" | "openai";
+
+export const modelProviders = sqliteTable(
+	"model_providers",
+	{
+		id: text("id").primaryKey(),
+		name: text("name").notNull(),
+		protocol: text("protocol").notNull().$type<LocalModelProviderProtocol>(),
+		baseUrl: text("base_url").notNull(),
+		proxyUrl: text("proxy_url"),
+		enabled: integer("enabled", { mode: "boolean" }).notNull(),
+		secretEncrypted: text("secret_encrypted"),
+		createdAt: text("created_at").notNull(),
+		updatedAt: text("updated_at").notNull(),
+	},
+	(table) => [index("model_providers_created_at_idx").on(table.createdAt)],
+);
+
+export type InsertModelProvider = typeof modelProviders.$inferInsert;
+export type SelectModelProvider = typeof modelProviders.$inferSelect;
+
+export const modelProviderModels = sqliteTable(
+	"model_provider_models",
+	{
+		providerId: text("provider_id")
+			.notNull()
+			.references(() => modelProviders.id, { onDelete: "cascade" }),
+		modelId: text("model_id").notNull(),
+		displayName: text("display_name"),
+		lastFetchedAt: text("last_fetched_at"),
+		position: integer("position").notNull(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.providerId, table.modelId] }),
+		index("model_provider_models_provider_id_idx").on(table.providerId),
+		index("model_provider_models_model_id_idx").on(table.modelId),
+	],
+);
+
+export type InsertModelProviderModel = typeof modelProviderModels.$inferInsert;
+export type SelectModelProviderModel = typeof modelProviderModels.$inferSelect;
+
 export type V1MigrationKind = "project" | "workspace";
 export type V1MigrationStatus = "success" | "linked" | "error" | "skipped";
 

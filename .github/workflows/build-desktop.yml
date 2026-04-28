@@ -90,6 +90,16 @@ jobs:
         working-directory: apps/desktop
         run: bun run generate:icons
 
+      - name: Configure desktop local service ports
+        run: |
+          if [ "${{ inputs.channel }}" = "canary" ]; then
+            echo "DESKTOP_NOTIFICATIONS_PORT=51742" >> "$GITHUB_ENV"
+            echo "DESKTOP_DEVICE_BRIDGE_GRPC_PORT=10883" >> "$GITHUB_ENV"
+          else
+            echo "DESKTOP_NOTIFICATIONS_PORT=51741" >> "$GITHUB_ENV"
+            echo "DESKTOP_DEVICE_BRIDGE_GRPC_PORT=10882" >> "$GITHUB_ENV"
+          fi
+
       - name: Compile app with electron-vite
         working-directory: apps/desktop
         env:
@@ -240,6 +250,16 @@ jobs:
       - name: Generate file icons
         working-directory: apps/desktop
         run: bun run generate:icons
+
+      - name: Configure desktop local service ports
+        run: |
+          if [ "${{ inputs.channel }}" = "canary" ]; then
+            echo "DESKTOP_NOTIFICATIONS_PORT=51742" >> "$GITHUB_ENV"
+            echo "DESKTOP_DEVICE_BRIDGE_GRPC_PORT=10883" >> "$GITHUB_ENV"
+          else
+            echo "DESKTOP_NOTIFICATIONS_PORT=51741" >> "$GITHUB_ENV"
+            echo "DESKTOP_DEVICE_BRIDGE_GRPC_PORT=10882" >> "$GITHUB_ENV"
+          fi
 
       - name: Compile app with electron-vite
         working-directory: apps/desktop

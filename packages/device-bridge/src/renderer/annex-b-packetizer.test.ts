@@ -34,10 +34,6 @@ describe("AnnexBPacketizer", () => {
 		const units: Uint8Array[] = [];
 		const p = new AnnexBPacketizer((unit) => units.push(unit));
 
-		// Need 3 slices total for emit:
-		// append 1 → 1 start code, not enough
-		// append 2 → 2 start codes, processes slice1, keeps slice2 in buffer
-		// append 3 → 3 start codes in buffer (prev + new), processes slice2, triggers emit
 		const slice1 = makeNal(1, 5);
 		p.append(slice1);
 		expect(units.length).toBe(0);
@@ -49,5 +45,21 @@ describe("AnnexBPacketizer", () => {
 		const slice3 = makeNal(1, 5);
 		p.append(slice3);
 		expect(units.length).toBe(1);
+	});
+
+	test("finds start codes split across chunks", () => {
+		const units: Uint8Array[] = [];
+		const p = new AnnexBPacketizer((unit) => units.push(unit));
+		const slice1 = makeNal(1, 2);
+		const slice2 = makeNal(1, 2);
+		const slice3 = makeNal(1, 2);
+		const stream = new Uint8Array([...slice1, ...slice2, ...slice3]);
+
+		p.append(stream.slice(0, slice1.length + 2));
+		p.append(stream.slice(slice1.length + 2, slice1.length + 4));
+		p.append(stream.slice(slice1.length + 4));
+
+		expect(units.length).toBe(1);
+		expect(Array.from(units[0] ?? [])).toEqual(Array.from(slice1));
 	});
 });

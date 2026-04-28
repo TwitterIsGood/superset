@@ -1,3 +1,6 @@
+export const MODEL_PROXY_HOST = "127.0.0.1";
+export const MODEL_PROXY_PORT = 39127;
+
 export type ModelProviderProtocol = "anthropic" | "openai";
 
 export interface ModelProviderModel {
@@ -39,8 +42,21 @@ export interface FetchProviderModelsInput {
 	secret?: string;
 }
 
+export type ModelProxyStatusCode =
+	| "running"
+	| "stopped"
+	| "starting"
+	| "script_missing"
+	| "port_occupied_by_superset"
+	| "port_occupied_by_other"
+	| "manifest_token_mismatch"
+	| "protocol_mismatch"
+	| "health_unavailable"
+	| "spawn_timeout";
+
 export interface ModelProxyStatus {
 	running: boolean;
+	statusCode: ModelProxyStatusCode;
 	baseUrl: string | null;
 	port: number | null;
 	tokenConfigured: boolean;

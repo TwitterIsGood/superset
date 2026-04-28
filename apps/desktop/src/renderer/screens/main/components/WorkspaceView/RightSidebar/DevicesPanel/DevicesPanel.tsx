@@ -9,6 +9,40 @@ import {
 	type SelectedDevice,
 } from "./components/GroupedDevicePicker";
 
+function areDeviceListsEqual(
+	a: DeviceListResult,
+	b: DeviceListResult,
+): boolean {
+	return (
+		a.errors.android === b.errors.android &&
+		a.errors.ios === b.errors.ios &&
+		a.android.length === b.android.length &&
+		a.ios.length === b.ios.length &&
+		a.android.every((device, index) => {
+			const other = b.android[index];
+			return (
+				other !== undefined &&
+				device.id === other.id &&
+				device.state === other.state &&
+				device.kind === other.kind
+			);
+		}) &&
+		a.ios.every((device, index) => {
+			const other = b.ios[index];
+			return (
+				other !== undefined &&
+				device.id === other.id &&
+				device.name === other.name &&
+				device.runtime === other.runtime &&
+				device.state === other.state &&
+				device.isAvailable === other.isAvailable &&
+				device.pointScale === other.pointScale &&
+				device.kind === other.kind
+			);
+		})
+	);
+}
+
 export function DevicesPanel() {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const {
@@ -51,14 +85,22 @@ export function DevicesPanel() {
 	const [error, setError] = useState<string | null>(null);
 
 	const devicesRef = useRef(devices);
+	const isRefreshInFlightRef = useRef(false);
 	devicesRef.current = devices;
 
 	const refreshDevices = useCallback(async () => {
+		if (isRefreshInFlightRef.current) return;
+		isRefreshInFlightRef.current = true;
 		try {
 			const result = await listDevices();
-			setDevices(result);
+			if (!areDeviceListsEqual(devicesRef.current, result)) {
+				devicesRef.current = result;
+				setDevices(result);
+			}
 		} catch (err) {
 			console.error("[DevicesPanel] Failed to list devices:", err);
+		} finally {
+			isRefreshInFlightRef.current = false;
 		}
 	}, [listDevices]);
 

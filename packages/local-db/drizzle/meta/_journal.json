@@ -302,6 +302,13 @@
       "when": 1777131667205,
       "tag": "0042_local_first_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1777377784509,
+      "tag": "0043_model_providers_sqlite",
+      "breakpoints": true
     }
   ]
 }

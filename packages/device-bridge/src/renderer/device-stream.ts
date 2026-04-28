@@ -2,6 +2,7 @@
 
 import type { IpcTransport, StreamConfig } from "../types";
 import { AnnexBPacketizer } from "./annex-b-packetizer";
+import { classifyGesture, type GestureStart } from "./gesture";
 import { H264Decoder } from "./h264-decoder";
 import { IpcClient } from "./ipc-client";
 
@@ -19,10 +20,12 @@ export class DeviceStream {
 	private liveTarget: LiveTarget | null = null;
 	private removeChunkListener: (() => void) | null = null;
 	private removeStatusListener: (() => void) | null = null;
+	private pendingChunks: Uint8Array[] = [];
+	private pendingChunkBytes = 0;
+	private readonly maxPendingChunkBytes = 8 * 1024 * 1024;
 
 	// Canvas interaction
-	private dragStart: { x: number; y: number } | null = null;
-	private mouseDownTime: number = 0;
+	private gestureStart: GestureStart | null = null;
 
 	constructor(canvas: HTMLCanvasElement, transport: IpcTransport) {
 		this.ipc = new IpcClient(transport);
@@ -31,8 +34,9 @@ export class DeviceStream {
 		if (!ctx) throw new Error("Canvas 2D context is unavailable.");
 		this.ctx = ctx;
 
-		canvas.addEventListener("mousedown", this.onMouseDown);
-		canvas.addEventListener("mouseup", this.onMouseUp);
+		canvas.addEventListener("pointerdown", this.onPointerDown);
+		canvas.addEventListener("pointerup", this.onPointerUp);
+		canvas.addEventListener("pointercancel", this.onPointerCancel);
 		canvas.style.cursor = "pointer";
 	}
 
@@ -64,9 +68,17 @@ export class DeviceStream {
 
 		if (platform === "android") {
 			this.liveTarget = { platform, deviceId: opts.deviceId, pointScale };
-			this.removeStatusListener = this.ipc.onAndroidLiveStatus(() => {});
+			let config: StreamConfig | null = null;
+			this.removeStatusListener = this.ipc.onAndroidLiveStatus((message) => {
+				if (
+					typeof message === "string" &&
+					message.includes("Restarting Android")
+				) {
+					this.resetDecoder(config);
+				}
+			});
 			this.removeChunkListener = this.ipc.onAndroidLiveChunk((chunk) => {
-				this.packetizer?.append(new Uint8Array(chunk.data));
+				this.appendLiveChunk(new Uint8Array(chunk.data));
 			});
 
 			const result = await this.ipc.androidLiveStart(opts.deviceId);
@@ -75,10 +87,12 @@ export class DeviceStream {
 				throw new Error(result.error);
 			}
 
+			config = result;
 			await this.initDecoder({ ...result, fps: result.fps });
 			this.packetizer = new AnnexBPacketizer((unit) =>
 				this.decoder?.decode(unit),
 			);
+			this.flushPendingChunks();
 			return result;
 		}
 
@@ -114,6 +128,7 @@ export class DeviceStream {
 		this.decoder?.close();
 		this.decoder = null;
 		this.packetizer = null;
+		this.clearPendingChunks();
 		this.liveTarget = null;
 		this.canvas.style.display = "none";
 		if (target?.platform === "android") await this.ipc.androidLiveStop();
@@ -122,8 +137,9 @@ export class DeviceStream {
 
 	dispose(): void {
 		void this.stopLive();
-		this.canvas.removeEventListener("mousedown", this.onMouseDown);
-		this.canvas.removeEventListener("mouseup", this.onMouseUp);
+		this.canvas.removeEventListener("pointerdown", this.onPointerDown);
+		this.canvas.removeEventListener("pointerup", this.onPointerUp);
+		this.canvas.removeEventListener("pointercancel", this.onPointerCancel);
 	}
 
 	private async initDecoder(config: {
@@ -136,7 +152,45 @@ export class DeviceStream {
 		await this.decoder.configure(config);
 	}
 
-	private canvasToDevice(event: MouseEvent): { x: number; y: number } {
+	private resetDecoder(config: StreamConfig | null): void {
+		if (!config) return;
+		this.decoder?.close();
+		this.packetizer?.reset();
+		this.clearPendingChunks();
+		this.decoder = new H264Decoder(this.canvas, this.ctx);
+		void this.decoder.configure(config);
+	}
+
+	private appendLiveChunk(chunk: Uint8Array): void {
+		if (this.packetizer) {
+			this.packetizer.append(chunk);
+			return;
+		}
+
+		this.pendingChunks.push(chunk);
+		this.pendingChunkBytes += chunk.byteLength;
+		while (
+			this.pendingChunkBytes > this.maxPendingChunkBytes &&
+			this.pendingChunks.length > 0
+		) {
+			const dropped = this.pendingChunks.shift();
+			this.pendingChunkBytes -= dropped?.byteLength ?? 0;
+		}
+	}
+
+	private flushPendingChunks(): void {
+		const packetizer = this.packetizer;
+		if (!packetizer) return;
+		for (const chunk of this.pendingChunks) packetizer.append(chunk);
+		this.clearPendingChunks();
+	}
+
+	private clearPendingChunks(): void {
+		this.pendingChunks = [];
+		this.pendingChunkBytes = 0;
+	}
+
+	private canvasToDevice(event: PointerEvent): { x: number; y: number } {
 		const rect = this.canvas.getBoundingClientRect();
 		const scaleX = this.canvas.width / rect.width;
 		const scaleY = this.canvas.height / rect.height;
@@ -146,25 +200,42 @@ export class DeviceStream {
 		};
 	}
 
-	private onMouseDown = (event: MouseEvent): void => {
-		if (!this.liveTarget) return;
+	private onPointerDown = (event: PointerEvent): void => {
+		if (!this.liveTarget || event.button !== 0) return;
 		const pos = this.canvasToDevice(event);
-		this.dragStart = pos;
-		this.mouseDownTime = Date.now();
-		this.forwardTap(pos.x, pos.y);
+		this.gestureStart = { ...pos, timestamp: Date.now() };
+		this.canvas.setPointerCapture(event.pointerId);
 	};
 
-	private onMouseUp = (event: MouseEvent): void => {
-		const start = this.dragStart;
-		this.dragStart = null;
+	private onPointerUp = (event: PointerEvent): void => {
+		const start = this.gestureStart;
+		this.gestureStart = null;
 		if (!start) return;
-		const end = this.canvasToDevice(event);
-		const dx = end.x - start.x;
-		const dy = end.y - start.y;
-		const dist = Math.sqrt(dx * dx + dy * dy);
-		// If dragged enough, also send swipe (the earlier tap is harmless)
-		if (dist > 10 && Date.now() - this.mouseDownTime < 1000) {
-			this.forwardSwipe(start.x, start.y, end.x, end.y);
+		if (this.canvas.hasPointerCapture(event.pointerId)) {
+			this.canvas.releasePointerCapture(event.pointerId);
+		}
+		const gesture = classifyGesture(
+			start,
+			this.canvasToDevice(event),
+			Date.now(),
+		);
+		if (gesture.type === "tap") {
+			this.forwardTap(gesture.x, gesture.y);
+			return;
+		}
+		this.forwardSwipe(
+			gesture.x1,
+			gesture.y1,
+			gesture.x2,
+			gesture.y2,
+			gesture.duration,
+		);
+	};
+
+	private onPointerCancel = (event: PointerEvent): void => {
+		this.gestureStart = null;
+		if (this.canvas.hasPointerCapture(event.pointerId)) {
+			this.canvas.releasePointerCapture(event.pointerId);
 		}
 	};
 
@@ -187,11 +258,19 @@ export class DeviceStream {
 		y1: number,
 		x2: number,
 		y2: number,
+		duration: number,
 	): Promise<void> {
 		const t = this.liveTarget;
 		if (!t) return;
 		if (t.platform === "android") {
-			await this.ipc.androidSwipe({ deviceId: t.deviceId, x1, y1, x2, y2 });
+			await this.ipc.androidSwipe({
+				deviceId: t.deviceId,
+				x1,
+				y1,
+				x2,
+				y2,
+				duration,
+			});
 		} else {
 			const s = t.pointScale;
 			await this.ipc.iosSwipe({
@@ -200,6 +279,7 @@ export class DeviceStream {
 				y1: Math.round(y1 / s),
 				x2: Math.round(x2 / s),
 				y2: Math.round(y2 / s),
+				duration,
 			});
 		}
 	}

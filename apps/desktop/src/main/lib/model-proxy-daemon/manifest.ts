@@ -2,19 +2,28 @@ import {
 	existsSync,
 	mkdirSync,
 	readFileSync,
+	rmSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import {
-	ensureSupersetHomeDirExists,
-	SUPERSET_HOME_DIR,
 	SUPERSET_HOME_DIR_MODE,
 	SUPERSET_SENSITIVE_FILE_MODE,
 } from "main/lib/app-environment";
-import type { ModelProxyDaemonManifest } from "./types";
+import {
+	MODEL_PROXY_PORT,
+	MODEL_PROXY_SERVICE,
+	type ModelProxyDaemonManifest,
+} from "./types";
 
-const MODEL_PROXY_DIR = join(SUPERSET_HOME_DIR, "model-proxy");
+const GLOBAL_SUPERSET_DAEMON_DIR = join(homedir(), ".superset", "daemons");
+const MODEL_PROXY_DIR = join(
+	GLOBAL_SUPERSET_DAEMON_DIR,
+	"model-proxy",
+	`port-${MODEL_PROXY_PORT}`,
+);
 const MANIFEST_PATH = join(MODEL_PROXY_DIR, "daemon-manifest.json");
 const CONTROL_TOKEN_PATH = join(MODEL_PROXY_DIR, "daemon-control.token");
 const SPAWN_LOCK_PATH = join(MODEL_PROXY_DIR, "daemon.spawn.lock");
@@ -41,12 +50,13 @@ export function modelProxyLogPath(): string {
 }
 
 export function ensureModelProxyDaemonDir(): void {
-	ensureSupersetHomeDirExists();
-	if (!existsSync(MODEL_PROXY_DIR)) {
-		mkdirSync(MODEL_PROXY_DIR, {
-			recursive: true,
-			mode: SUPERSET_HOME_DIR_MODE,
-		});
+	for (const directory of [GLOBAL_SUPERSET_DAEMON_DIR, MODEL_PROXY_DIR]) {
+		if (!existsSync(directory)) {
+			mkdirSync(directory, {
+				recursive: true,
+				mode: SUPERSET_HOME_DIR_MODE,
+			});
+		}
 	}
 }
 
@@ -56,6 +66,7 @@ function isManifest(value: unknown): value is ModelProxyDaemonManifest {
 	}
 	const record = value as Record<string, unknown>;
 	return (
+		record.service === MODEL_PROXY_SERVICE &&
 		typeof record.pid === "number" &&
 		typeof record.endpoint === "string" &&
 		typeof record.controlToken === "string" &&
@@ -91,6 +102,31 @@ export function removeModelProxyManifest(): void {
 	} catch {
 		// Best-effort cleanup.
 	}
+}
+
+export function removeModelProxySpawnLock(): void {
+	try {
+		if (existsSync(SPAWN_LOCK_PATH)) unlinkSync(SPAWN_LOCK_PATH);
+	} catch {
+		// Best-effort cleanup.
+	}
+}
+
+export function removeModelProxyControlState(): void {
+	removeModelProxyManifest();
+	removeModelProxySpawnLock();
+	try {
+		if (existsSync(CONTROL_TOKEN_PATH)) unlinkSync(CONTROL_TOKEN_PATH);
+	} catch {
+		// Best-effort cleanup.
+	}
+}
+
+export function removeModelProxyDaemonDirForTest(): void {
+	if (process.env.NODE_ENV !== "test") {
+		throw new Error("removeModelProxyDaemonDirForTest is test-only");
+	}
+	rmSync(MODEL_PROXY_DIR, { recursive: true, force: true });
 }
 
 export function isProcessAlive(pid: number): boolean {
