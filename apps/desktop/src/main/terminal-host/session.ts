@@ -455,10 +455,14 @@ export class Session {
 	 */
 	private flushSubprocessStdinQueue(): void {
 		if (!this.subprocess?.stdin || this.disposed) return;
+		if (this.subprocessStdinDrainArmed) return;
 
 		while (this.subprocessStdinQueue.length > 0) {
 			const buf = this.subprocessStdinQueue[0];
 			const canWrite = this.subprocess.stdin.write(buf);
+			this.subprocessStdinQueue.shift();
+			this.subprocessStdinQueuedBytes -= buf.length;
+
 			if (!canWrite) {
 				if (!this.subprocessStdinDrainArmed) {
 					this.subprocessStdinDrainArmed = true;
@@ -469,9 +473,6 @@ export class Session {
 				}
 				return;
 			}
-
-			this.subprocessStdinQueue.shift();
-			this.subprocessStdinQueuedBytes -= buf.length;
 		}
 	}
 

@@ -29,12 +29,13 @@ class FakeStdout extends EventEmitter {
 
 class FakeStdin extends EventEmitter {
 	readonly writes: Buffer[] = [];
+	writeResults: boolean[] = [];
 
 	write(chunk: Buffer | string): boolean {
 		this.writes.push(
 			Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, "utf8"),
 		);
-		return true;
+		return this.writeResults.shift() ?? true;
 	}
 }
 
@@ -261,6 +262,55 @@ describe("Terminal Host Session shell args", () => {
 		).broadcastEvent("data", { type: "data", data: "hello" });
 
 		expect(writes.some((message) => message.includes('"hello"'))).toBe(true);
+	});
+});
+
+describe("Terminal Host Session subprocess stdin backpressure", () => {
+	beforeEach(() => {
+		fakeChildProcess = new FakeChildProcess();
+		spawnCalls = [];
+	});
+
+	it("does not resend a chunk after subprocess stdin reports backpressure", () => {
+		const session = new Session({
+			sessionId: "session-stdin-backpressure",
+			workspaceId: "workspace-1",
+			paneId: "pane-1",
+			tabId: "tab-1",
+			cols: 80,
+			rows: 24,
+			cwd: "/tmp",
+			shell: "/bin/zsh",
+			spawnProcess: () => fakeChildProcess as unknown as ChildProcess,
+		});
+
+		spawnAndReadySession(session);
+		fakeChildProcess.stdin.writes.length = 0;
+		fakeChildProcess.stdin.writeResults = [true, false];
+
+		(
+			session as unknown as {
+				sendWriteToSubprocess: (data: string) => boolean;
+			}
+		).sendWriteToSubprocess("x".repeat(9000));
+
+		expect(fakeChildProcess.stdin.writes.length).toBe(2);
+		expect(fakeChildProcess.stdin.writes[0]).toEqual(
+			createFrameHeader(PtySubprocessIpcType.Write, 8192),
+		);
+		expect(fakeChildProcess.stdin.writes[1]).toEqual(
+			Buffer.from("x".repeat(8192)),
+		);
+
+		fakeChildProcess.stdin.emit("drain");
+
+		expect(fakeChildProcess.stdin.writes.length).toBe(4);
+		expect(fakeChildProcess.stdin.writes[2]).toEqual(
+			createFrameHeader(PtySubprocessIpcType.Write, 808),
+		);
+		expect(fakeChildProcess.stdin.writes[3]).toEqual(
+			Buffer.from("x".repeat(808)),
+		);
 	});
 });
 
