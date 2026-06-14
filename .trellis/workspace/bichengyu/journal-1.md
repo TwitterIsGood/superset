@@ -759,3 +759,37 @@ Added Automation provider/model selection, run-local model injection through hos
 ### Next Steps
 
 - None - task complete
+
+
+## Session 23: Worktree dev slot isolation
+
+**Date**: 2026-06-14
+**Task**: Worktree dev slot isolation
+**Package**: desktop
+**Branch**: `codex/model-provider-configuration-center`
+
+### Summary
+
+Added a worktree-aware local dev bootstrap command, documented shared-vs-isolated data mode, integrated the prepare gate into Trellis workflow/config, and validated with unit tests, prepare-only runs, linked worktree dry run, lint, and typecheck.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d6969e218` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
