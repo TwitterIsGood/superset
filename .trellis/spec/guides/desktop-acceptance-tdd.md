@@ -53,6 +53,11 @@ Use this contract before any desktop-facing Trellis acceptance run. The desktop 
 
 ### 2. Signatures
 
+- Worktree-aware dev graph: `bun run dev:worktree`
+- Prepare without launching long-running dev servers:
+  `bun run dev:worktree -- --prepare-only`
+- Isolated data mode for schema/destructive testing:
+  `bun run dev:worktree -- --data isolated`
 - Docker service graph: `docker compose up -d`
 - Preferred desktop graph when Caddy is installed: `bun run dev:desktop`
 - Manual graph when debugging pieces separately:
@@ -64,18 +69,23 @@ Use this contract before any desktop-facing Trellis acceptance run. The desktop 
 
 ### 3. Contracts
 
-- Local Docker ports come from `.env`: Postgres on `LOCAL_PG_PORT` (this workspace: `3014`), Neon HTTP proxy on `LOCAL_NEON_PROXY_PORT` (`3015`), raw Electric on `LOCAL_ELECTRIC_PORT` (`3009`).
-- API runs on `API_PORT` (`3001`) and is required for email/password login, registration, organization/project/workspace writes, and auth/session checks.
-- Desktop renderer runs on `DESKTOP_VITE_PORT` (`3005` in this workspace) and Electron exposes CDP automation on `DESKTOP_AUTOMATION_PORT` (`9322`).
-- `apps/electric-proxy` runs on `WRANGLER_PORT` (`3012`) and is the auth-aware Electric proxy used by V2 collections.
-- Caddy, when available, runs `dev:caddy` and exposes the Worker through `https://localhost:${CADDY_ELECTRIC_PORT}` (`3010`).
+- Run `bun run dev:worktree -- --prepare-only` before desktop acceptance in a fresh or unfamiliar worktree. It must print the current root, role, primary root, data mode, port base, data port base, and URLs.
+- Local app ports come from the current worktree's managed `.env` block. Do not assume hard-coded `3000`/`3001`/`3005` after switching worktrees.
+- Shared data mode is the default. It isolates app ports and `SUPERSET_HOME_DIR` per worktree while pointing `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `ELECTRIC_URL`, `KV_REST_API_URL`, and `KV_URL` at the primary worktree's local data stack.
+- Isolated data mode uses the current worktree's port window for Postgres, Neon HTTP proxy, raw Electric, Redis, and KV REST. Use it only for schema or destructive testing.
+- API runs on `API_PORT` and is required for email/password login, registration, organization/project/workspace writes, and auth/session checks.
+- Desktop renderer runs on `DESKTOP_VITE_PORT` and Electron exposes CDP automation on `DESKTOP_AUTOMATION_PORT` (`9322`).
+- `apps/electric-proxy` runs on `WRANGLER_PORT` and is the auth-aware Electric proxy used by V2 collections.
+- Caddy, when available, runs `dev:caddy` and exposes the Worker through `https://localhost:${CADDY_ELECTRIC_PORT}`.
 - `NEXT_PUBLIC_ELECTRIC_URL` must point at the reachable auth-aware Electric proxy, not raw Electric. With Caddy use `https://localhost:${CADDY_ELECTRIC_PORT}`. Without Caddy use `http://localhost:${WRANGLER_PORT}`.
 - `ELECTRIC_URL` is for server/Worker access to raw Electric shape endpoints; renderer code should not use it directly.
 - `apps/desktop/electron.vite.config.ts` loads root `.env` with `override: true`. Inline shell overrides such as `NEXT_PUBLIC_ELECTRIC_URL=... bun run --cwd apps/desktop dev` will not beat root `.env`; edit `.env` and restart desktop when changing renderer compile-time env.
 
 ### 4. Validation & Error Matrix
 
-- Docker DB stack is down -> API auth and DB-backed workspace writes fail; start `docker compose up -d`.
+- `bun run dev:worktree -- --prepare-only` prints a data stack probe failure -> normal `bun run dev:worktree` may auto-start the selected data stack; prepare-only intentionally does not start long-running services.
+- Shared data mode cannot resolve a trustworthy primary worktree -> fail clearly; do not silently fall back to isolated mode because account/workspace/provider rows will appear missing.
+- Docker DB stack is down -> API auth and DB-backed workspace writes fail; start `bun run dev:worktree` or use `docker compose up -d` only when debugging pieces manually.
 - API is down -> login/register blocks or renderer calls to `NEXT_PUBLIC_API_URL` fail; start `bun run --cwd apps/api dev`.
 - Electric proxy is down or `NEXT_PUBLIC_ELECTRIC_URL` is stale -> V2 collection-backed workspace/sidebar data can appear empty even when cloud rows exist; start `apps/electric-proxy` and restart desktop with a reachable proxy URL.
 - Caddy is missing -> `bun run dev:desktop` can fail in `dev:caddy`; use the manual graph and set `NEXT_PUBLIC_ELECTRIC_URL=http://localhost:${WRANGLER_PORT}` locally.
@@ -85,7 +95,8 @@ Use this contract before any desktop-facing Trellis acceptance run. The desktop 
 
 ### 5. Good/Base/Bad Cases
 
-- Good: `docker compose up -d`, `bun run dev:desktop`, then `bun run desktop:automation -- smoke --url-includes "#/" --screenshot .trellis/tasks/<task>/artifacts/desktop.png --report .trellis/tasks/<task>/artifacts/desktop.json`.
+- Good: `bun run dev:worktree`, then `bun run desktop:automation -- smoke --url-includes "#/" --screenshot .trellis/tasks/<task>/artifacts/desktop.png --report .trellis/tasks/<task>/artifacts/desktop.json`.
+- Base: `bun run dev:worktree -- --prepare-only` in an already-running graph to repair files and verify URLs without launching another desktop instance.
 - Base: when Caddy is unavailable, run API, `apps/electric-proxy`, and desktop manually, set `NEXT_PUBLIC_ELECTRIC_URL=http://localhost:${WRANGLER_PORT}`, restart desktop, then run Desktop Automation CLI.
 - Bad: only running `bun run --cwd apps/desktop dev` and treating a visible Electron window as proof that auth, Electric collections, host-service, and workspace panes work.
 
@@ -109,11 +120,8 @@ This can still compile the renderer with the `.env` value because desktop Vite l
 Correct:
 
 ```bash
-docker compose up -d
-bun run --cwd apps/api dev
-bun run --cwd apps/electric-proxy dev
-# If Caddy is absent, set NEXT_PUBLIC_ELECTRIC_URL="http://localhost:3012" in .env.
-bun run --cwd apps/desktop dev
+bun run dev:worktree -- --prepare-only
+bun run dev:worktree
 bun run desktop:automation -- window-info --json
 ```
 

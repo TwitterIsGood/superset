@@ -4,6 +4,12 @@
 # Neon account, no real third-party keys. Mirrors setup.sh, but replaces the
 # Neon branch with a docker-compose bundle (Postgres + neon-proxy + Electric)
 # on per-workspace allocated ports so multiple worktrees never collide.
+#
+# Preferred day-to-day multi-worktree entrypoint:
+#   bun run dev:worktree
+#
+# Use this script directly when you deliberately want the older fully isolated
+# local stack setup behavior.
 set -uo pipefail
 
 SUPERSET_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

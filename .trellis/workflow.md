@@ -128,18 +128,27 @@ Inline mode: skip jsonl curation; Phase 2 reads artifacts/specs via `trellis-bef
 - 2.2 Quality check `[required · repeatable]`
 - 2.3 Rollback `[on demand]`
 
+Before any implementation starts in this repository, run the worktree prepare gate:
+
+```bash
+bun run dev:worktree -- --prepare-only --no-install
+```
+
+This is a project-level, platform-neutral Trellis gate. It detects the current git worktree, repairs the managed `.env` block, writes local dev port files, and prints the selected URLs without starting long-running services. Do not replace this with platform-specific PreToolUse hooks.
+
 Channel-driven sub-agent dispatch is the default execution model for this workflow. The main session uses `trellis channel create`, `trellis channel spawn`, `trellis channel send`, and `trellis channel wait` to coordinate workers. Fall back to native host sub-agents only when the user explicitly asks for native dispatch or a host-only capability is required.
 
 [workflow-state:in_progress]
-Flow: channel-driven `implement` worker -> channel-driven `check` worker -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
+Flow: worktree prepare gate -> channel-driven `implement` worker -> channel-driven `check` worker -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
 Main-session default: use `trellis channel spawn` with `.trellis/agents/implement.md` and `.trellis/agents/check.md`; do not use native Claude Task / Codex sub_agent unless explicitly requested or host-only tools require it.
+Before spawning implementation workers, run `bun run dev:worktree -- --prepare-only --no-install` from the repo root and inspect the printed current root, role, data mode, port base, and URLs.
 Worker context order: jsonl entries -> `prd.md` -> `design.md if present` -> `implement.md if present`. Use stable worker handles such as `implement`, `check`, `check-cx`, `check-cc`; read results with `trellis channel messages --raw` when precision matters.
 [/workflow-state:in_progress]
 
 [workflow-state:in_progress-inline]
-Flow: `trellis-before-dev` -> edit -> channel-driven `check` worker -> validation -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
+Flow: worktree prepare gate -> `trellis-before-dev` -> edit -> channel-driven `check` worker -> validation -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
 Inline implementation is allowed only when the user asked for it or the change is too small to justify a worker. After editing, prefer `trellis channel spawn --agent check` for independent review.
-Read context before editing: `prd.md` -> `design.md if present` -> `implement.md if present`, plus relevant spec/research loaded by skills.
+Before editing, run `bun run dev:worktree -- --prepare-only --no-install`, then read context: `prd.md` -> `design.md if present` -> `implement.md if present`, plus relevant spec/research loaded by skills.
 [/workflow-state:in_progress-inline]
 
 ### Phase 3: Finish
@@ -254,6 +263,14 @@ python3 ./.trellis/scripts/task.py start <task-dir>
 Goal: the main session turns reviewed planning artifacts into checked code through channel workers.
 
 #### 2.1 Implement `[required · repeatable]`
+
+Before implementation, the main session must run:
+
+```bash
+bun run dev:worktree -- --prepare-only --no-install
+```
+
+Treat failures as environment setup problems to fix before code changes. The `after_start` hook in `.trellis/config.yaml` also runs this command once when a task starts, but the explicit Phase 2 gate remains the source of truth because lifecycle hook failures are warnings and do not block Trellis.
 
 [Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi]
 

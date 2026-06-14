@@ -6,6 +6,7 @@ In this repository, workspace means the isolated Superset git-worktree checkout 
 ## Commands
 - Use Bun for package operations. Do not introduce npm, yarn, or pnpm lockfiles or scripts.
 - Use Turbo/root scripts for broad checks: `bun run lint`, `bun run lint:fix`, `bun run format`, `bun run typecheck`, `bun test`, and `bun build`.
+- For Superset repo development across multiple git worktrees, use `bun run dev:worktree` as the default one-command entrypoint. It detects the current Git worktree, allocates isolated app ports, writes the managed `.env` block, and starts the desktop dev graph. Use `bun run dev:worktree -- --prepare-only` when an agent should repair files and print URLs without launching long-running services. Use `bun run dev:worktree -- --data isolated` only for schema or destructive testing that needs a separate DB stack.
 - Biome runs at the repository root. `bun run lint:fix` maps to `biome check --write --unsafe`; `bun run lint` is check-only and CI treats warnings as failures.
 - Prefer package scripts for tight validation while iterating, then run the root command that matches the blast radius.
 - Prefer `gh` for GitHub operations such as PRs and issues when available.

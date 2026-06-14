@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/guides/monorepo-standards.md", "reason": "Check new scripts follow Bun/root command conventions."}
+{"file": ".trellis/spec/guides/quality-and-testing.md", "reason": "Check focused tests and root lint expectations are satisfied."}
+{"file": ".trellis/spec/guides/desktop-acceptance-tdd.md", "reason": "Check dev startup contract is not regressed."}

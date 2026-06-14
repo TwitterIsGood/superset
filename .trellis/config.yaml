@@ -49,6 +49,9 @@ max_journal_lines: 2000
 #     - "echo 'Task finished'"
 #   after_archive:
 #     - "echo 'Task archived'"
+hooks:
+  after_start:
+    - "bun run dev:worktree -- --prepare-only --no-install"
 
 #-------------------------------------------------------------------------------
 # Monorepo / Packages

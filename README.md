@@ -92,11 +92,19 @@ Want to hack on Superset or contribute a PR? Spin up a local dev environment in 
 ```bash
 git clone https://github.com/superset-sh/superset.git
 cd superset
-./.superset/setup.local.sh
-bun run dev
+bun run dev:worktree
 ```
 
-No Neon account or third-party credentials needed — `setup.local.sh` brings up a local Postgres + Electric stack via Docker and seeds a dev account. Sign in with the **"Sign in as dev"** button (or `admin@local.test` / `supersetdev`).
+No Neon account or third-party credentials needed. `bun run dev:worktree` detects the current git worktree, assigns a stable port window, writes local `.env` overrides idempotently, and starts the desktop dev graph. Multiple worktrees get different app ports by default while sharing the primary worktree's local Postgres/Electric/Redis/KV data stack so accounts, workspaces, providers, tasks, and automations stay visible across worktrees.
+
+Useful variants:
+
+```bash
+bun run dev:worktree -- --prepare-only     # write/repair files and print URLs
+bun run dev:worktree -- --data isolated    # use a per-worktree DB stack
+```
+
+Sign in with the **"Sign in as dev"** button (or `admin@local.test` / `supersetdev`) after the local data stack has been migrated and seeded. The older `./.superset/setup.local.sh` remains available for a fully isolated local stack, but `bun run dev:worktree` is the recommended path for multi-worktree development.
 
 Prereqs: `bun`, `docker`, `jq`, `caddy` (`brew install jq caddy && caddy trust`).
 

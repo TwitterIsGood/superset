@@ -25,6 +25,27 @@ Create `.superset/config.json` in your project:
 
 Setup and teardown commands run sequentially in the workspace directory.
 
+## Superset Repo Local Dev
+
+When developing this repository across multiple git worktrees, use the worktree-aware root command instead of manually chaining setup scripts:
+
+```bash
+bun run dev:worktree
+```
+
+It detects the current git worktree, assigns a stable 20-port window, writes `.env` through a managed block, generates `Caddyfile`, `apps/electric-proxy/.dev.vars`, and `.superset/ports.json`, then starts the desktop dev graph.
+
+Default mode shares the primary worktree's local Postgres/Electric/Redis/KV data stack while keeping app ports and `SUPERSET_HOME_DIR` isolated per worktree. That keeps accounts, workspaces, providers, tasks, and automations visible across worktrees without letting desktop host-service sockets or local SQLite state collide.
+
+Use these variants when needed:
+
+```bash
+bun run dev:worktree -- --prepare-only
+bun run dev:worktree -- --data isolated
+```
+
+`--prepare-only` is the safe command for AI agents that only need to repair files and inspect selected URLs. `--data isolated` is for schema migrations or destructive testing where the worktree must own its own DB stack.
+
 ## Run Script
 
 The `run` field defines commands that start your dev server or other long-running processes. Unlike setup/teardown, run commands are:

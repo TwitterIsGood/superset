@@ -5,7 +5,7 @@ description: View and manage active ports per workspace
 
 ## Overview
 
-Superset does not assign per-workspace port ranges. It discovers listening ports from processes running in each workspace and lets you manage them from the UI.
+Superset discovers listening ports from processes running in each workspace and lets you manage them from the UI. This repository also ships a local dev helper, `bun run dev:worktree`, that assigns a stable 20-port window per git worktree so multiple Superset dev checkouts can run side by side without fighting over `3000`, `3001`, or the desktop Vite port.
 
 ![Port Panel](/images/ports.png)
 
@@ -50,6 +50,24 @@ Create `.superset/ports.json` in your repository:
 - Changes are detected automatically
 - Ports can be opened at `localhost:PORT` from the browser action
 
+## Superset Repo Worktree Ports
+
+For this repository, use the worktree-aware dev command:
+
+```bash
+bun run dev:worktree
+```
+
+The command:
+
+- detects whether the checkout is the primary git worktree or a linked worktree
+- allocates or reuses a stable 20-port window from `~/.superset/port-allocations.json`
+- writes `.env`, `Caddyfile`, `apps/electric-proxy/.dev.vars`, and `.superset/ports.json`
+- keeps app ports isolated per worktree
+- uses shared local dev data by default so accounts, workspaces, providers, tasks, and automations remain visible across worktrees
+
+Run `bun run dev:worktree -- --prepare-only` to write/repair files and print the selected ports without starting dev servers. Use `bun run dev:worktree -- --data isolated` only when you need a separate per-worktree database stack for schema or destructive testing.
+
 **Error Handling:**
 
 If `ports.json` is malformed:
@@ -58,7 +76,7 @@ If `ports.json` is malformed:
 
 **Tips:**
 - Commit `.superset/ports.json` to share port labels with your team
-- **Pro tip:** If you want deterministic per-workspace port ranges, implement it in setup/teardown scripts by reserving a range in a shared file (for example `~/.superset/port-allocations.json`) during setup and releasing it during teardown. See this repo's examples: [`.superset/setup.sh`](https://github.com/superset-sh/superset/blob/main/.superset/setup.sh) and [`.superset/teardown.sh`](https://github.com/superset-sh/superset/blob/main/.superset/teardown.sh).
+- Use `bun run dev:worktree -- --prepare-only` when a new AI agent or shell enters a worktree and needs to know the correct local URLs before launching anything.
 
 ## Discovery and Updates
 

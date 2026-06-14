@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/guides/monorepo-standards.md", "reason": "Root script, Bun, file placement, and command conventions."}
+{"file": ".trellis/spec/guides/monorepo-conventions.md", "reason": "Monorepo command and package boundary guidance for root-level dev tooling."}
+{"file": ".trellis/spec/guides/backend-conventions.md", "reason": "CLI/runtime construction and service startup conventions."}
+{"file": ".trellis/spec/guides/desktop-conventions.md", "reason": "Desktop dev runtime, host-service, and local state constraints."}
+{"file": ".trellis/spec/guides/quality-and-testing.md", "reason": "Validation expectations for root scripts and desktop-facing changes."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse existing port allocation and setup helpers where possible."}
+{"file": ".trellis/spec/guides/desktop-acceptance-tdd.md", "reason": "Defines local desktop startup contract and acceptance strategy."}
