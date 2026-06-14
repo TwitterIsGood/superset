@@ -42,3 +42,4 @@ title from the left conversation list without opening or selecting text.
 - `bun run --cwd apps/desktop typecheck`
 - `python3 ./.trellis/scripts/task.py validate .trellis/tasks/06-14-copy-chat-title-context-menu`
 - `bun run lint`
+- `DESKTOP_AUTOMATION_PORT=9435 bun run desktop:automation -- smoke --url-includes '#/sign-in' --screenshot .trellis/tasks/06-14-copy-chat-title-context-menu/artifacts/startup-sign-in.png --report .trellis/tasks/06-14-copy-chat-title-context-menu/artifacts/startup-sign-in.json --json`
