@@ -24,15 +24,16 @@ import { useOptimisticCollectionActions } from "renderer/routes/_authenticated/h
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { createChatRuntimeServiceIpcClient } from "renderer/screens/main/components/WorkspaceView/ContentView/TabsContent/TabView/ChatPane/utils/chat-runtime-service-client";
 import { PROTOCOL_SCHEME } from "shared/constants";
+import {
+	resolveCopyableChatTitle,
+	shouldUseMessageTitleFallback,
+	textFromMessageContent,
+	toSessionTitle,
+} from "./utils/resolveCopyableChatTitle";
 
 interface DashboardChatSidebarProps {
 	activeSessionId: string | null;
 	isCollapsed: boolean;
-}
-
-function toSessionTitle(title: string | null): string {
-	const trimmed = title?.trim();
-	return trimmed && trimmed.length > 0 ? trimmed : "New Chat";
 }
 
 const chatRuntimeIpcClient = createChatRuntimeServiceIpcClient();
@@ -40,20 +41,6 @@ const chatRuntimeIpcClient = createChatRuntimeServiceIpcClient();
 type StandaloneChatMessage = Awaited<
 	ReturnType<typeof chatRuntimeIpcClient.session.listMessages.query>
 >[number];
-
-function textFromMessageContent(content: StandaloneChatMessage["content"]) {
-	return content
-		.map((part) => {
-			if (part.type === "text") return part.text;
-			if (part.type === "file") {
-				return part.filename ? `[File: ${part.filename}]` : "[File]";
-			}
-			if (part.type === "image") return "[Image]";
-			return "";
-		})
-		.filter(Boolean)
-		.join("\n");
-}
 
 function messagesToMarkdown(args: {
 	title: string;
@@ -113,10 +100,24 @@ export function DashboardChatSidebar({
 	);
 
 	const handleCopyTitle = useCallback(
-		async (title: string) => {
+		async (sessionId: string, title: string | null) => {
 			try {
-				await copyToClipboard(title);
-				toast.success("Copied title");
+				const displayTitle = toSessionTitle(title);
+				let copyTitle = resolveCopyableChatTitle({ title });
+				if (shouldUseMessageTitleFallback(displayTitle)) {
+					try {
+						const messages =
+							await chatRuntimeIpcClient.session.listMessages.query({
+								sessionId,
+							});
+						copyTitle = resolveCopyableChatTitle({ title, messages });
+					} catch {
+						copyTitle = displayTitle;
+					}
+				}
+
+				await copyToClipboard(copyTitle);
+				toast.success("已复制会话标题");
 			} catch (error) {
 				toast.error("Failed to copy title", {
 					description:
@@ -236,11 +237,11 @@ export function DashboardChatSidebar({
 									<ContextMenuContent className="w-56">
 										<ContextMenuItem
 											onSelect={() => {
-												void handleCopyTitle(title);
+												void handleCopyTitle(session.id, session.title);
 											}}
 										>
 											<Copy className="size-4" />
-											Copy title
+											复制会话标题
 										</ContextMenuItem>
 										<ContextMenuItem
 											onSelect={() => {

@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/desktop/frontend/quality-guidelines.md", "reason": "Required focused checks, root lint, and desktop acceptance considerations."}
+{"file": ".trellis/spec/guides/desktop-acceptance-tdd.md", "reason": "Rationale for using focused tests instead of full Desktop Automation CLI acceptance for this small renderer-only menu behavior."}

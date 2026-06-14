@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/guides/superset-engineering-guide.md", "reason": "Repo-wide engineering rules for Bun, Biome, type safety, and desktop renderer work."}
+{"file": ".trellis/spec/guides/frontend-conventions.md", "reason": "Shared React/Tailwind/component organization conventions."}
+{"file": ".trellis/spec/guides/desktop-conventions.md", "reason": "Desktop renderer boundaries and IPC conventions."}
+{"file": ".trellis/spec/desktop/frontend/component-guidelines.md", "reason": "Desktop frontend component and co-location guidance."}
+{"file": ".trellis/spec/desktop/frontend/type-safety.md", "reason": "Desktop frontend TypeScript expectations."}
