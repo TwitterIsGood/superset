@@ -31,10 +31,9 @@ title from the left conversation list without opening or selecting text.
 ## Notes
 
 - This is a lightweight renderer-only change, so PRD-only planning is enough.
-- Desktop Automation CLI acceptance is not planned because the behavior is
-  covered by focused helper tests plus existing context menu wiring in a single
-  renderer component. Full Electron startup would mainly validate Radix menu
-  behavior that is already provided by `@superset/ui/context-menu`.
+- Desktop Automation CLI acceptance was added after implementation to verify
+  the menu from an authenticated desktop Chat session, not only from the sign-in
+  route.
 
 ## Validation
 
@@ -43,3 +42,13 @@ title from the left conversation list without opening or selecting text.
 - `python3 ./.trellis/scripts/task.py validate .trellis/tasks/06-14-copy-chat-title-context-menu`
 - `bun run lint`
 - `DESKTOP_AUTOMATION_PORT=9435 bun run desktop:automation -- smoke --url-includes '#/sign-in' --screenshot .trellis/tasks/06-14-copy-chat-title-context-menu/artifacts/startup-sign-in.png --report .trellis/tasks/06-14-copy-chat-title-context-menu/artifacts/startup-sign-in.json --json`
+- Authenticated desktop smoke with isolated Electron env (`DESKTOP_VITE_PORT=3135`,
+  `DESKTOP_AUTOMATION_PORT=9435`, temp `SUPERSET_HOME_DIR`, local API token):
+  - Reached `http://localhost:3135/#/chat` after login token bootstrap.
+  - `DESKTOP_AUTOMATION_PORT=9435 bun run desktop:automation -- wait-for --text '复制会话标题' --timeout-ms 5000 --json`
+  - `DESKTOP_AUTOMATION_PORT=9435 bun run desktop:automation -- click --text '复制会话标题' --json`
+  - `DESKTOP_AUTOMATION_PORT=9435 bun run desktop:automation -- wait-for --text '已复制会话标题' --timeout-ms 5000 --json`
+  - `DESKTOP_AUTOMATION_PORT=9435 bun run desktop:automation -- evaluate-js --code 'navigator.clipboard.readText()' --json`
+  - `DESKTOP_AUTOMATION_PORT=9435 bun run desktop:automation -- console-logs --level error --json`
+  - Artifacts: `artifacts/chat-authenticated.png`,
+    `artifacts/chat-context-menu-authenticated.png`.
