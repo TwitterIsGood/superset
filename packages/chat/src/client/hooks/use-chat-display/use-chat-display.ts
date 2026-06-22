@@ -16,6 +16,7 @@ type HistoryMessage = ListMessagesOutput[number];
 type HistoryMessagePart = HistoryMessage["content"][number];
 type HistoryMessageContent = HistoryMessagePart[];
 type CurrentMessage = DisplayStateOutput["currentMessage"];
+export type RetainedAbortedMessagesByScope = Record<string, ListMessagesOutput>;
 
 export type ChatDisplayState = DisplayStateOutput;
 export type ChatHistoryMessages = ListMessagesOutput;
@@ -25,6 +26,14 @@ export interface UseChatDisplayOptions {
 	cwd?: string;
 	enabled?: boolean;
 	fps?: number;
+}
+
+export function getRetainedAbortedMessagesScopeKey({
+	sessionId,
+	cwd,
+}: Pick<UseChatDisplayOptions, "sessionId" | "cwd">): string | null {
+	if (!sessionId) return null;
+	return `${sessionId}\u0000${cwd ?? ""}`;
 }
 
 function toRefetchIntervalMs(fps: number): number {
@@ -173,6 +182,29 @@ export function mergeRetainedAbortedMessages(
 	return merged as ListMessagesOutput;
 }
 
+export function getRetainedAbortedMessagesForScope(
+	retainedMessagesByScope: RetainedAbortedMessagesByScope,
+	scopeKey: string | null,
+): ListMessagesOutput {
+	if (!scopeKey) return [];
+	return retainedMessagesByScope[scopeKey] ?? [];
+}
+
+export function withRetainedAbortedMessageForScope(
+	retainedMessagesByScope: RetainedAbortedMessagesByScope,
+	scopeKey: string | null,
+	retainedMessage: HistoryMessage | null,
+): RetainedAbortedMessagesByScope {
+	if (!scopeKey || !retainedMessage) return retainedMessagesByScope;
+	return {
+		...retainedMessagesByScope,
+		[scopeKey]: mergeRetainedAbortedMessages(
+			retainedMessagesByScope[scopeKey] ?? [],
+			[retainedMessage] as ListMessagesOutput,
+		),
+	};
+}
+
 export function toRetainedAbortedMessage(
 	currentMessage: CurrentMessage | null,
 ): HistoryMessage | null {
@@ -205,10 +237,18 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 	const { sessionId, cwd, enabled = true, fps = 4 } = options;
 	const utils = chatRuntimeServiceTrpc.useUtils();
 	const [commandError, setCommandError] = useState<unknown>(null);
-	const [retainedAbortedMessages, setRetainedAbortedMessages] =
-		useState<ListMessagesOutput>([]);
+	const [retainedAbortedMessagesByScope, setRetainedAbortedMessagesByScope] =
+		useState<RetainedAbortedMessagesByScope>({});
 	const sessionCommandInput =
 		sessionId === null ? null : { sessionId, ...(cwd ? { cwd } : {}) };
+	const retainedAbortedMessagesScopeKey = getRetainedAbortedMessagesScopeKey({
+		sessionId,
+		cwd,
+	});
+	const retainedAbortedMessages = getRetainedAbortedMessagesForScope(
+		retainedAbortedMessagesByScope,
+		retainedAbortedMessagesScopeKey,
+	);
 	const queryInput = sessionCommandInput ?? skipToken;
 	const isQueryEnabled = enabled && Boolean(sessionId);
 	const refetchIntervalMs = toRefetchIntervalMs(fps);
@@ -306,10 +346,6 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 		optimisticIdRef.current = null;
 		fileMessageCountAtSendRef.current = null;
 	}, [retainedHistoricalMessages]);
-
-	useEffect(() => {
-		setRetainedAbortedMessages([]);
-	}, []);
 
 	const messages = useMemo(() => {
 		const withOptimistic = optimisticUserMessage
@@ -424,7 +460,13 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 						] as ListMessagesOutput)
 					: retainedAbortedMessages;
 				if (retainedMessage) {
-					setRetainedAbortedMessages(nextRetainedMessages);
+					setRetainedAbortedMessagesByScope((previous) =>
+						withRetainedAbortedMessageForScope(
+							previous,
+							retainedAbortedMessagesScopeKey,
+							retainedMessage,
+						),
+					);
 				}
 				try {
 					const result =
@@ -457,7 +499,13 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 						] as ListMessagesOutput)
 					: retainedAbortedMessages;
 				if (retainedMessage) {
-					setRetainedAbortedMessages(nextRetainedMessages);
+					setRetainedAbortedMessagesByScope((previous) =>
+						withRetainedAbortedMessageForScope(
+							previous,
+							retainedAbortedMessagesScopeKey,
+							retainedMessage,
+						),
+					);
 				}
 				try {
 					const result =
@@ -530,6 +578,7 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 			cwd,
 			currentMessage,
 			retainedAbortedMessages,
+			retainedAbortedMessagesScopeKey,
 			retainedHistoricalMessages,
 			sessionCommandInput,
 			sessionId,

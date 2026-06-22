@@ -4,11 +4,19 @@ import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { hasAnsweredQuestionToolCall } from "renderer/components/Chat/ChatInterface/utils/messageHelpers";
 
-interface UseChatDisplayOptions {
+export interface UseChatDisplayOptions {
 	sessionId: string | null;
 	workspaceId: string;
 	enabled?: boolean;
 	fps?: number;
+}
+
+export function getRetainedAbortedMessagesScopeKey({
+	sessionId,
+	workspaceId,
+}: Pick<UseChatDisplayOptions, "sessionId" | "workspaceId">): string | null {
+	if (!sessionId) return null;
+	return `${sessionId}\u0000${workspaceId}`;
 }
 
 function toRefetchIntervalMs(fps: number): number {
@@ -27,6 +35,7 @@ type HistoryMessage = ListMessagesOutput[number];
 type HistoryMessagePart = HistoryMessage["content"][number];
 type SendMessageInput = ChatInputs["sendMessage"];
 type CurrentMessage = DisplayStateOutput["currentMessage"];
+export type RetainedAbortedMessagesByScope = Record<string, ListMessagesOutput>;
 
 function findLastUserMessageIndex(messages: ListMessagesOutput): number {
 	for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -150,6 +159,29 @@ function mergeRetainedAbortedMessages(
 	return merged as ListMessagesOutput;
 }
 
+export function getRetainedAbortedMessagesForScope(
+	retainedMessagesByScope: RetainedAbortedMessagesByScope,
+	scopeKey: string | null,
+): ListMessagesOutput {
+	if (!scopeKey) return [];
+	return retainedMessagesByScope[scopeKey] ?? [];
+}
+
+export function withRetainedAbortedMessageForScope(
+	retainedMessagesByScope: RetainedAbortedMessagesByScope,
+	scopeKey: string | null,
+	retainedMessage: HistoryMessage | null,
+): RetainedAbortedMessagesByScope {
+	if (!scopeKey || !retainedMessage) return retainedMessagesByScope;
+	return {
+		...retainedMessagesByScope,
+		[scopeKey]: mergeRetainedAbortedMessages(
+			retainedMessagesByScope[scopeKey] ?? [],
+			[retainedMessage] as ListMessagesOutput,
+		),
+	};
+}
+
 function toRetainedAbortedMessage(
 	currentMessage: CurrentMessage | null,
 ): HistoryMessage | null {
@@ -181,10 +213,18 @@ function getLegacyImagePayload(
 export function useChatDisplay(options: UseChatDisplayOptions) {
 	const { sessionId, workspaceId, enabled = true, fps = 4 } = options;
 	const [commandError, setCommandError] = useState<unknown>(null);
-	const [retainedAbortedMessages, setRetainedAbortedMessages] =
-		useState<ListMessagesOutput>([]);
+	const [retainedAbortedMessagesByScope, setRetainedAbortedMessagesByScope] =
+		useState<RetainedAbortedMessagesByScope>({});
 	const queryInput =
 		sessionId === null ? undefined : { sessionId, workspaceId };
+	const retainedAbortedMessagesScopeKey = getRetainedAbortedMessagesScopeKey({
+		sessionId,
+		workspaceId,
+	});
+	const retainedAbortedMessages = getRetainedAbortedMessagesForScope(
+		retainedAbortedMessagesByScope,
+		retainedAbortedMessagesScopeKey,
+	);
 	const trpcUtils = workspaceTrpc.useUtils();
 	const isQueryEnabled = enabled && Boolean(sessionId);
 	const refetchIntervalMs = toRefetchIntervalMs(fps);
@@ -268,10 +308,6 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 		optimisticIdRef.current = null;
 		fileMessageCountAtSendRef.current = null;
 	}, [retainedHistoricalMessages]);
-
-	useEffect(() => {
-		setRetainedAbortedMessages([]);
-	}, []);
 
 	const messages = useMemo(() => {
 		const withOptimistic = optimisticUserMessage
@@ -373,7 +409,13 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 						] as ListMessagesOutput)
 					: retainedAbortedMessages;
 				if (retainedMessage) {
-					setRetainedAbortedMessages(nextRetainedMessages);
+					setRetainedAbortedMessagesByScope((previous) =>
+						withRetainedAbortedMessageForScope(
+							previous,
+							retainedAbortedMessagesScopeKey,
+							retainedMessage,
+						),
+					);
 				}
 				try {
 					const result = await stopMutation.mutateAsync(queryInput);
@@ -446,6 +488,7 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 			currentMessage,
 			queryInput,
 			retainedAbortedMessages,
+			retainedAbortedMessagesScopeKey,
 			retainedHistoricalMessages,
 			respondToApprovalMutation,
 			respondToPlanMutation,

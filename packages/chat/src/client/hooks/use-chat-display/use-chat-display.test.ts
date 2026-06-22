@@ -3,9 +3,12 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { ChatRuntimeServiceRouter } from "../../../server/trpc";
 import {
 	findLatestAssistantErrorMessage,
+	getRetainedAbortedMessagesForScope,
+	getRetainedAbortedMessagesScopeKey,
 	mergeRetainedAbortedMessages,
 	toRetainedAbortedMessage,
 	withoutActiveTurnAssistantHistory,
+	withRetainedAbortedMessageForScope,
 } from "./use-chat-display";
 
 type RouterOutputs = inferRouterOutputs<ChatRuntimeServiceRouter>;
@@ -193,6 +196,60 @@ describe("retained aborted messages", () => {
 
 		expect(merged.map((message) => message.id)).toEqual([
 			"u_1",
+			"a_interrupted",
+		]);
+	});
+
+	it("keeps retained stopped output isolated by session and cwd when switching sessions", () => {
+		const retained = {
+			...assistantMessageAt(
+				"a_interrupted",
+				"partial answer from session A",
+				"2026-02-26T00:00:01.000Z",
+			),
+			stopReason: "aborted",
+		} as unknown as ListMessagesOutput[number];
+		const scopeA = getRetainedAbortedMessagesScopeKey({
+			sessionId: "session-a",
+			cwd: "/workspace-a",
+		});
+		const scopeB = getRetainedAbortedMessagesScopeKey({
+			sessionId: "session-b",
+			cwd: "/workspace-a",
+		});
+		const sameSessionDifferentCwd = getRetainedAbortedMessagesScopeKey({
+			sessionId: "session-a",
+			cwd: "/workspace-b",
+		});
+
+		const retainedByScope = withRetainedAbortedMessageForScope(
+			{},
+			scopeA,
+			retained,
+		);
+
+		const sessionBMessages = mergeRetainedAbortedMessages(
+			[userMessage("u_b", "session B prompt")],
+			getRetainedAbortedMessagesForScope(retainedByScope, scopeB),
+		);
+		const differentCwdMessages = mergeRetainedAbortedMessages(
+			[userMessage("u_cwd", "same session in another cwd")],
+			getRetainedAbortedMessagesForScope(
+				retainedByScope,
+				sameSessionDifferentCwd,
+			),
+		);
+		const sessionAMessages = mergeRetainedAbortedMessages(
+			[userMessage("u_a", "session A prompt")],
+			getRetainedAbortedMessagesForScope(retainedByScope, scopeA),
+		);
+
+		expect(sessionBMessages.map((message) => message.id)).toEqual(["u_b"]);
+		expect(differentCwdMessages.map((message) => message.id)).toEqual([
+			"u_cwd",
+		]);
+		expect(sessionAMessages.map((message) => message.id)).toEqual([
+			"u_a",
 			"a_interrupted",
 		]);
 	});
