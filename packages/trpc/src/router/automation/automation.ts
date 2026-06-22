@@ -27,6 +27,7 @@ import {
 	requireActiveOrgId,
 	requireActiveOrgMembership,
 } from "../utils/active-org";
+import { recordAutomationConfigVersion } from "./config-versions";
 import { startAutomationDispatch } from "./dispatch";
 import {
 	getAutomationForUser,
@@ -51,6 +52,12 @@ import { automationVersionsRouter } from "./versions";
 
 function escapeLikePattern(value: string): string {
 	return value.replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
+function configVersionSourceFromSession(session: {
+	session: { userAgent: string | null };
+}) {
+	return promptSourceFromSession(session) === "agent" ? "agent" : "human";
 }
 
 type AutomationJwtContext = {
@@ -416,6 +423,12 @@ export const automationRouter = {
 					capabilities: input.capabilities,
 					capabilityIdsByVersion,
 				});
+				await recordAutomationConfigVersion(tx, {
+					automationId: row.id,
+					authorUserId: ctx.session.user.id,
+					source: configVersionSourceFromSession(ctx.session),
+					summary: "Created automation configuration.",
+				});
 
 				return row;
 			});
@@ -528,6 +541,12 @@ export const automationRouter = {
 						capabilityIdsByVersion,
 					});
 				}
+				await recordAutomationConfigVersion(tx, {
+					automationId: input.id,
+					authorUserId: ctx.session.user.id,
+					source: configVersionSourceFromSession(ctx.session),
+					summary: "Updated automation configuration.",
+				});
 
 				return row;
 			});
@@ -581,6 +600,12 @@ export const automationRouter = {
 					content: input.prompt,
 					source: promptSourceFromSession(ctx.session),
 				});
+				await recordAutomationConfigVersion(tx, {
+					automationId: input.id,
+					authorUserId: ctx.session.user.id,
+					source: configVersionSourceFromSession(ctx.session),
+					summary: "Updated automation prompt.",
+				});
 
 				return row;
 			});
@@ -618,11 +643,29 @@ export const automationRouter = {
 				}).nextRunAt;
 			}
 
-			const [updated] = await dbWs
-				.update(automations)
-				.set(patch)
-				.where(eq(automations.id, input.id))
-				.returning();
+			const updated = await dbWs.transaction(async (tx) => {
+				const [row] = await tx
+					.update(automations)
+					.set(patch)
+					.where(eq(automations.id, input.id))
+					.returning();
+
+				if (!row) {
+					throw new TRPCError({
+						code: "NOT_FOUND",
+						message: "Automation not found",
+					});
+				}
+
+				await recordAutomationConfigVersion(tx, {
+					automationId: input.id,
+					authorUserId: ctx.session.user.id,
+					source: configVersionSourceFromSession(ctx.session),
+					summary: input.enabled ? "Resumed automation." : "Paused automation.",
+				});
+
+				return row;
+			});
 
 			return { ...updated, scheduleText: safeDescribeRrule(updated) };
 		}),

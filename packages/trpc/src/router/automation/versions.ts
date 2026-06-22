@@ -1,5 +1,6 @@
 import { db, dbWs } from "@superset/db/client";
 import {
+	automationConfigVersions,
 	automationPromptVersions,
 	automations,
 	users,
@@ -9,12 +10,109 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { protectedProcedure } from "../../trpc";
 import { requireActiveOrgMembership } from "../utils/active-org";
+import { restoreAutomationConfigVersion } from "./config-versions";
 import { getAutomationForUser, recordPromptVersion } from "./helpers";
 
 const DEFAULT_VERSION_LIMIT = 100;
 const MAX_VERSION_LIMIT = 200;
 
 export const automationVersionsRouter = {
+	listConfig: protectedProcedure
+		.input(
+			z.object({
+				automationId: z.string().uuid(),
+				limit: z
+					.number()
+					.int()
+					.min(1)
+					.max(MAX_VERSION_LIMIT)
+					.default(DEFAULT_VERSION_LIMIT),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			const organizationId = await requireActiveOrgMembership(ctx);
+			await getAutomationForUser(
+				ctx.session.user.id,
+				organizationId,
+				input.automationId,
+			);
+
+			return db
+				.select({
+					id: automationConfigVersions.id,
+					automationId: automationConfigVersions.automationId,
+					authorUserId: automationConfigVersions.authorUserId,
+					authorName: users.name,
+					authorImage: users.image,
+					source: automationConfigVersions.source,
+					snapshotHash: automationConfigVersions.snapshotHash,
+					summary: automationConfigVersions.summary,
+					previousVersionId: automationConfigVersions.previousVersionId,
+					restoredFromVersionId: automationConfigVersions.restoredFromVersionId,
+					controlChatSessionId: automationConfigVersions.controlChatSessionId,
+					controlChatRunId: automationConfigVersions.controlChatRunId,
+					sourceInstruction: automationConfigVersions.sourceInstruction,
+					createdAt: automationConfigVersions.createdAt,
+				})
+				.from(automationConfigVersions)
+				.leftJoin(users, eq(users.id, automationConfigVersions.authorUserId))
+				.where(eq(automationConfigVersions.automationId, input.automationId))
+				.orderBy(desc(automationConfigVersions.createdAt))
+				.limit(input.limit);
+		}),
+
+	getConfig: protectedProcedure
+		.input(z.object({ versionId: z.string().uuid() }))
+		.query(async ({ ctx, input }) => {
+			const organizationId = await requireActiveOrgMembership(ctx);
+
+			const [row] = await db
+				.select({
+					id: automationConfigVersions.id,
+					automationId: automationConfigVersions.automationId,
+					snapshot: automationConfigVersions.snapshot,
+					summary: automationConfigVersions.summary,
+					source: automationConfigVersions.source,
+					sourceInstruction: automationConfigVersions.sourceInstruction,
+					createdAt: automationConfigVersions.createdAt,
+				})
+				.from(automationConfigVersions)
+				.innerJoin(
+					automations,
+					eq(automations.id, automationConfigVersions.automationId),
+				)
+				.where(
+					and(
+						eq(automationConfigVersions.id, input.versionId),
+						eq(automations.organizationId, organizationId),
+						eq(automations.ownerUserId, ctx.session.user.id),
+					),
+				)
+				.limit(1);
+
+			if (!row) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Configuration version not found",
+				});
+			}
+
+			return row;
+		}),
+
+	restoreConfig: protectedProcedure
+		.input(z.object({ versionId: z.string().uuid() }))
+		.mutation(async ({ ctx, input }) => {
+			const organizationId = await requireActiveOrgMembership(ctx);
+			return dbWs.transaction((tx) =>
+				restoreAutomationConfigVersion(tx, {
+					versionId: input.versionId,
+					organizationId,
+					userId: ctx.session.user.id,
+				}),
+			);
+		}),
+
 	list: protectedProcedure
 		.input(
 			z.object({

@@ -48,6 +48,25 @@ function conflict(message: string): never {
 	throw new TRPCError({ code: "CONFLICT", message });
 }
 
+function getManifestName(manifest: Record<string, unknown>): string | null {
+	return typeof manifest.name === "string" && manifest.name.trim()
+		? manifest.name.trim()
+		: null;
+}
+
+function getValidationDisplaySummary(
+	validationSummary: Record<string, unknown>,
+): string | null {
+	const display =
+		typeof validationSummary.display === "object" &&
+		validationSummary.display !== null &&
+		!Array.isArray(validationSummary.display)
+			? (validationSummary.display as Record<string, unknown>)
+			: null;
+	const summary = display?.summary;
+	return typeof summary === "string" && summary.trim() ? summary.trim() : null;
+}
+
 async function getCapabilityUsageCounts(capabilityId: string) {
 	const [projectUsage] = await db
 		.select({ value: count() })
@@ -357,6 +376,10 @@ export const capabilityRouter = {
 							artifactSizeBytes: pkg.archiveSizeBytes,
 							sourceType: input.sourceType,
 							sourceRef: input.sourceRef ?? input.filename,
+							sourceInstruction: input.sourceInstruction ?? null,
+							sourceSummary: input.sourceSummary ?? null,
+							controlChatSessionId: input.controlChatSessionId ?? null,
+							controlChatRunId: input.controlChatRunId ?? null,
 							validationSummary: pkg.validationSummary,
 							auditStatus: audit.status,
 							auditModelProviderId: audit.modelProviderId,
@@ -428,6 +451,65 @@ export const capabilityRouter = {
 					),
 				)
 				.returning();
+			if (!updated) notFound();
+			return updated;
+		}),
+
+	setCurrentVersion: protectedProcedure
+		.input(
+			z.object({
+				id: z.string().uuid(),
+				versionId: z.string().uuid(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const organizationId = await requireActiveOrgMembership(ctx);
+
+			const [row] = await db
+				.select({
+					versionId: capabilityPackageVersions.id,
+					auditStatus: capabilityPackageVersions.auditStatus,
+					manifest: capabilityPackageVersions.manifest,
+					validationSummary: capabilityPackageVersions.validationSummary,
+				})
+				.from(capabilityPackages)
+				.innerJoin(
+					capabilityPackageVersions,
+					eq(capabilityPackageVersions.capabilityId, capabilityPackages.id),
+				)
+				.where(
+					and(
+						eq(capabilityPackages.id, input.id),
+						eq(capabilityPackages.organizationId, organizationId),
+						eq(capabilityPackageVersions.id, input.versionId),
+					),
+				)
+				.limit(1);
+
+			if (!row) notFound("Capability version not found");
+			if (!canActivateCapabilityVersion({ auditStatus: row.auditStatus })) {
+				badRequest(
+					"Only versions that passed security audit can be activated.",
+				);
+			}
+
+			const [updated] = await dbWs
+				.update(capabilityPackages)
+				.set({
+					currentVersionId: row.versionId,
+					name: getManifestName(row.manifest) ?? undefined,
+					description: getValidationDisplaySummary(row.validationSummary),
+					status: "active",
+					updatedAt: new Date(),
+				})
+				.where(
+					and(
+						eq(capabilityPackages.id, input.id),
+						eq(capabilityPackages.organizationId, organizationId),
+					),
+				)
+				.returning();
+
 			if (!updated) notFound();
 			return updated;
 		}),

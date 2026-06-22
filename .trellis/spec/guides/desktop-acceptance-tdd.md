@@ -36,6 +36,7 @@ Use it like this:
 - Start the real desktop app with `bun run --cwd apps/desktop dev`; the script sets `DESKTOP_AUTOMATION_PORT=9322`.
 - Use Desktop Automation CLI commands to inspect and drive the app: `window-info`, `inspect-dom`, `wait-for`, `click`, `type-text`, `send-keys`, `navigate`, `console-logs`, `evaluate-js`, and `screenshot`.
 - Prefer `smoke` for Trellis gates, for example `bun run desktop:automation -- smoke --url-includes "#/sign-in" --screenshot .trellis/tasks/<task>/artifacts/01-sign-in.png --report .trellis/tasks/<task>/artifacts/01-sign-in.json`.
+- For standalone screenshot artifacts, pass the file with `--path`: `bun run desktop:automation -- screenshot --path .trellis/tasks/<task>/artifacts/01-state.png --json`. A positional file argument captures a screenshot but does not save the artifact.
 - Save screenshot artifacts under the task directory, for example `.trellis/tasks/<task>/artifacts/01-sign-in.png`.
 - Record any CLI failures, console errors, report paths, and screenshot paths in validation notes.
 - If Desktop Automation cannot control an OS-level surface, use Codex Desktop Computer Use as a fallback and record why the fallback was needed.
@@ -142,6 +143,18 @@ DESKTOP_AUTOMATION_PORT="$(grep '^DESKTOP_AUTOMATION_PORT=' .env | cut -d= -f2)"
   --screenshot .trellis/tasks/<task>/artifacts/desktop-smoke.png \
   --report .trellis/tasks/<task>/artifacts/desktop-smoke.json
 bun run dev:worktree:cleanup -- --e2e-slug <slug> --worktree-name <name>
+```
+
+Wrong:
+
+```bash
+bun run desktop:automation -- screenshot .trellis/tasks/<task>/artifacts/state.png --json
+```
+
+Correct:
+
+```bash
+bun run desktop:automation -- screenshot --path .trellis/tasks/<task>/artifacts/state.png --json
 ```
 
 Wrong:
