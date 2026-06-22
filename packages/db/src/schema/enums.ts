@@ -115,6 +115,61 @@ export const automationPromptSourceValues = [
 export const automationPromptSourceEnum = z.enum(automationPromptSourceValues);
 export type AutomationPromptSource = z.infer<typeof automationPromptSourceEnum>;
 
+export const controlChatSessionStatusValues = [
+	"idle",
+	"running",
+	"archived",
+] as const;
+export const controlChatSessionStatusEnum = z.enum(
+	controlChatSessionStatusValues,
+);
+export type ControlChatSessionStatus = z.infer<
+	typeof controlChatSessionStatusEnum
+>;
+
+export const controlChatMessageRoleValues = [
+	"user",
+	"assistant",
+	"system",
+] as const;
+export const controlChatMessageRoleEnum = z.enum(controlChatMessageRoleValues);
+export type ControlChatMessageRole = z.infer<typeof controlChatMessageRoleEnum>;
+
+export const controlChatRunStatusValues = [
+	"queued",
+	"running",
+	"completed",
+	"failed",
+	"aborted",
+] as const;
+export const controlChatRunStatusEnum = z.enum(controlChatRunStatusValues);
+export type ControlChatRunStatus = z.infer<typeof controlChatRunStatusEnum>;
+
+export const controlChatToolCallStatusValues = [
+	"queued",
+	"running",
+	"completed",
+	"failed",
+] as const;
+export const controlChatToolCallStatusEnum = z.enum(
+	controlChatToolCallStatusValues,
+);
+export type ControlChatToolCallStatus = z.infer<
+	typeof controlChatToolCallStatusEnum
+>;
+
+export const controlChatToolTargetKindValues = [
+	"cloud",
+	"host",
+	"workspace",
+] as const;
+export const controlChatToolTargetKindEnum = z.enum(
+	controlChatToolTargetKindValues,
+);
+export type ControlChatToolTargetKind = z.infer<
+	typeof controlChatToolTargetKindEnum
+>;
+
 export const capabilityPackageTypeValues = ["skill", "cli"] as const;
 export const capabilityPackageTypeEnum = z.enum(capabilityPackageTypeValues);
 export type CapabilityPackageType = z.infer<typeof capabilityPackageTypeEnum>;

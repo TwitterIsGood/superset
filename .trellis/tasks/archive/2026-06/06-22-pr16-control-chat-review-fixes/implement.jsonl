@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/trpc/backend/control-chat-management-tools.md", "reason": "Control Chat typed tool, cancellation, versioning, and validation contracts."}
+{"file": ".trellis/spec/guides/database-and-migrations.md", "reason": "Generated migration rules and production DB constraints."}
+{"file": ".trellis/spec/desktop/frontend/index.md", "reason": "Desktop renderer ownership, state, and component conventions."}
+{"file": ".trellis/spec/trpc/backend/index.md", "reason": "Cloud tRPC router and backend validation conventions."}

@@ -449,6 +449,13 @@
       "when": 1781793461976,
       "tag": "0063_capability_packages",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1782111202860,
+      "tag": "0064_control_chat_management_tools",
+      "breakpoints": true
     }
   ]
 }

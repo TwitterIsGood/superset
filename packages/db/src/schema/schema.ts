@@ -27,6 +27,11 @@ import {
 	capabilityPackageStatusValues,
 	capabilityPackageTypeValues,
 	commandStatusValues,
+	controlChatMessageRoleValues,
+	controlChatRunStatusValues,
+	controlChatSessionStatusValues,
+	controlChatToolCallStatusValues,
+	controlChatToolTargetKindValues,
 	deviceTypeValues,
 	integrationProviderValues,
 	remoteControlSessionModeValues,
@@ -987,6 +992,26 @@ export const automationPromptSource = pgEnum(
 	"automation_prompt_source",
 	automationPromptSourceValues,
 );
+export const controlChatSessionStatus = pgEnum(
+	"control_chat_session_status",
+	controlChatSessionStatusValues,
+);
+export const controlChatMessageRole = pgEnum(
+	"control_chat_message_role",
+	controlChatMessageRoleValues,
+);
+export const controlChatRunStatus = pgEnum(
+	"control_chat_run_status",
+	controlChatRunStatusValues,
+);
+export const controlChatToolCallStatus = pgEnum(
+	"control_chat_tool_call_status",
+	controlChatToolCallStatusValues,
+);
+export const controlChatToolTargetKind = pgEnum(
+	"control_chat_tool_target_kind",
+	controlChatToolTargetKindValues,
+);
 export const capabilityPackageType = pgEnum(
 	"capability_package_type",
 	capabilityPackageTypeValues,
@@ -1003,6 +1028,185 @@ export const capabilityPackageAuditStatus = pgEnum(
 	"capability_package_audit_status",
 	capabilityPackageAuditStatusValues,
 );
+
+export type ControlChatMessageContent =
+	| { type: "text"; text: string }
+	| {
+			type: "tool_summary";
+			toolCallId: string;
+			toolName: string;
+			status: "queued" | "running" | "completed" | "failed";
+			summary: string;
+	  }
+	| {
+			type: "context_summary";
+			title: string;
+			items: string[];
+	  }
+	| { type: "error"; text: string };
+
+export const controlChatSessions = pgTable(
+	"control_chat_sessions",
+	{
+		id: uuid().primaryKey().defaultRandom(),
+		organizationId: uuid("organization_id")
+			.notNull()
+			.references(() => organizations.id, { onDelete: "cascade" }),
+		ownerUserId: uuid("owner_user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		title: text().notNull().default("Control Chat"),
+		status: controlChatSessionStatus().notNull().default("idle"),
+		activeRunId: uuid("active_run_id"),
+		metadata: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow()
+			.$onUpdate(() => new Date()),
+		lastActiveAt: timestamp("last_active_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		index("control_chat_sessions_org_idx").on(table.organizationId),
+		index("control_chat_sessions_owner_idx").on(table.ownerUserId),
+		index("control_chat_sessions_active_idx").on(table.activeRunId),
+		index("control_chat_sessions_last_active_idx").on(table.lastActiveAt),
+	],
+);
+
+export type InsertControlChatSession = typeof controlChatSessions.$inferInsert;
+export type SelectControlChatSession = typeof controlChatSessions.$inferSelect;
+
+export const controlChatMessages = pgTable(
+	"control_chat_messages",
+	{
+		id: text().primaryKey(),
+		sessionId: uuid("session_id")
+			.notNull()
+			.references(() => controlChatSessions.id, { onDelete: "cascade" }),
+		organizationId: uuid("organization_id")
+			.notNull()
+			.references(() => organizations.id, { onDelete: "cascade" }),
+		createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		role: controlChatMessageRole().notNull(),
+		content: jsonb().notNull().$type<ControlChatMessageContent[]>(),
+		metadata: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		index("control_chat_messages_session_created_idx").on(
+			table.sessionId,
+			table.createdAt,
+		),
+		index("control_chat_messages_org_idx").on(table.organizationId),
+		index("control_chat_messages_created_by_idx").on(table.createdByUserId),
+	],
+);
+
+export type InsertControlChatMessage = typeof controlChatMessages.$inferInsert;
+export type SelectControlChatMessage = typeof controlChatMessages.$inferSelect;
+
+export const controlChatRuns = pgTable(
+	"control_chat_runs",
+	{
+		id: uuid().primaryKey().defaultRandom(),
+		sessionId: uuid("session_id")
+			.notNull()
+			.references(() => controlChatSessions.id, { onDelete: "cascade" }),
+		organizationId: uuid("organization_id")
+			.notNull()
+			.references(() => organizations.id, { onDelete: "cascade" }),
+		startedByUserId: uuid("started_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		status: controlChatRunStatus().notNull().default("queued"),
+		originHostId: text("origin_host_id"),
+		executionHostId: text("execution_host_id"),
+		permissionMode: text("permission_mode")
+			.notNull()
+			.default("bypassPermissions"),
+		modelProviderId: uuid("model_provider_id").references(
+			() => modelProviders.id,
+			{
+				onDelete: "set null",
+			},
+		),
+		modelId: text("model_id"),
+		context: jsonb("context")
+			.$type<Record<string, unknown>>()
+			.notNull()
+			.default({}),
+		error: text(),
+		startedAt: timestamp("started_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		completedAt: timestamp("completed_at", { withTimezone: true }),
+	},
+	(table) => [
+		index("control_chat_runs_session_idx").on(table.sessionId),
+		index("control_chat_runs_org_idx").on(table.organizationId),
+		index("control_chat_runs_status_idx").on(table.status),
+		index("control_chat_runs_started_by_idx").on(table.startedByUserId),
+	],
+);
+
+export type InsertControlChatRun = typeof controlChatRuns.$inferInsert;
+export type SelectControlChatRun = typeof controlChatRuns.$inferSelect;
+
+export const controlChatToolCalls = pgTable(
+	"control_chat_tool_calls",
+	{
+		id: text().primaryKey(),
+		runId: uuid("run_id")
+			.notNull()
+			.references(() => controlChatRuns.id, { onDelete: "cascade" }),
+		sessionId: uuid("session_id")
+			.notNull()
+			.references(() => controlChatSessions.id, { onDelete: "cascade" }),
+		organizationId: uuid("organization_id")
+			.notNull()
+			.references(() => organizations.id, { onDelete: "cascade" }),
+		toolName: text("tool_name").notNull(),
+		targetKind: controlChatToolTargetKind("target_kind")
+			.notNull()
+			.default("cloud"),
+		targetHostId: text("target_host_id"),
+		targetWorkspaceId: uuid("target_workspace_id").references(
+			() => v2Workspaces.id,
+			{
+				onDelete: "set null",
+			},
+		),
+		input: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+		output: jsonb().$type<Record<string, unknown>>(),
+		status: controlChatToolCallStatus().notNull().default("queued"),
+		error: text(),
+		startedAt: timestamp("started_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		completedAt: timestamp("completed_at", { withTimezone: true }),
+	},
+	(table) => [
+		index("control_chat_tool_calls_run_idx").on(table.runId),
+		index("control_chat_tool_calls_session_idx").on(table.sessionId),
+		index("control_chat_tool_calls_org_idx").on(table.organizationId),
+		index("control_chat_tool_calls_tool_idx").on(table.toolName),
+		index("control_chat_tool_calls_target_host_idx").on(table.targetHostId),
+	],
+);
+
+export type InsertControlChatToolCall =
+	typeof controlChatToolCalls.$inferInsert;
+export type SelectControlChatToolCall =
+	typeof controlChatToolCalls.$inferSelect;
 
 export const automations = pgTable(
 	"automations",
@@ -1170,6 +1374,87 @@ export type InsertAutomationPromptVersion =
 export type SelectAutomationPromptVersion =
 	typeof automationPromptVersions.$inferSelect;
 
+export interface AutomationConfigSnapshot {
+	name: string;
+	prompt: string;
+	agent: string;
+	modelProviderId: string | null;
+	modelId: string | null;
+	modelConfig: Record<string, unknown>;
+	targetHostId: string | null;
+	v2ProjectId: string | null;
+	v2WorkspaceId: string | null;
+	rrule: string;
+	dtstart: string;
+	timezone: string;
+	enabled: boolean;
+	mcpScope: string[];
+	nextRunAt: string;
+	capabilities: {
+		capabilityId: string;
+		capabilityVersionId: string;
+		enabled: boolean;
+		config: Record<string, unknown>;
+		displayOrder: number;
+	}[];
+}
+
+export const automationConfigVersions = pgTable(
+	"automation_config_versions",
+	{
+		id: uuid().primaryKey().defaultRandom(),
+		automationId: uuid("automation_id")
+			.notNull()
+			.references(() => automations.id, { onDelete: "cascade" }),
+		authorUserId: uuid("author_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		source: text().notNull(),
+		snapshot: jsonb().notNull().$type<AutomationConfigSnapshot>(),
+		snapshotHash: text("snapshot_hash").notNull(),
+		summary: text(),
+		previousVersionId: uuid("previous_version_id"),
+		restoredFromVersionId: uuid("restored_from_version_id"),
+		controlChatSessionId: uuid("control_chat_session_id").references(
+			() => controlChatSessions.id,
+			{ onDelete: "set null" },
+		),
+		controlChatRunId: uuid("control_chat_run_id").references(
+			() => controlChatRuns.id,
+			{ onDelete: "set null" },
+		),
+		sourceInstruction: text("source_instruction"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		index("automation_config_versions_automation_idx").on(
+			table.automationId,
+			table.createdAt,
+		),
+		index("automation_config_versions_author_idx").on(table.authorUserId),
+		index("automation_config_versions_control_chat_session_idx").on(
+			table.controlChatSessionId,
+		),
+		foreignKey({
+			columns: [table.previousVersionId],
+			foreignColumns: [table.id],
+			name: "automation_config_versions_previous_version_id_fk",
+		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.restoredFromVersionId],
+			foreignColumns: [table.id],
+			name: "automation_config_versions_restored_from_version_id_fk",
+		}).onDelete("set null"),
+	],
+);
+
+export type InsertAutomationConfigVersion =
+	typeof automationConfigVersions.$inferInsert;
+export type SelectAutomationConfigVersion =
+	typeof automationConfigVersions.$inferSelect;
+
 export const capabilityPackages = pgTable(
 	"capability_packages",
 	{
@@ -1228,6 +1513,16 @@ export const capabilityPackageVersions = pgTable(
 		artifactSizeBytes: integer("artifact_size_bytes").notNull(),
 		sourceType: capabilityPackageSourceType("source_type").notNull(),
 		sourceRef: text("source_ref"),
+		sourceInstruction: text("source_instruction"),
+		sourceSummary: text("source_summary"),
+		controlChatSessionId: uuid("control_chat_session_id").references(
+			() => controlChatSessions.id,
+			{ onDelete: "set null" },
+		),
+		controlChatRunId: uuid("control_chat_run_id").references(
+			() => controlChatRuns.id,
+			{ onDelete: "set null" },
+		),
 		validationSummary: jsonb("validation_summary")
 			.$type<Record<string, unknown>>()
 			.notNull()
@@ -1260,6 +1555,9 @@ export const capabilityPackageVersions = pgTable(
 			table.artifactSha256,
 		),
 		index("capability_package_versions_audit_status_idx").on(table.auditStatus),
+		index("capability_package_versions_control_chat_session_idx").on(
+			table.controlChatSessionId,
+		),
 		unique("capability_package_versions_capability_version_unique").on(
 			table.capabilityId,
 			table.version,

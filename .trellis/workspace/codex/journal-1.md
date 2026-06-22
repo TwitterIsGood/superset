@@ -177,3 +177,105 @@ Added Stop for project clone: renderer modal/toast cancellation, host-service gi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Control Chat management tools
+
+**Date**: 2026-06-22
+**Task**: Control Chat management tools
+**Package**: desktop
+**Branch**: `codex/control-chat-tools-automations`
+
+### Summary
+
+Implemented global Control Chat for Automation and Capability management, including typed tools, versioning, floating desktop panel, validation matrix, and task archive.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d3a03fd16` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 7: PR16 Control Chat Review Fixes
+
+**Date**: 2026-06-22
+**Task**: PR16 Control Chat Review Fixes
+**Package**: desktop
+**Branch**: `codex/control-chat-tools-automations`
+
+### Summary
+
+Fixed PR #16 review blockers: generated Control Chat migration, added runtime abort checks, fixed new-chat session state and CI-safe store persistence, marked failed tool turns as failed runs, updated specs, and verified lint/typecheck/tests/tool matrix.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fa4a11d70` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 8: PR16 CI Test Follow-up
+
+**Date**: 2026-06-22
+**Task**: PR16 CI Test Follow-up
+**Package**: desktop
+**Branch**: `codex/control-chat-tools-automations`
+
+### Summary
+
+Fixed GitHub CI Test failure by moving Control Chat runtime status helpers into a pure module so runtime status tests do not import the DB-backed runtime without DATABASE_URL; verified DATABASE_URL= packages/trpc tests plus lint/typecheck/full test locally.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `94af05a0d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

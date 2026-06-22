@@ -167,6 +167,10 @@ export const capabilityPackageUploadSchema = z
 		fileData: z.string().min(1),
 		sourceType: z.enum(capabilityPackageSourceTypeValues).default("zip"),
 		sourceRef: z.string().trim().max(1000).optional(),
+		sourceInstruction: z.string().trim().max(20_000).optional(),
+		sourceSummary: z.string().trim().max(2_000).optional(),
+		controlChatSessionId: z.string().uuid().optional(),
+		controlChatRunId: z.string().uuid().optional(),
 	})
 	.strict();
 

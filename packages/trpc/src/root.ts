@@ -8,6 +8,7 @@ import { automationRouter } from "./router/automation";
 import { billingRouter } from "./router/billing";
 import { capabilityRouter } from "./router/capability";
 import { chatRouter } from "./router/chat";
+import { controlChatRouter } from "./router/control-chat";
 import { deviceRouter } from "./router/device";
 import { hostRouter } from "./router/host";
 import { integrationRouter } from "./router/integration";
@@ -33,6 +34,7 @@ export const appRouter = createTRPCRouter({
 	billing: billingRouter,
 	capability: capabilityRouter,
 	chat: chatRouter,
+	controlChat: controlChatRouter,
 	device: deviceRouter,
 	host: hostRouter,
 	integration: integrationRouter,

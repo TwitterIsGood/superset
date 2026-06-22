@@ -17,6 +17,7 @@ Cloud API tRPC routers and shared server/client wiring.
 ## Guide Index
 
 - [Directory Structure](./directory-structure.md)
+- [Control Chat Management Tools](./control-chat-management-tools.md)
 - [Database Guidelines](./database-guidelines.md)
 - [Automation Run Workflow](./automation-run-workflow.md)
 - [Error Handling](./error-handling.md)

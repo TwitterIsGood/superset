@@ -16,6 +16,7 @@ import {
 import {
 	agentCommands,
 	automationCapabilities,
+	automationConfigVersions,
 	automationPromptVersions,
 	automationRuns,
 	automations,
@@ -23,6 +24,10 @@ import {
 	capabilityPackageVersions,
 	chatMessages,
 	chatSessions,
+	controlChatMessages,
+	controlChatRuns,
+	controlChatSessions,
+	controlChatToolCalls,
 	devicePresence,
 	integrationConnections,
 	modelProviderModels,
@@ -62,8 +67,12 @@ export const usersRelations = relations(users, ({ many }) => ({
 	agentCommands: many(agentCommands),
 	chatSessions: many(chatSessions),
 	chatMessages: many(chatMessages),
+	controlChatSessions: many(controlChatSessions),
+	controlChatMessages: many(controlChatMessages),
+	controlChatRuns: many(controlChatRuns),
 	automations: many(automations),
 	automationPromptVersions: many(automationPromptVersions),
+	automationConfigVersions: many(automationConfigVersions),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -105,8 +114,13 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
 	agentCommands: many(agentCommands),
 	chatSessions: many(chatSessions),
 	chatMessages: many(chatMessages),
+	controlChatSessions: many(controlChatSessions),
+	controlChatMessages: many(controlChatMessages),
+	controlChatRuns: many(controlChatRuns),
+	controlChatToolCalls: many(controlChatToolCalls),
 	automations: many(automations),
 	automationRuns: many(automationRuns),
+	automationConfigVersions: many(automationConfigVersions),
 }));
 
 export const membersRelations = relations(members, ({ one }) => ({
@@ -249,6 +263,14 @@ export const capabilityPackageVersionsRelations = relations(
 		createdBy: one(users, {
 			fields: [capabilityPackageVersions.createdByUserId],
 			references: [users.id],
+		}),
+		controlChatSession: one(controlChatSessions, {
+			fields: [capabilityPackageVersions.controlChatSessionId],
+			references: [controlChatSessions.id],
+		}),
+		controlChatRun: one(controlChatRuns, {
+			fields: [capabilityPackageVersions.controlChatRunId],
+			references: [controlChatRuns.id],
 		}),
 		projectBindings: many(projectCapabilities),
 		automationBindings: many(automationCapabilities),
@@ -518,6 +540,86 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
 	}),
 }));
 
+export const controlChatSessionsRelations = relations(
+	controlChatSessions,
+	({ one, many }) => ({
+		organization: one(organizations, {
+			fields: [controlChatSessions.organizationId],
+			references: [organizations.id],
+		}),
+		owner: one(users, {
+			fields: [controlChatSessions.ownerUserId],
+			references: [users.id],
+		}),
+		messages: many(controlChatMessages),
+		runs: many(controlChatRuns),
+		toolCalls: many(controlChatToolCalls),
+	}),
+);
+
+export const controlChatMessagesRelations = relations(
+	controlChatMessages,
+	({ one }) => ({
+		session: one(controlChatSessions, {
+			fields: [controlChatMessages.sessionId],
+			references: [controlChatSessions.id],
+		}),
+		organization: one(organizations, {
+			fields: [controlChatMessages.organizationId],
+			references: [organizations.id],
+		}),
+		createdBy: one(users, {
+			fields: [controlChatMessages.createdByUserId],
+			references: [users.id],
+		}),
+	}),
+);
+
+export const controlChatRunsRelations = relations(
+	controlChatRuns,
+	({ one, many }) => ({
+		session: one(controlChatSessions, {
+			fields: [controlChatRuns.sessionId],
+			references: [controlChatSessions.id],
+		}),
+		organization: one(organizations, {
+			fields: [controlChatRuns.organizationId],
+			references: [organizations.id],
+		}),
+		startedBy: one(users, {
+			fields: [controlChatRuns.startedByUserId],
+			references: [users.id],
+		}),
+		modelProvider: one(modelProviders, {
+			fields: [controlChatRuns.modelProviderId],
+			references: [modelProviders.id],
+		}),
+		toolCalls: many(controlChatToolCalls),
+	}),
+);
+
+export const controlChatToolCallsRelations = relations(
+	controlChatToolCalls,
+	({ one }) => ({
+		run: one(controlChatRuns, {
+			fields: [controlChatToolCalls.runId],
+			references: [controlChatRuns.id],
+		}),
+		session: one(controlChatSessions, {
+			fields: [controlChatToolCalls.sessionId],
+			references: [controlChatSessions.id],
+		}),
+		organization: one(organizations, {
+			fields: [controlChatToolCalls.organizationId],
+			references: [organizations.id],
+		}),
+		targetWorkspace: one(v2Workspaces, {
+			fields: [controlChatToolCalls.targetWorkspaceId],
+			references: [v2Workspaces.id],
+		}),
+	}),
+);
+
 export const automationsRelations = relations(automations, ({ one, many }) => ({
 	organization: one(organizations, {
 		fields: [automations.organizationId],
@@ -537,6 +639,7 @@ export const automationsRelations = relations(automations, ({ one, many }) => ({
 	}),
 	runs: many(automationRuns),
 	promptVersions: many(automationPromptVersions),
+	configVersions: many(automationConfigVersions),
 	capabilities: many(automationCapabilities),
 }));
 
@@ -570,6 +673,38 @@ export const automationPromptVersionsRelations = relations(
 			fields: [automationPromptVersions.restoredFromVersionId],
 			references: [automationPromptVersions.id],
 			relationName: "restoredFromVersion",
+		}),
+	}),
+);
+
+export const automationConfigVersionsRelations = relations(
+	automationConfigVersions,
+	({ one }) => ({
+		automation: one(automations, {
+			fields: [automationConfigVersions.automationId],
+			references: [automations.id],
+		}),
+		author: one(users, {
+			fields: [automationConfigVersions.authorUserId],
+			references: [users.id],
+		}),
+		previousVersion: one(automationConfigVersions, {
+			fields: [automationConfigVersions.previousVersionId],
+			references: [automationConfigVersions.id],
+			relationName: "previousVersion",
+		}),
+		restoredFromVersion: one(automationConfigVersions, {
+			fields: [automationConfigVersions.restoredFromVersionId],
+			references: [automationConfigVersions.id],
+			relationName: "restoredFromConfigVersion",
+		}),
+		controlChatSession: one(controlChatSessions, {
+			fields: [automationConfigVersions.controlChatSessionId],
+			references: [controlChatSessions.id],
+		}),
+		controlChatRun: one(controlChatRuns, {
+			fields: [automationConfigVersions.controlChatRunId],
+			references: [controlChatRuns.id],
 		}),
 	}),
 );
