@@ -28,6 +28,7 @@ function createRuntime(options?: {
 		cwd: CWD,
 		harness: {
 			abort: mock(() => {}),
+			waitForCurrentThreadStreamIdle: mock(async () => {}),
 			respondToToolApproval: mock(async (payload: unknown) => payload),
 			respondToQuestion:
 				options?.respondToQuestion ?? mock(async (payload: unknown) => payload),
@@ -70,6 +71,11 @@ function createServiceHarness(options?: Parameters<typeof createRuntime>[0]) {
 		getOrCreateRuntime,
 		runtime,
 		abort: runtime.harness.abort as ReturnType<typeof mock>,
+		waitForCurrentThreadStreamIdle: (
+			runtime.harness as RuntimeSession["harness"] & {
+				waitForCurrentThreadStreamIdle: ReturnType<typeof mock>;
+			}
+		).waitForCurrentThreadStreamIdle,
 		respondToToolApproval: runtime.harness.respondToToolApproval as ReturnType<
 			typeof mock
 		>,
@@ -84,7 +90,12 @@ function createServiceHarness(options?: Parameters<typeof createRuntime>[0]) {
 
 describe("ChatRuntimeService control mutations", () => {
 	it("passes cwd through stop and abort mutations", async () => {
-		const { caller, getOrCreateRuntime, abort } = createServiceHarness();
+		const {
+			caller,
+			getOrCreateRuntime,
+			abort,
+			waitForCurrentThreadStreamIdle,
+		} = createServiceHarness();
 
 		await caller.session.stop({ sessionId: SESSION_ID, cwd: CWD });
 		await caller.session.abort({ sessionId: SESSION_ID, cwd: CWD });
@@ -92,6 +103,7 @@ describe("ChatRuntimeService control mutations", () => {
 		expect(getOrCreateRuntime).toHaveBeenNthCalledWith(1, SESSION_ID, CWD);
 		expect(getOrCreateRuntime).toHaveBeenNthCalledWith(2, SESSION_ID, CWD);
 		expect(abort).toHaveBeenCalledTimes(2);
+		expect(waitForCurrentThreadStreamIdle).toHaveBeenCalledTimes(2);
 	});
 
 	it("passes cwd through approval, question, and plan responses", async () => {

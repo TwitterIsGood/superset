@@ -68,6 +68,7 @@ const harnessSendMessageMock = mock(async (_payload: unknown) => ({
 }));
 const harnessGetCurrentThreadIdMock = mock(() => "thread-1");
 const harnessAbortMock = mock(() => {});
+const harnessWaitForIdleMock = mock(async () => {});
 const harnessSwitchThreadMock = mock(
 	async (_input: { threadId: string }) => {},
 );
@@ -91,6 +92,7 @@ const createMastraCodeMock = mock(async (config: unknown) => {
 			sendMessage: harnessSendMessageMock,
 			getCurrentThreadId: harnessGetCurrentThreadIdMock,
 			abort: harnessAbortMock,
+			waitForCurrentThreadStreamIdle: harnessWaitForIdleMock,
 			switchThread: harnessSwitchThreadMock,
 			setState: harnessSetStateMock,
 			config: {
@@ -171,6 +173,7 @@ describe("ChatRuntimeManager model provider integration", () => {
 		harnessSendMessageMock.mockClear();
 		harnessGetCurrentThreadIdMock.mockClear();
 		harnessAbortMock.mockClear();
+		harnessWaitForIdleMock.mockClear();
 		harnessSwitchThreadMock.mockClear();
 		harnessSetStateMock.mockClear();
 		harnessGetStoreMock.mockClear();
@@ -325,5 +328,28 @@ describe("ChatRuntimeManager model provider integration", () => {
 		expect(harnessSendMessageMock).toHaveBeenCalledWith({
 			content: "Retry previous user prompt",
 		});
+	});
+
+	it("waits for the aborted harness stream to become idle before stop returns", async () => {
+		const db = createTestDb();
+		const root = tempRoot ?? tmpdir();
+		const workspacePath = join(root, "worktree");
+		seedWorkspace(db, workspacePath);
+		const runtimeResolver: ModelProviderRuntimeResolver = {
+			hasUsableRuntimeEnv: mock(async () => true),
+			prepareRuntimeEnv: mock(async () => {}),
+		};
+		const manager = new ChatRuntimeManager({
+			db,
+			runtimeResolver,
+		});
+
+		await manager.stop({
+			sessionId: SESSION_ID,
+			workspaceId: WORKSPACE_ID,
+		});
+
+		expect(harnessAbortMock).toHaveBeenCalledTimes(1);
+		expect(harnessWaitForIdleMock).toHaveBeenCalledTimes(1);
 	});
 });

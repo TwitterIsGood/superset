@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 25
-- **Last Active**: 2026-06-21
+- **Total Sessions**: 27
+- **Last Active**: 2026-06-22
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~863 | Active |
+| `journal-1.md` | ~931 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 27 | 2026-06-22 | Address Chat stop retention review | `4d80cc25e` | `codex/chat-abort-retention` |
+| 26 | 2026-06-22 | Fix Chat stop and resend handling | `8096f61d8` | `codex/chat-abort-retention` |
 | 25 | 2026-06-21 | Capability artifact object storage | `361516504` | `main` |
 | 24 | 2026-06-17 | Finalize online service and Trellis upgrade | `995953a88` | `main` |
 | 23 | 2026-06-17 | Online service isolation and stale session recovery | `64418a443` | `main` |

@@ -1,5 +1,9 @@
 import { describe, expect, it, mock } from "bun:test";
-import { sendMessageForSession, toSendFailureMessage } from "./sendMessage";
+import {
+	isChatAbortError,
+	sendMessageForSession,
+	toSendFailureMessage,
+} from "./sendMessage";
 
 describe("sendMessageForSession", () => {
 	it("creates a fresh session and sends to that session when no current session exists", async () => {
@@ -104,5 +108,21 @@ describe("toSendFailureMessage", () => {
 				new Error("Unauthorized model provider token, please reconnect OAuth"),
 			),
 		).toBe("Unauthorized model provider token, please reconnect OAuth");
+	});
+});
+
+describe("isChatAbortError", () => {
+	it("matches user-initiated abort errors", () => {
+		expect(isChatAbortError(new Error("Chat request was aborted."))).toBe(true);
+		expect(isChatAbortError(new Error("Request was aborted."))).toBe(true);
+	});
+
+	it("does not match regular send failures", () => {
+		expect(isChatAbortError(new Error("A response is already running."))).toBe(
+			false,
+		);
+		expect(isChatAbortError(new Error("Provider returned HTTP 500"))).toBe(
+			false,
+		);
 	});
 });

@@ -41,6 +41,7 @@ import type { ChatPaneInterfaceProps } from "./types";
 import { toOptimisticUserMessage } from "./utils/optimisticUserMessage";
 import {
 	type ChatSendMessageInput,
+	isChatAbortError,
 	toSendFailureMessage,
 } from "./utils/sendMessage";
 import {
@@ -616,6 +617,11 @@ export function ChatPaneInterface({
 					onUserMessageSubmitted?.(content);
 				}
 			} catch (error) {
+				if (isChatAbortError(error)) {
+					setSubmitStatus(undefined);
+					clearRuntimeError();
+					return;
+				}
 				const sendErrorMessage = toSendFailureMessage(error);
 				setSubmitStatus(undefined);
 				setRuntimeErrorMessage(sendErrorMessage);
@@ -736,6 +742,11 @@ export function ChatPaneInterface({
 				});
 			} catch (error) {
 				autoLaunchInFlightRef.current = null;
+				if (isChatAbortError(error)) {
+					setSubmitStatus(undefined);
+					clearRuntimeError();
+					return;
+				}
 
 				const sendErrorMessage = toSendFailureMessage(error);
 				setSubmitStatus(undefined);
@@ -839,6 +850,11 @@ export function ChatPaneInterface({
 					restarted_from_message_id: request.messageId,
 				});
 			} catch (error) {
+				if (isChatAbortError(error)) {
+					setSubmitStatus(undefined);
+					clearRuntimeError();
+					return;
+				}
 				setPendingUserTurn(null);
 				const sendErrorMessage = toSendFailureMessage(error);
 				setSubmitStatus(undefined);

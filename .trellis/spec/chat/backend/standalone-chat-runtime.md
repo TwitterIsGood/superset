@@ -68,6 +68,7 @@
 - Fresh session first send -> preserve the optimistic user message across the route change from no session to the created `sessionId`; the message list must render the user bubble and Thinking/tool progress, not the empty `Start a conversation` state.
 - Runtime cache lost, hot reload, app restart, or opening a session on another machine -> `listMessages` hydrates from `chat_messages` and must not return an empty history solely because the local runtime Map is empty.
 - Runtime cache stale but present -> `listMessages` returns cached history immediately, starts a background cloud refresh, and the next query observes refreshed messages. The UI must not show `Loading conversation` for stale-cache refreshes.
+- Runtime message exposure -> `getDisplayState` and `listMessages` must return cloned message objects instead of the mutable session-owned `currentMessage` / `messages` entries. Renderer caches, tests, and consumers must not be able to mutate in-flight runtime state through returned objects.
 - Successful send mutation -> the renderer must synchronously query `session.listMessages` and `session.getDisplayState` through the raw tRPC client, then write both results into the matching React Query cache with `setData`. This is required for fast new-session turns where the cache was manually seeded with an optimistic user message before the route observer subscribed. Do not rely on invalidation or polling to reveal the final assistant message.
 - Electron tRPC cache refresh -> do not use `chatRuntimeServiceTrpcUtils.session.*.fetch(...)` in this renderer path. The Electron link does not support that shortcut reliably and can throw `client[procedureType] is not a function`. Use `chatRuntimeServiceTrpcUtils.client.session.<procedure>.query(...)` plus `setData(...)` instead.
 - Claude tool call/result persistence fails -> update `ChatMessageContent` in `packages/db/src/schema/schema.ts` and `chatMessageContentSchema` in `packages/trpc/src/router/chat/chat.ts`; both layers must accept `tool_call` and `tool_result`.
@@ -90,6 +91,7 @@
 - Unit test that SSE chunks update `currentMessage` before `sendMessage` resolves.
 - Unit test that an empty runtime hydrates existing messages from `chat.listMessages`.
 - Unit test that stale cached history returns immediately while cloud history refreshes in the background.
+- Unit test that mutating/asserting `getDisplayState().currentMessage` or `listMessages()` results cannot corrupt the session-owned in-flight assistant message.
 - Unit test that a pasted URL is fetched and injected into provider messages before the provider request.
 - Unit test that provider tool-call/tool-result events update `currentMessage` before completion and persist as structured content.
 - Unit test that successful `sendMessage` refreshes `listMessages` and `getDisplayState` through raw client queries and writes the results into cache after the mutation resolves.

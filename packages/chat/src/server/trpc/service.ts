@@ -57,6 +57,20 @@ type StandaloneRuntimeMessage = Awaited<
 	ReturnType<StandaloneChatRuntimeManager["listMessages"]>
 >[number];
 type RuntimeMessages = Array<HarnessMessage | StandaloneRuntimeMessage>;
+type HarnessWithOptionalStreamIdle = {
+	waitForCurrentThreadStreamIdle?: () => Promise<void>;
+};
+
+async function abortAndWaitForIdle(runtime: RuntimeSession): Promise<void> {
+	runtime.harness.abort();
+	const waitForIdle = (
+		runtime.harness as unknown as HarnessWithOptionalStreamIdle
+	).waitForCurrentThreadStreamIdle;
+	if (waitForIdle) {
+		await waitForIdle.call(runtime.harness);
+	}
+	runtime.lastErrorMessage = null;
+}
 
 function respondToQuestionWithOptimisticState(
 	runtime: RuntimeSession,
@@ -387,26 +401,26 @@ export class ChatRuntimeService {
 
 				stop: t.procedure.input(sessionIdInput).mutation(async ({ input }) => {
 					if (!input.cwd) {
-						this.standaloneRuntime.abort(input.sessionId);
+						await this.standaloneRuntime.abort(input.sessionId);
 						return;
 					}
 					const runtime = await this.getOrCreateRuntime(
 						input.sessionId,
 						input.cwd,
 					);
-					runtime.harness.abort();
+					await abortAndWaitForIdle(runtime);
 				}),
 
 				abort: t.procedure.input(sessionIdInput).mutation(async ({ input }) => {
 					if (!input.cwd) {
-						this.standaloneRuntime.abort(input.sessionId);
+						await this.standaloneRuntime.abort(input.sessionId);
 						return;
 					}
 					const runtime = await this.getOrCreateRuntime(
 						input.sessionId,
 						input.cwd,
 					);
-					runtime.harness.abort();
+					await abortAndWaitForIdle(runtime);
 				}),
 
 				approval: t.router({

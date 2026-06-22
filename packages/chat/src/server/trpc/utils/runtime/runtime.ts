@@ -277,6 +277,9 @@ export function subscribeToSessionEvents(
 			runtime.pendingQuestionResponses.clear();
 			const raw = event.reason;
 			const reason = raw === "aborted" || raw === "error" ? raw : "complete";
+			if (reason === "aborted") {
+				runtime.lastErrorMessage = null;
+			}
 			if (runtime.hookManager) {
 				void runtime.hookManager.runStop(undefined, reason).catch(() => {});
 			}

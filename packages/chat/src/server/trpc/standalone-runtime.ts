@@ -558,6 +558,28 @@ function textFromContent(content: StandaloneMessageContent[]): string {
 		.join("\n");
 }
 
+function applyFinalAssistantText(
+	message: StandaloneMessage,
+	finalText: string,
+): void {
+	if (!finalText) return;
+	const existingText = textFromContent(message.content);
+	if (!existingText) {
+		message.content.push({ type: "text", text: finalText });
+		return;
+	}
+	if (existingText === finalText) return;
+
+	const textParts = message.content.filter(
+		(part): part is Extract<StandaloneMessageContent, { type: "text" }> =>
+			part.type === "text",
+	);
+	const [textPart] = textParts;
+	if (textParts.length === 1 && textPart) {
+		textPart.text = finalText;
+	}
+}
+
 function reasoningFromContent(content: StandaloneMessageContent[]): string {
 	return content
 		.map((part) => {
@@ -850,6 +872,33 @@ function normalizeStandaloneMessage(
 		createdAt: message.createdAt,
 		...(message.stopReason ? { stopReason: message.stopReason } : {}),
 		...(message.errorMessage ? { errorMessage: message.errorMessage } : {}),
+	};
+}
+
+function cloneStandaloneContent(
+	content: StandaloneMessageContent[],
+): StandaloneMessageContent[] {
+	return content.map((part) => structuredClone(part));
+}
+
+function cloneStandaloneMessage(message: StandaloneMessage): StandaloneMessage {
+	return {
+		id: message.id,
+		role: message.role,
+		content: cloneStandaloneContent(message.content),
+		createdAt: new Date(message.createdAt),
+		...(message.stopReason ? { stopReason: message.stopReason } : {}),
+		...(message.errorMessage ? { errorMessage: message.errorMessage } : {}),
+	};
+}
+
+function cloneStandalonePendingApproval(
+	pendingApproval: StandalonePendingApproval | null,
+): StandalonePendingApproval | null {
+	if (!pendingApproval) return null;
+	return {
+		...pendingApproval,
+		args: structuredClone(pendingApproval.args),
 	};
 }
 
@@ -1932,9 +1981,11 @@ export class StandaloneChatRuntimeManager {
 		const session = this.getSession(sessionId);
 		return {
 			isRunning: session.isRunning,
-			currentMessage: session.currentMessage,
+			currentMessage: session.currentMessage
+				? cloneStandaloneMessage(session.currentMessage)
+				: null,
 			pendingQuestion: null,
-			pendingApproval: session.pendingApproval,
+			pendingApproval: cloneStandalonePendingApproval(session.pendingApproval),
 			pendingPlanApproval: null,
 			activeTools: new Map(),
 			toolInputBuffers: new Map(),
@@ -1947,7 +1998,7 @@ export class StandaloneChatRuntimeManager {
 		const session = this.getSession(sessionId);
 		if (!session.hydrated) {
 			await this.hydrateSession(session);
-			return session.messages;
+			return session.messages.map(cloneStandaloneMessage);
 		}
 
 		const shouldRefresh =
@@ -1961,20 +2012,46 @@ export class StandaloneChatRuntimeManager {
 				);
 			});
 		}
-		return session.messages;
+		return session.messages.map(cloneStandaloneMessage);
 	}
 
-	abort(sessionId: string): void {
+	async abort(sessionId: string): Promise<void> {
 		const session = this.getSession(sessionId);
+		const abortedMessage =
+			session.currentMessage?.role === "assistant"
+				? session.currentMessage
+				: null;
 		session.abortController?.abort();
 		for (const resolver of session.pendingApprovalResolvers.values()) {
 			resolver.reject(new Error("Chat request was aborted."));
 		}
 		session.pendingApprovalResolvers.clear();
 		session.pendingApproval = null;
+		session.lastErrorMessage = null;
+
+		let persistAbortedMessage: Promise<void> | null = null;
+		if (
+			abortedMessage &&
+			!session.messages.some((message) => message.id === abortedMessage.id)
+		) {
+			abortedMessage.stopReason = "aborted";
+			delete abortedMessage.errorMessage;
+			session.messages.push(abortedMessage);
+			persistAbortedMessage = this.persistMessage(
+				session.sessionId,
+				abortedMessage,
+			).catch((error) => {
+				console.warn(
+					"[standalone-chat] Failed to persist aborted message:",
+					error,
+				);
+			});
+		}
+
 		session.isRunning = false;
 		session.currentMessage = null;
 		session.abortController = null;
+		await persistAbortedMessage;
 	}
 
 	async respondToApproval(
@@ -2160,6 +2237,7 @@ export class StandaloneChatRuntimeManager {
 				requestToolApproval: (request) =>
 					this.requestToolApproval(session, request),
 				onEvent: (event) => {
+					if (abortController.signal.aborted) return;
 					if (event.type === "text-delta") {
 						eventCounters.textDeltas += 1;
 						appendTextPart(assistantMessage, "text", event.text);
@@ -2201,11 +2279,12 @@ export class StandaloneChatRuntimeManager {
 					}
 				},
 			});
+			if (abortController.signal.aborted) {
+				return;
+			}
 			const reasoningText =
-				response.reasoningText ||
+				response.reasoningText ??
 				reasoningFromContent(assistantMessage.content);
-			const existingAssistantText = textFromContent(assistantMessage.content);
-			const assistantText = response.text || existingAssistantText;
 			if (
 				reasoningText &&
 				!assistantMessage.content.some((part) => part.type === "reasoning")
@@ -2215,9 +2294,7 @@ export class StandaloneChatRuntimeManager {
 					text: reasoningText,
 				});
 			}
-			if (assistantText && !existingAssistantText) {
-				assistantMessage.content.push({ type: "text", text: assistantText });
-			}
+			applyFinalAssistantText(assistantMessage, response.text);
 			if (assistantMessage.content.length === 0) {
 				assistantMessage.content.push({
 					type: "text",
@@ -2247,6 +2324,9 @@ export class StandaloneChatRuntimeManager {
 				assistantContentParts: assistantMessage.content.length,
 			});
 		} catch (error) {
+			if (abortController.signal.aborted) {
+				return;
+			}
 			const normalizedError = normalizeStandaloneRuntimeError(error);
 			const message = normalizedError.message;
 			this.logger.error?.("[standalone-chat] Claude turn failed", {
@@ -2291,14 +2371,16 @@ export class StandaloneChatRuntimeManager {
 			);
 			throw normalizedError;
 		} finally {
-			for (const resolver of session.pendingApprovalResolvers.values()) {
-				resolver.reject(new Error("Chat request finished before approval."));
+			if (session.abortController === abortController) {
+				for (const resolver of session.pendingApprovalResolvers.values()) {
+					resolver.reject(new Error("Chat request finished before approval."));
+				}
+				session.pendingApprovalResolvers.clear();
+				session.pendingApproval = null;
+				session.isRunning = false;
+				session.currentMessage = null;
+				session.abortController = null;
 			}
-			session.pendingApprovalResolvers.clear();
-			session.pendingApproval = null;
-			session.isRunning = false;
-			session.currentMessage = null;
-			session.abortController = null;
 		}
 	}
 
@@ -2330,7 +2412,7 @@ export class StandaloneChatRuntimeManager {
 			id: message.id,
 			sessionId,
 			role: message.role,
-			content: message.content,
+			content: cloneStandaloneContent(message.content),
 			createdAt: message.createdAt,
 			...(message.stopReason ? { stopReason: message.stopReason } : {}),
 			...(message.errorMessage ? { errorMessage: message.errorMessage } : {}),

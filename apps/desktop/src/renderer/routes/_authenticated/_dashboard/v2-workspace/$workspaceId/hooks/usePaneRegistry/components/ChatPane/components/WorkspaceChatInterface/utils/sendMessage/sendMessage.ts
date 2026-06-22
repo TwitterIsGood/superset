@@ -23,6 +23,16 @@ function toBaseErrorMessage(error: unknown): string {
 	return "Failed to send message";
 }
 
+export function isChatAbortError(error: unknown): boolean {
+	if (error instanceof Error && error.name === "AbortError") return true;
+	const message = toBaseErrorMessage(error).toLowerCase();
+	return (
+		message.includes("request was aborted") ||
+		message.includes("chat request was aborted") ||
+		message.includes("operation was aborted")
+	);
+}
+
 function toNumericStatus(value: unknown): number | null {
 	if (typeof value === "number" && Number.isFinite(value)) return value;
 	if (typeof value !== "string") return null;
