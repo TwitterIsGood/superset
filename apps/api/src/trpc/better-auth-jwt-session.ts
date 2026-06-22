@@ -21,7 +21,7 @@ export function isFullSessionJwtPayload(
 	return isRecord(payload) && !Object.hasOwn(payload, "scope");
 }
 
-export async function sessionFromVerifiedBetterAuthJwtBearer<TSession>(
+export async function sessionFromVerifiedFullSessionJwtBearer<TSession>(
 	headers: Headers,
 	options: {
 		verifyJwt: (token: string) => Promise<unknown>;

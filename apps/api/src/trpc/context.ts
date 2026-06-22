@@ -10,10 +10,8 @@ import { verifyAccessToken } from "better-auth/oauth2";
 import { eq } from "drizzle-orm";
 import { env } from "@/env";
 import {
-	getBearerToken,
 	isRecord,
-	looksLikeJwt,
-	sessionFromVerifiedBetterAuthJwtBearer,
+	sessionFromVerifiedFullSessionJwtBearer,
 } from "./better-auth-jwt-session";
 
 const apiUrl = env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "");
@@ -76,7 +74,7 @@ async function sessionFromJwtPayload(
 async function sessionFromBetterAuthJwtBearer(
 	headers: Headers,
 ): Promise<Session | null> {
-	return sessionFromVerifiedBetterAuthJwtBearer(headers, {
+	return sessionFromVerifiedFullSessionJwtBearer(headers, {
 		verifyJwt: async (token) => {
 			const { payload } = await auth.api.verifyJWT({
 				body: { token },
@@ -90,30 +88,25 @@ async function sessionFromBetterAuthJwtBearer(
 async function sessionFromOAuthBearer(
 	headers: Headers,
 ): Promise<Session | null> {
-	const token = getBearerToken(headers);
-	if (!token || !looksLikeJwt(token)) return null;
+	return sessionFromVerifiedFullSessionJwtBearer(headers, {
+		verifyJwt: (token) =>
+			verifyAccessToken(token, {
+				jwksUrl: `${apiUrl}/api/auth/jwks`,
+				verifyOptions: {
+					issuer: apiUrl,
+					audience: [apiUrl, `${apiUrl}/`],
+				},
+			}),
+		sessionFromJwtPayload: async (token, payload) => {
+			const authorizedClientId =
+				typeof payload.azp === "string" ? payload.azp : null;
+			if (authorizedClientId && !TRUSTED_API_CLIENTS.has(authorizedClientId)) {
+				return null;
+			}
 
-	let payload: unknown;
-	try {
-		payload = await verifyAccessToken(token, {
-			jwksUrl: `${apiUrl}/api/auth/jwks`,
-			verifyOptions: {
-				issuer: apiUrl,
-				audience: [apiUrl, `${apiUrl}/`],
-			},
-		});
-	} catch {
-		return null;
-	}
-	if (!isRecord(payload)) return null;
-
-	const authorizedClientId =
-		typeof payload.azp === "string" ? payload.azp : null;
-	if (authorizedClientId && !TRUSTED_API_CLIENTS.has(authorizedClientId)) {
-		return null;
-	}
-
-	return sessionFromJwtPayload(token, payload);
+			return sessionFromJwtPayload(token, payload);
+		},
+	});
 }
 
 async function resolveActiveOrganizationForSession(

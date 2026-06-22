@@ -1,10 +1,10 @@
 import { describe, expect, mock, test } from "bun:test";
 import {
 	isFullSessionJwtPayload,
-	sessionFromVerifiedBetterAuthJwtBearer,
+	sessionFromVerifiedFullSessionJwtBearer,
 } from "./better-auth-jwt-session";
 
-describe("Better Auth JWT session fallback", () => {
+describe("full-session JWT bearer fallback", () => {
 	test("accepts only unscoped full-session JWT payloads", () => {
 		expect(isFullSessionJwtPayload({ sub: "user-1" })).toBe(true);
 		expect(
@@ -22,28 +22,30 @@ describe("Better Auth JWT session fallback", () => {
 		expect(isFullSessionJwtPayload(null)).toBe(false);
 	});
 
-	test("does not convert a mobile workspace-control JWT into a protected session", async () => {
-		const verifyJwt = mock(async () => ({
-			sub: "user-1",
-			scope: "mobile-workspace-control",
-		}));
-		const sessionFromJwtPayload = mock(async () => ({ id: "session-1" }));
+	test("does not convert scoped control JWTs into protected sessions", async () => {
+		for (const scope of ["mobile-workspace-control", "automation-run"]) {
+			const verifyJwt = mock(async () => ({
+				sub: "user-1",
+				scope,
+			}));
+			const sessionFromJwtPayload = mock(async () => ({ id: "session-1" }));
 
-		const session = await sessionFromVerifiedBetterAuthJwtBearer(
-			new Headers({ authorization: "Bearer header.payload.signature" }),
-			{ verifyJwt, sessionFromJwtPayload },
-		);
+			const session = await sessionFromVerifiedFullSessionJwtBearer(
+				new Headers({ authorization: "Bearer header.payload.signature" }),
+				{ verifyJwt, sessionFromJwtPayload },
+			);
 
-		expect(session).toBeNull();
-		expect(verifyJwt).toHaveBeenCalledTimes(1);
-		expect(sessionFromJwtPayload).not.toHaveBeenCalled();
+			expect(session).toBeNull();
+			expect(verifyJwt).toHaveBeenCalledTimes(1);
+			expect(sessionFromJwtPayload).not.toHaveBeenCalled();
+		}
 	});
 
 	test("converts an unscoped Better Auth JWT into a protected session", async () => {
 		const verifyJwt = mock(async () => ({ sub: "user-1" }));
 		const sessionFromJwtPayload = mock(async () => ({ id: "session-1" }));
 
-		const session = await sessionFromVerifiedBetterAuthJwtBearer(
+		const session = await sessionFromVerifiedFullSessionJwtBearer(
 			new Headers({ authorization: "Bearer header.payload.signature" }),
 			{ verifyJwt, sessionFromJwtPayload },
 		);

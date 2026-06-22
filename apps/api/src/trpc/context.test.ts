@@ -8,9 +8,29 @@ describe("api tRPC context", () => {
 	it("accepts Better Auth JWT bearer tokens for protected mobile tRPC calls", () => {
 		expect(SOURCE).toContain("sessionFromBetterAuthJwtBearer");
 		expect(SOURCE).toContain("auth.api.verifyJWT");
-		expect(SOURCE).toContain("sessionFromVerifiedBetterAuthJwtBearer");
+		expect(SOURCE).toContain("sessionFromVerifiedFullSessionJwtBearer");
 		expect(SOURCE).toContain("sessionFromJwtPayload");
 		expect(SOURCE).toContain("sessionFromOAuthBearer");
+	});
+
+	it("guards both JWT/JWKS fallbacks against scoped control tokens", () => {
+		const betterAuthStart = SOURCE.indexOf(
+			"async function sessionFromBetterAuthJwtBearer",
+		);
+		const oauthStart = SOURCE.indexOf("async function sessionFromOAuthBearer");
+		const resolveStart = SOURCE.indexOf(
+			"async function resolveActiveOrganizationForSession",
+		);
+
+		expect(betterAuthStart).toBeGreaterThan(0);
+		expect(oauthStart).toBeGreaterThan(betterAuthStart);
+		expect(resolveStart).toBeGreaterThan(oauthStart);
+		expect(SOURCE.slice(betterAuthStart, oauthStart)).toContain(
+			"sessionFromVerifiedFullSessionJwtBearer",
+		);
+		expect(SOURCE.slice(oauthStart, resolveStart)).toContain(
+			"sessionFromVerifiedFullSessionJwtBearer",
+		);
 	});
 
 	it("resolves a missing active organization before creating the tRPC context", () => {
