@@ -347,6 +347,11 @@ export interface TerminalSessionSummary {
 	title: string | null;
 }
 
+export interface TerminalSessionSnapshot extends TerminalSessionSummary {
+	outputTail: string;
+	bufferBytes: number;
+}
+
 export function listTerminalSessions(
 	options: { workspaceId?: string; includeExited?: boolean } = {},
 ): TerminalSessionSummary[] {
@@ -369,6 +374,47 @@ export function listTerminalSessions(
 			attached: pruneAndCountOpenSockets(session) > 0,
 			title: session.title,
 		}));
+}
+
+export function getTerminalSessionSnapshot({
+	terminalId,
+	workspaceId,
+	maxBytes = 16 * 1024,
+}: {
+	terminalId: string;
+	workspaceId: string;
+	maxBytes?: number;
+}): TerminalSessionSnapshot | { error: string } {
+	const session = sessions.get(terminalId);
+	if (!session) {
+		return { error: "Terminal session not found" };
+	}
+	if (session.workspaceId !== workspaceId) {
+		return { error: "Terminal session does not belong to this workspace" };
+	}
+
+	const combined = Buffer.concat(
+		session.buffer.map((chunk) =>
+			Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength),
+		),
+		session.bufferBytes,
+	);
+	const tail =
+		combined.byteLength > maxBytes
+			? combined.subarray(combined.byteLength - maxBytes)
+			: combined;
+
+	return {
+		terminalId: session.terminalId,
+		workspaceId: session.workspaceId,
+		createdAt: session.createdAt,
+		exited: session.exited,
+		exitCode: session.exitCode,
+		attached: pruneAndCountOpenSockets(session) > 0,
+		title: session.title,
+		outputTail: tail.toString("utf8"),
+		bufferBytes: session.bufferBytes,
+	};
 }
 
 export function countTerminalSessions(
@@ -421,6 +467,45 @@ export function writeInputToSession({
 	}
 
 	session.pty.write(data);
+	return { success: true };
+}
+
+export function resizeTerminalSession({
+	terminalId,
+	workspaceId,
+	cols,
+	rows,
+}: {
+	terminalId: string;
+	workspaceId: string;
+	cols: number;
+	rows: number;
+}): { success: true } | { error: string } {
+	const session = sessions.get(terminalId);
+	if (!session) {
+		return { error: "Terminal session not found" };
+	}
+	if (session.workspaceId !== workspaceId) {
+		return { error: "Terminal session does not belong to this workspace" };
+	}
+	if (session.exited) {
+		return { error: "Terminal session has exited" };
+	}
+
+	const normalizedCols = normalizeTerminalDimension(
+		cols,
+		MIN_TERMINAL_COLS,
+		session.cols,
+	);
+	const normalizedRows = normalizeTerminalDimension(
+		rows,
+		MIN_TERMINAL_ROWS,
+		session.rows,
+	);
+	session.pty.resize(normalizedCols, normalizedRows);
+	session.modeTracker.resize(normalizedCols, normalizedRows);
+	session.cols = normalizedCols;
+	session.rows = normalizedRows;
 	return { success: true };
 }
 

@@ -20,5 +20,6 @@ Expo React Native mobile app.
 - [Component Guidelines](./component-guidelines.md)
 - [Hook Guidelines](./hook-guidelines.md)
 - [State Management](./state-management.md)
+- [Mobile Development Workflow](./mobile-development-workflow.md)
 - [Type Safety](./type-safety.md)
 - [Quality Guidelines](./quality-guidelines.md)

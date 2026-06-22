@@ -1,5 +1,6 @@
 import { neonConfig } from "@neondatabase/serverless";
 
+const LOOPBACK_HOST = "127.0.0.1";
 const LOCAL_DATABASE_HOSTS = new Set([
 	"db.localtest.me",
 	"localhost",
@@ -15,7 +16,8 @@ export function isLocalProxy(databaseUrl: string): boolean {
 }
 
 export function configureLocalProxy(): void {
-	neonConfig.fetchEndpoint = (_host, port) => `http://localhost:${port}/sql`;
-	neonConfig.wsProxy = (_host, port) => `localhost:${port}/v2`;
+	neonConfig.fetchEndpoint = (_host, port) =>
+		`http://${LOOPBACK_HOST}:${port}/sql`;
+	neonConfig.wsProxy = (_host, port) => `${LOOPBACK_HOST}:${port}/v2`;
 	neonConfig.useSecureWebSocket = false;
 }

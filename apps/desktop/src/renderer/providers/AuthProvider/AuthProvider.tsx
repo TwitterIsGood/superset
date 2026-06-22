@@ -8,26 +8,55 @@ import {
 import { isStoredAuthTokenCurrent } from "renderer/lib/auth-session-state";
 import { SupersetLogo } from "renderer/routes/sign-in/components/SupersetLogo/SupersetLogo";
 import { electronTrpc } from "../../lib/electron-trpc";
+import { getJwtExpiresAt, looksLikeJwt } from "./utils/authJwt";
 
-async function refreshAuthJwt(logContext: string): Promise<void> {
+const JWT_REFRESH_INTERVAL_MS = 50 * 60 * 1000;
+
+async function refreshAuthJwt(logContext: string): Promise<string | null> {
 	try {
-		await ensureFreshJwt();
+		return await ensureFreshJwt();
 	} catch (err) {
 		console.warn(`[AuthProvider] JWT refresh failed ${logContext}`, err);
 	}
+	return null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
 	const [isHydrated, setIsHydrated] = useState(false);
 	const { data: session, refetch: refetchSession } = authClient.useSession();
-	const syncCliAuthConfigMutation =
-		electronTrpc.auth.syncCliAuthConfig.useMutation();
+	const syncCliAuthConfigWithTokenMutation =
+		electronTrpc.auth.syncCliAuthConfigWithToken.useMutation();
 
 	const { data: storedToken, isSuccess } =
 		electronTrpc.auth.getStoredToken.useQuery(undefined, {
 			refetchOnWindowFocus: false,
 			refetchOnReconnect: false,
 		});
+
+	const syncSessionJwtForHostRuntime = useEffectEvent(
+		async (
+			logContext: string,
+			organizationId?: string | null,
+		): Promise<boolean> => {
+			const token = await refreshAuthJwt(logContext);
+			if (!token) return false;
+
+			const expiresAt = getJwtExpiresAt(token);
+			try {
+				await syncCliAuthConfigWithTokenMutation.mutateAsync({
+					token,
+					expiresAt,
+					organizationId:
+						organizationId ?? session?.session?.activeOrganizationId ?? null,
+				});
+				setJwt(token);
+				return true;
+			} catch (error) {
+				console.warn("[AuthProvider] CLI auth config sync failed", error);
+				return false;
+			}
+		},
+	);
 
 	useEffect(() => {
 		if (!isSuccess || isHydrated) return;
@@ -37,7 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		async function hydrate() {
 			if (storedToken?.token && storedToken?.expiresAt) {
 				if (isStoredAuthTokenCurrent(storedToken.expiresAt)) {
-					setAuthToken(storedToken.token);
+					if (looksLikeJwt(storedToken.token)) {
+						setAuthToken(null);
+						setJwt(storedToken.token);
+					} else {
+						setAuthToken(storedToken.token);
+					}
 					try {
 						await refetchSession();
 					} catch (err) {
@@ -46,8 +80,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 							err,
 						);
 					}
-					await refreshAuthJwt("during hydration");
+					if (!looksLikeJwt(storedToken.token)) {
+						await syncSessionJwtForHostRuntime("during hydration");
+					}
 				}
+			} else {
+				await syncSessionJwtForHostRuntime(
+					"from existing desktop session",
+				).catch((error) => {
+					console.warn(
+						"[AuthProvider] session JWT fallback persistence failed",
+						error,
+					);
+					return false;
+				});
 			}
 			if (!cancelled) {
 				setIsHydrated(true);
@@ -63,6 +109,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	electronTrpc.auth.onTokenChanged.useSubscription(undefined, {
 		onData: async (data) => {
 			if (data?.token && data?.expiresAt) {
+				if (looksLikeJwt(data.token)) {
+					setAuthToken(null);
+					setJwt(data.token);
+					try {
+						await refetchSession();
+					} catch (err) {
+						console.warn(
+							"[AuthProvider] session refetch failed after JWT token persistence",
+							err,
+						);
+					}
+					setIsHydrated(true);
+					return;
+				}
+
 				setAuthToken(data.token);
 				setJwt(null);
 				try {
@@ -73,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 						err,
 					);
 				}
-				await refreshAuthJwt("after token change");
+				await syncSessionJwtForHostRuntime("after token change");
 				setIsHydrated(true);
 			} else if (data === null) {
 				setAuthToken(null);
@@ -93,10 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		if (!isHydrated) return;
 
-		void refreshAuthJwt("on interval start");
+		void syncSessionJwtForHostRuntime("on interval start");
 		const interval = setInterval(
-			() => void refreshAuthJwt("on interval"),
-			50 * 60 * 1000,
+			() => void syncSessionJwtForHostRuntime("on interval"),
+			JWT_REFRESH_INTERVAL_MS,
 		);
 		const refreshOnResume = () => void refreshAuthJwt("on resume");
 		window.addEventListener("focus", refreshOnResume);
@@ -110,26 +171,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		};
 	}, [isHydrated]);
 
-	const syncCliAuthConfigForSession = useEffectEvent(
-		async (organizationId: string | null) => {
-			await syncCliAuthConfigMutation.mutateAsync({ organizationId });
-		},
-	);
-
 	useEffect(() => {
-		if (!isHydrated || !storedToken?.token || !storedToken?.expiresAt) return;
+		if (!isHydrated || !session?.user) return;
 
-		void syncCliAuthConfigForSession(
+		void syncSessionJwtForHostRuntime(
+			"after session organization change",
 			session?.session?.activeOrganizationId ?? null,
 		).catch((error) => {
 			console.warn("[AuthProvider] CLI auth config sync failed", error);
 		});
-	}, [
-		isHydrated,
-		session?.session?.activeOrganizationId,
-		storedToken?.expiresAt,
-		storedToken?.token,
-	]);
+	}, [isHydrated, session?.session?.activeOrganizationId, session?.user]);
 
 	if (!isHydrated) {
 		return (

@@ -26,7 +26,18 @@ export class RelayDispatchError extends Error {
 	}
 }
 
-function parseRelayResponse<TOutput>(rawBody: string, status: number): TOutput {
+async function parseRelayResponse<TOutput>(
+	response: Response,
+	rawBody: string,
+): Promise<TOutput> {
+	if (!response.ok) {
+		throw new RelayDispatchError(
+			`relay ${response.status}: ${rawBody.slice(0, 500)}`,
+			response.status,
+			rawBody,
+		);
+	}
+
 	type TrpcEnvelope = { result?: { data?: unknown } };
 	let parsed: TrpcEnvelope;
 	try {
@@ -34,7 +45,7 @@ function parseRelayResponse<TOutput>(rawBody: string, status: number): TOutput {
 	} catch {
 		throw new RelayDispatchError(
 			`invalid JSON from relay: ${rawBody.slice(0, 200)}`,
-			status,
+			response.status,
 			rawBody,
 		);
 	}
@@ -42,7 +53,7 @@ function parseRelayResponse<TOutput>(rawBody: string, status: number): TOutput {
 	if (!parsed.result || parsed.result.data === undefined) {
 		throw new RelayDispatchError(
 			`missing result.data in relay response: ${rawBody.slice(0, 200)}`,
-			status,
+			response.status,
 			rawBody,
 		);
 	}
@@ -87,25 +98,21 @@ export async function relayMutation<TInput, TOutput>(
 	}
 
 	const rawBody = await response.text();
-	if (!response.ok) {
-		throw new RelayDispatchError(
-			`relay ${response.status}: ${rawBody.slice(0, 500)}`,
-			response.status,
-			rawBody,
-		);
-	}
-
-	return parseRelayResponse<TOutput>(rawBody, response.status);
+	return parseRelayResponse<TOutput>(response, rawBody);
 }
 
 /**
  * Invoke a single host-service tRPC query through the relay proxy.
  */
-export async function relayQuery<TOutput>(
+export async function relayQuery<TInput, TOutput>(
 	options: RelayClientOptions,
 	procedure: string,
+	input: TInput,
 ): Promise<TOutput> {
-	const url = `${options.relayUrl}/hosts/${options.hostId}/trpc/${procedure}`;
+	const encodedInput = encodeURIComponent(
+		JSON.stringify(SuperJSON.serialize(input)),
+	);
+	const url = `${options.relayUrl}/hosts/${options.hostId}/trpc/${procedure}?input=${encodedInput}`;
 
 	const controller = new AbortController();
 	const timer = setTimeout(
@@ -117,7 +124,9 @@ export async function relayQuery<TOutput>(
 	try {
 		response = await fetch(url, {
 			method: "GET",
-			headers: { authorization: `Bearer ${options.jwt}` },
+			headers: {
+				authorization: `Bearer ${options.jwt}`,
+			},
 			signal: controller.signal,
 		});
 	} finally {
@@ -125,13 +134,5 @@ export async function relayQuery<TOutput>(
 	}
 
 	const rawBody = await response.text();
-	if (!response.ok) {
-		throw new RelayDispatchError(
-			`relay ${response.status}: ${rawBody.slice(0, 500)}`,
-			response.status,
-			rawBody,
-		);
-	}
-
-	return parseRelayResponse<TOutput>(rawBody, response.status);
+	return parseRelayResponse<TOutput>(response, rawBody);
 }

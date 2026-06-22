@@ -21,10 +21,10 @@ const ALLOWLIST = new Set([
 	"trpc/router/project/handlers.ts",
 	"trpc/router/project/project.ts",
 	"trpc/router/project/utils/persist-project.ts",
-
-	// Workspace bootstrap can consume the cloud clone URL to materialize a local
-	// project before creating a workspace; it does not route GitHub queries.
+	// Workspace create recovery clones a missing local project from the cloud
+	// project snapshot. This is setup/materialization, not a GitHub query.
 	"trpc/router/workspaces/workspaces.ts",
+	"trpc/router/workspace-creation/shared/local-project.ts",
 
 	// Resolver itself: mentions field names in JSDoc, no member reads.
 	"trpc/router/workspace-creation/shared/project-helpers.ts",

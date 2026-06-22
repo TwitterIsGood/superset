@@ -42,6 +42,7 @@ mise.toml
 
 # Temporary files
 .tmp/
+tmp/
 
 # Turbo
 .turbo

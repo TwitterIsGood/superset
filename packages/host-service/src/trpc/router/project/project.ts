@@ -577,16 +577,12 @@ export const projectRouter = router({
 					let resolved: ResolvedRepo;
 					if (cloudProject.repoCloneUrl) {
 						const parsed = parseGitHubRemote(cloudProject.repoCloneUrl);
-						if (!parsed) {
-							throw new TRPCError({
-								code: "BAD_REQUEST",
-								message: `Could not parse GitHub remote from ${cloudProject.repoCloneUrl}`,
-							});
-						}
-						resolved = await resolveMatchingSlug(
-							input.mode.repoPath,
-							`${parsed.owner}/${parsed.name}`,
-						);
+						resolved = parsed
+							? await resolveMatchingSlug(
+									input.mode.repoPath,
+									`${parsed.owner}/${parsed.name}`,
+								)
+							: await resolveLocalRepo(input.mode.repoPath);
 					} else {
 						resolved = await resolveLocalRepo(input.mode.repoPath);
 					}

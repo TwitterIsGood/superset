@@ -501,6 +501,10 @@ export class ChatRuntimeManager {
 		return resolved?.modelId ?? modelId;
 	}
 
+	async hasUsableRuntimeEnv(): Promise<boolean> {
+		return this.runtimeResolver.hasUsableRuntimeEnv();
+	}
+
 	private subscribeToSessionEvents(runtime: RuntimeSession): void {
 		runtime.harness.subscribe((event: unknown) => {
 			if (isHarnessErrorEvent(event) || isHarnessWorkspaceErrorEvent(event)) {

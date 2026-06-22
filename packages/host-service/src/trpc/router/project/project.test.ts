@@ -21,3 +21,23 @@ describe("project create cancellation wiring", () => {
 		expect(handlersSource).toContain('"canceled"');
 	});
 });
+
+describe("project.setup import", () => {
+	test("allows cloud projects whose repoCloneUrl is a local path", () => {
+		const importBranch = routerSource.slice(
+			routerSource.indexOf('case "import":'),
+			routerSource.indexOf(
+				"if (!cloudProject.repoCloneUrl && resolved.parsed)",
+			),
+		);
+
+		expect(importBranch).toContain(
+			"parseGitHubRemote(cloudProject.repoCloneUrl)",
+		);
+		expect(importBranch).toContain("await resolveMatchingSlug");
+		expect(importBranch).toContain(
+			"await resolveLocalRepo(input.mode.repoPath)",
+		);
+		expect(importBranch).not.toContain("Could not parse GitHub remote");
+	});
+});

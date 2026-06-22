@@ -220,6 +220,7 @@ export const auth = betterAuth({
 				expirationTime: "1h",
 				definePayload: async ({
 					user,
+					session,
 				}: {
 					user: { id: string; email: string };
 					session: Record<string, unknown>;
@@ -231,7 +232,16 @@ export const auth = betterAuth({
 					const organizationIds = [
 						...new Set(userMemberships.map((m) => m.organizationId)),
 					];
-					return { sub: user.id, email: user.email, organizationIds };
+					const activeOrganizationId =
+						typeof session.activeOrganizationId === "string"
+							? session.activeOrganizationId
+							: null;
+					return {
+						sub: user.id,
+						email: user.email,
+						organizationId: activeOrganizationId ?? undefined,
+						organizationIds,
+					};
 				},
 			},
 		}),
@@ -1172,6 +1182,8 @@ export const auth = betterAuth({
 
 export type Session = typeof auth.$Infer.Session;
 export type User = typeof auth.$Infer.Session.user;
+export { resolveSessionOrganizationState };
+export type { SessionOrganizationContext };
 
 /**
  * Mints a short-lived JWT signed with the same JWKS key the Better Auth JWT
@@ -1187,6 +1199,7 @@ export async function mintUserJwt(args: {
 	userId: string;
 	email?: string;
 	organizationIds: string[];
+	organizationId?: string;
 	scope?: string;
 	runId?: string;
 	/** Token lifetime in seconds. Default 300 (5 minutes). */
@@ -1199,6 +1212,7 @@ export async function mintUserJwt(args: {
 			payload: {
 				sub: args.userId,
 				email: args.email,
+				organizationId: args.organizationId ?? args.organizationIds[0],
 				organizationIds: args.organizationIds,
 				scope: args.scope,
 				runId: args.runId,

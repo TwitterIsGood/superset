@@ -18,6 +18,7 @@
 			"!.trellis/tasks",
 			"!.trellis/workspace",
 			"!apps/mobile/uniwind-types.d.ts",
+			"!apps/mobile/screens/(authenticated)/workspaces/**/components/TerminalEmulator/terminalWebViewHtml.ts",
 			"!packages/sdk/src"
 		]
 	},

@@ -60,6 +60,23 @@ export const createAuthRouter = () => {
 				return { success: true };
 			}),
 
+		syncCliAuthConfigWithToken: publicProcedure
+			.input(
+				z.object({
+					token: z.string(),
+					expiresAt: z.string(),
+					organizationId: z.string().nullable().optional(),
+				}),
+			)
+			.mutation(async ({ input }) => {
+				await syncCliAuthConfig({
+					token: input.token,
+					expiresAt: input.expiresAt,
+					organizationId: input.organizationId,
+				});
+				return { success: true };
+			}),
+
 		/**
 		 * Subscribe to auth events. Only fires for actual changes:
 		 * - New authentication (OAuth callback) -> { token, expiresAt }

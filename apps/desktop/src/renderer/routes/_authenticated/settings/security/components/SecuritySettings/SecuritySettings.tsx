@@ -2,6 +2,7 @@ import { Label } from "@superset/ui/label";
 import { toast } from "@superset/ui/sonner";
 import { Switch } from "@superset/ui/switch";
 import { useState } from "react";
+import { authClient } from "renderer/lib/auth-client";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import {
 	isItemVisible,
@@ -21,8 +22,11 @@ export function SecuritySettings({ visibleItems }: SecuritySettingsProps) {
 	);
 
 	const utils = electronTrpc.useUtils();
+	const { data: session } = authClient.useSession();
 	const { data: exposeEnabled, isLoading } =
 		electronTrpc.settings.getExposeHostServiceViaRelay.useQuery();
+	const startHostService =
+		electronTrpc.hostServiceCoordinator.start.useMutation();
 
 	const setExpose =
 		electronTrpc.settings.setExposeHostServiceViaRelay.useMutation({
@@ -49,12 +53,28 @@ export function SecuritySettings({ visibleItems }: SecuritySettingsProps) {
 	const [confirmTargetEnabled, setConfirmTargetEnabled] = useState(false);
 
 	const runToggle = (enabled: boolean) => {
-		toast.promise(setExpose.mutateAsync({ enabled }), {
-			loading: "Restarting host services…",
-			success: ({ restartedOrgCount }) =>
-				restartedOrgCount > 0
-					? `Restarted ${restartedOrgCount} host service${restartedOrgCount === 1 ? "" : "s"}`
-					: "Setting saved",
+		const activeOrganizationId = session?.session?.activeOrganizationId ?? null;
+		const updatePromise = (async () => {
+			const result = await setExpose.mutateAsync({ enabled });
+			if (enabled && activeOrganizationId) {
+				await startHostService.mutateAsync({
+					organizationId: activeOrganizationId,
+				});
+				return { ...result, startedActiveOrg: true };
+			}
+			return { ...result, startedActiveOrg: false };
+		})();
+
+		toast.promise(updatePromise, {
+			loading: enabled
+				? "Starting host service for relay…"
+				: "Restarting host services…",
+			success: ({ restartedOrgCount, startedActiveOrg }) =>
+				startedActiveOrg
+					? "Host service is ready for relay"
+					: restartedOrgCount > 0
+						? `Restarted ${restartedOrgCount} host service${restartedOrgCount === 1 ? "" : "s"}`
+						: "Setting saved",
 			error: (err: Error) => err.message ?? "Failed to update setting",
 		});
 	};
@@ -96,7 +116,9 @@ export function SecuritySettings({ visibleItems }: SecuritySettingsProps) {
 						id="expose-host-service-via-relay"
 						checked={exposeEnabled ?? false}
 						onCheckedChange={handleChange}
-						disabled={isLoading || setExpose.isPending}
+						disabled={
+							isLoading || setExpose.isPending || startHostService.isPending
+						}
 					/>
 				</div>
 			)}

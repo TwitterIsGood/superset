@@ -1,6 +1,7 @@
 import { getTrustedVercelPreviewOrigins } from "@superset/shared/vercel-preview-origins";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { isAllowedCorsOrigin } from "./cors-origin";
 import { env } from "./env";
 
 const desktopDevPorts = Array.from(
@@ -21,14 +22,14 @@ function getAllowedOrigins(deploymentOrigin: string) {
 		env.NEXT_PUBLIC_DESKTOP_URL,
 		...getTrustedVercelPreviewOrigins(deploymentOrigin),
 		...desktopDevOrigins,
-	].filter(Boolean);
+	].filter((origin): origin is string => Boolean(origin));
 }
 
 function getCorsHeaders(origin: string | null, deploymentOrigin: string) {
 	const allowedOrigins = getAllowedOrigins(deploymentOrigin);
-	const isAllowed = origin && allowedOrigins.includes(origin);
+	const isAllowed = isAllowedCorsOrigin({ allowedOrigins, origin });
 	return {
-		"Access-Control-Allow-Origin": isAllowed ? origin : "",
+		"Access-Control-Allow-Origin": isAllowed ? (origin ?? "") : "",
 		"Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 		"Access-Control-Allow-Headers":
 			"Content-Type, Authorization, x-trpc-source, trpc-accept, Producer-Id, Producer-Epoch, Producer-Seq, Stream-Closed",

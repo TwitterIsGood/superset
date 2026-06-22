@@ -10,6 +10,7 @@ const handler = (req: Request) =>
 		req,
 		router: appRouter,
 		createContext,
+		allowMethodOverride: true,
 		onError: ({ path, error }) => {
 			// Suppress NOT_FOUND only for the known-dead device.heartbeat path
 			// (removed in #4490). Old desktop clients gated behind UpdateRequiredPage

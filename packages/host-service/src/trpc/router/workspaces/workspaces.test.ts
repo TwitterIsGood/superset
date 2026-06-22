@@ -3,12 +3,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const SOURCE = readFileSync(join(import.meta.dir, "workspaces.ts"), "utf8");
+const LOCAL_PROJECT_SOURCE = readFileSync(
+	join(import.meta.dir, "../workspace-creation/shared/local-project.ts"),
+	"utf8",
+);
 
 describe("workspaces.create project preparation", () => {
 	test("prepares a missing local project instead of requiring setup first", () => {
 		expect(SOURCE).toContain("ensureLocalProjectForWorkspaceCreate");
 		expect(SOURCE).toContain("cloneRepoInto(cloudProject.repoCloneUrl");
 		expect(SOURCE).toContain("persistLocalProject(ctx, projectId, resolved)");
+		expect(LOCAL_PROJECT_SOURCE).toContain(
+			"export async function ensureLocalProject",
+		);
 
 		const createStart = SOURCE.indexOf("create: protectedProcedure");
 		const createEnd = SOURCE.indexOf("aiRename: protectedProcedure");

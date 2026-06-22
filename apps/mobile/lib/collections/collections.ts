@@ -1,5 +1,10 @@
-import { snakeCamelMapper } from "@electric-sql/client";
+import {
+	FetchError,
+	type ShapeStreamOptions,
+	snakeCamelMapper,
+} from "@electric-sql/client";
 import type {
+	SelectChatSession,
 	SelectInvitation,
 	SelectMember,
 	SelectOrganization,
@@ -7,21 +12,54 @@ import type {
 	SelectTask,
 	SelectTaskStatus,
 	SelectUser,
+	SelectV2Host,
+	SelectV2Project,
+	SelectV2UsersHosts,
+	SelectV2Workspace,
 } from "@superset/db/schema";
 import { electricCollectionOptions } from "@tanstack/electric-db-collection";
 import type { Collection } from "@tanstack/react-db";
 import { createCollection } from "@tanstack/react-db";
-import { authClient } from "../auth/client";
+import { getJwt, refreshJwt } from "../auth/client";
 import { env } from "../env";
 import { apiClient } from "../trpc/client";
 
 const columnMapper = snakeCamelMapper();
-const electricUrl = `${env.EXPO_PUBLIC_API_URL}/api/electric/v1/shape`;
+const electricUrl = `${env.EXPO_PUBLIC_ELECTRIC_URL}/v1/shape`;
+const electricHeaders = {
+	Authorization: async () => {
+		const token = getJwt();
+		if (token) return `Bearer ${token}`;
+
+		const refreshedToken = await refreshJwt().catch(() => null);
+		return refreshedToken ? `Bearer ${refreshedToken}` : "";
+	},
+};
+
+const handleElectricSyncError: NonNullable<
+	ShapeStreamOptions["onError"]
+> = async (error) => {
+	if (error instanceof FetchError && error.status === 401) {
+		try {
+			await refreshJwt();
+		} catch (_refreshError) {
+			console.log("[collections] Clearing stale session after Electric 401");
+		}
+	} else {
+		console.error("[collections] Electric sync error", error);
+	}
+	return {};
+};
 
 interface OrgCollections {
 	tasks: Collection<SelectTask>;
 	taskStatuses: Collection<SelectTaskStatus>;
 	projects: Collection<SelectProject>;
+	v2Projects: Collection<SelectV2Project>;
+	v2Hosts: Collection<SelectV2Host>;
+	v2UsersHosts: Collection<SelectV2UsersHosts>;
+	v2Workspaces: Collection<SelectV2Workspace>;
+	chatSessions: Collection<SelectChatSession>;
 	members: Collection<SelectMember>;
 	users: Collection<SelectUser>;
 	invitations: Collection<SelectInvitation>;
@@ -36,28 +74,24 @@ const organizationsCollection = createCollection(
 		shapeOptions: {
 			url: electricUrl,
 			params: { table: "auth.organizations" },
-			headers: {
-				Cookie: () => authClient.getCookie() || "",
-			},
+			headers: electricHeaders,
 			columnMapper,
+			onError: handleElectricSyncError,
 		},
 		getKey: (item) => item.id,
 	}),
 );
 
 function createOrgCollections(organizationId: string): OrgCollections {
-	const headers = {
-		Cookie: () => authClient.getCookie() || "",
-	};
-
 	const tasks = createCollection(
 		electricCollectionOptions<SelectTask>({
 			id: `tasks-${organizationId}`,
 			shapeOptions: {
 				url: electricUrl,
 				params: { table: "tasks", organizationId },
-				headers,
+				headers: electricHeaders,
 				columnMapper,
+				onError: handleElectricSyncError,
 			},
 			getKey: (item) => item.id,
 			onUpdate: async ({ transaction }) => {
@@ -82,8 +116,9 @@ function createOrgCollections(organizationId: string): OrgCollections {
 			shapeOptions: {
 				url: electricUrl,
 				params: { table: "task_statuses", organizationId },
-				headers,
+				headers: electricHeaders,
 				columnMapper,
+				onError: handleElectricSyncError,
 			},
 			getKey: (item) => item.id,
 		}),
@@ -95,8 +130,79 @@ function createOrgCollections(organizationId: string): OrgCollections {
 			shapeOptions: {
 				url: electricUrl,
 				params: { table: "projects", organizationId },
-				headers,
+				headers: electricHeaders,
 				columnMapper,
+				onError: handleElectricSyncError,
+			},
+			getKey: (item) => item.id,
+		}),
+	);
+
+	const v2Projects = createCollection(
+		electricCollectionOptions<SelectV2Project>({
+			id: `v2-projects-${organizationId}`,
+			shapeOptions: {
+				url: electricUrl,
+				params: { table: "v2_projects", organizationId },
+				headers: electricHeaders,
+				columnMapper,
+				onError: handleElectricSyncError,
+			},
+			getKey: (item) => item.id,
+		}),
+	);
+
+	const v2Hosts = createCollection(
+		electricCollectionOptions<SelectV2Host>({
+			id: `v2-hosts-${organizationId}`,
+			shapeOptions: {
+				url: electricUrl,
+				params: { table: "v2_hosts", organizationId },
+				headers: electricHeaders,
+				columnMapper,
+				onError: handleElectricSyncError,
+			},
+			getKey: (item) => `${item.organizationId}:${item.machineId}`,
+		}),
+	);
+
+	const v2UsersHosts = createCollection(
+		electricCollectionOptions<SelectV2UsersHosts>({
+			id: `v2-users-hosts-${organizationId}`,
+			shapeOptions: {
+				url: electricUrl,
+				params: { table: "v2_users_hosts", organizationId },
+				headers: electricHeaders,
+				columnMapper,
+				onError: handleElectricSyncError,
+			},
+			getKey: (item) => `${item.organizationId}:${item.userId}:${item.hostId}`,
+		}),
+	);
+
+	const v2Workspaces = createCollection(
+		electricCollectionOptions<SelectV2Workspace>({
+			id: `v2-workspaces-${organizationId}`,
+			shapeOptions: {
+				url: electricUrl,
+				params: { table: "v2_workspaces", organizationId },
+				headers: electricHeaders,
+				columnMapper,
+				onError: handleElectricSyncError,
+			},
+			getKey: (item) => item.id,
+		}),
+	);
+
+	const chatSessions = createCollection(
+		electricCollectionOptions<SelectChatSession>({
+			id: `chat-sessions-${organizationId}`,
+			shapeOptions: {
+				url: electricUrl,
+				params: { table: "chat_sessions", organizationId },
+				headers: electricHeaders,
+				columnMapper,
+				onError: handleElectricSyncError,
 			},
 			getKey: (item) => item.id,
 		}),
@@ -108,8 +214,9 @@ function createOrgCollections(organizationId: string): OrgCollections {
 			shapeOptions: {
 				url: electricUrl,
 				params: { table: "auth.members", organizationId },
-				headers,
+				headers: electricHeaders,
 				columnMapper,
+				onError: handleElectricSyncError,
 			},
 			getKey: (item) => item.id,
 		}),
@@ -121,8 +228,9 @@ function createOrgCollections(organizationId: string): OrgCollections {
 			shapeOptions: {
 				url: electricUrl,
 				params: { table: "auth.users", organizationId },
-				headers,
+				headers: electricHeaders,
 				columnMapper,
+				onError: handleElectricSyncError,
 			},
 			getKey: (item) => item.id,
 		}),
@@ -134,14 +242,27 @@ function createOrgCollections(organizationId: string): OrgCollections {
 			shapeOptions: {
 				url: electricUrl,
 				params: { table: "auth.invitations", organizationId },
-				headers,
+				headers: electricHeaders,
 				columnMapper,
+				onError: handleElectricSyncError,
 			},
 			getKey: (item) => item.id,
 		}),
 	);
 
-	return { tasks, taskStatuses, projects, members, users, invitations };
+	return {
+		tasks,
+		taskStatuses,
+		projects,
+		v2Projects,
+		v2Hosts,
+		v2UsersHosts,
+		v2Workspaces,
+		chatSessions,
+		members,
+		users,
+		invitations,
+	};
 }
 
 export function getCollections(organizationId: string) {

@@ -124,6 +124,10 @@ function seedDefaultsIfEmpty(db: HostDb): HostAgentConfigRow[] {
 	return listOrdered(db);
 }
 
+export function listAgentConfigs(db: HostDb): HostAgentConfig[] {
+	return seedDefaultsIfEmpty(db).map(toOutput);
+}
+
 const updatePatchSchema = z
 	.object({
 		label: z.string().trim().min(1).optional(),
@@ -160,8 +164,7 @@ export const agentConfigsRouter = router({
 	 * on first call when no configs exist.
 	 */
 	list: protectedProcedure.query(({ ctx }) => {
-		const rows = seedDefaultsIfEmpty(ctx.db);
-		return rows.map(toOutput);
+		return listAgentConfigs(ctx.db);
 	}),
 
 	/**

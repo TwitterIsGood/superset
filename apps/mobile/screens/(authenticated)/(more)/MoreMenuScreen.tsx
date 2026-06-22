@@ -51,17 +51,17 @@ export function MoreMenuScreen() {
 
 	return (
 		<ScrollView
-			className="flex-1 bg-background"
+			className="flex-1 bg-[#090a0c]"
 			contentContainerStyle={{ paddingTop: insets.top + 16 }}
 		>
-			<View className="px-4 gap-6">
+			<View className="gap-5 px-2.5">
 				{/* Org section */}
-				<View className="gap-2">
-					<Text className="text-xs font-medium text-muted-foreground uppercase px-2">
+				<View className="gap-1">
+					<Text className="px-1.5 text-[11px] font-medium uppercase text-[#8b949e]">
 						Organization
 					</Text>
-					<View className="rounded-xl bg-card">
-						<View className="flex-row items-center gap-3 px-4 py-3">
+					<View className="rounded-md border border-[#23262d] bg-[#101216]">
+						<View className="flex-row items-center gap-3 px-3 py-2.5">
 							<Avatar
 								alt={activeOrg?.name ?? "Organization"}
 								className="size-9"
@@ -71,7 +71,7 @@ export function MoreMenuScreen() {
 								</AvatarFallback>
 							</Avatar>
 							<Text
-								className="text-base font-semibold flex-1"
+								className="flex-1 text-sm font-semibold text-[#f8fafc]"
 								numberOfLines={1}
 							>
 								{activeOrg?.name ?? "Select Organization"}
@@ -85,13 +85,16 @@ export function MoreMenuScreen() {
 										key={org.id}
 										onPress={() => handleSwitchOrg(org.id)}
 										disabled={switching}
-										className="flex-row items-center gap-3 px-4 py-3"
+										className="flex-row items-center gap-3 px-3 py-2.5"
 									>
 										<Icon
 											as={ArrowLeftRight}
-											className="text-muted-foreground size-5"
+											className="size-4 text-[#8b949e]"
 										/>
-										<Text className="text-base flex-1" numberOfLines={1}>
+										<Text
+											className="flex-1 text-sm text-[#f8fafc]"
+											numberOfLines={1}
+										>
 											Switch to {org.name}
 										</Text>
 									</Pressable>
@@ -102,34 +105,31 @@ export function MoreMenuScreen() {
 				</View>
 
 				{/* Menu items */}
-				<View className="gap-2">
-					<Text className="text-xs font-medium text-muted-foreground uppercase px-2">
+				<View className="gap-1">
+					<Text className="px-1.5 text-[11px] font-medium uppercase text-[#8b949e]">
 						General
 					</Text>
-					<View className="rounded-xl bg-card">
+					<View className="rounded-md border border-[#23262d] bg-[#101216]">
 						<Pressable
 							onPress={() => router.push("/(authenticated)/(more)/settings")}
-							className="flex-row items-center gap-3 px-4 py-3"
+							className="flex-row items-center gap-3 px-3 py-2.5"
 						>
-							<Icon as={Settings} className="text-foreground size-5" />
-							<Text className="text-base flex-1">Settings</Text>
-							<Icon
-								as={ChevronRight}
-								className="text-muted-foreground size-5"
-							/>
+							<Icon as={Settings} className="size-4 text-[#f8fafc]" />
+							<Text className="flex-1 text-sm text-[#f8fafc]">Settings</Text>
+							<Icon as={ChevronRight} className="size-4 text-[#8b949e]" />
 						</Pressable>
 					</View>
 				</View>
 
 				{/* Sign out */}
-				<View className="gap-2">
-					<View className="rounded-xl bg-card">
+				<View className="gap-1">
+					<View className="rounded-md border border-[#23262d] bg-[#101216]">
 						<Pressable
 							onPress={signOut}
-							className="flex-row items-center gap-3 px-4 py-3"
+							className="flex-row items-center gap-3 px-3 py-2.5"
 						>
-							<Icon as={LogOut} className="text-destructive size-5" />
-							<Text className="text-base text-destructive">Log out</Text>
+							<Icon as={LogOut} className="size-4 text-red-400" />
+							<Text className="text-sm text-red-400">Log out</Text>
 						</Pressable>
 					</View>
 				</View>

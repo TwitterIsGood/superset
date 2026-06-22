@@ -5,11 +5,20 @@ import type { HostServiceContext } from "../../../../types";
 import { gitConfigWrite } from "../../git/utils/config-write";
 import type { GitClient } from "./types";
 
-export type AdoptedWorkspace = NonNullable<
-	Awaited<
-		ReturnType<HostServiceContext["api"]["v2Workspace"]["getFromHost"]["query"]>
-	>
->;
+export type AdoptedWorkspace = {
+	id: string;
+	organizationId: string;
+	projectId: string;
+	hostId: string;
+	name: string;
+	branch: string;
+	type: "main" | "worktree";
+	createdByUserId: string | null;
+	taskId: string | null;
+	createdAt: Date;
+	updatedAt: Date;
+	txid?: unknown;
+};
 
 export interface AdoptExistingWorktreeArgs {
 	ctx: HostServiceContext;
@@ -21,6 +30,8 @@ export interface AdoptExistingWorktreeArgs {
 	baseBranch?: string;
 	/** v1→v2 migration relinks to a known cloud id; other callers leave undefined. */
 	existingWorkspaceId?: string;
+	/** Cloud row already verified by the caller, used to avoid host→cloud auth during mobile recovery. */
+	verifiedExistingWorkspace?: AdoptedWorkspace;
 	/** Optimistic-UI idempotency key for v2Workspace.create; ignored on relink. */
 	idempotencyId?: string;
 	/** Task link for v2Workspace.create; ignored on relink. */
@@ -58,13 +69,17 @@ export async function adoptExistingWorktree(
 		workspaceName,
 		baseBranch,
 		existingWorkspaceId,
+		verifiedExistingWorkspace,
 		idempotencyId,
 		taskId,
 		hostPromise,
 	} = args;
 
 	if (existingWorkspaceId) {
-		const existingCloud = await getHostWorkspace(ctx, existingWorkspaceId);
+		const existingCloud =
+			verifiedExistingWorkspace?.id === existingWorkspaceId
+				? verifiedExistingWorkspace
+				: await getHostWorkspace(ctx, existingWorkspaceId);
 		if (existingCloud) {
 			await recordBaseBranch(git, branch, baseBranch);
 			deleteLocalWorkspaceConflicts(ctx, {

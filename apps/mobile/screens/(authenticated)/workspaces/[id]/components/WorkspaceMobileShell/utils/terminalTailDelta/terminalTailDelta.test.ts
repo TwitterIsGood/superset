@@ -1,0 +1,55 @@
+/// <reference types="bun-types" />
+
+import { describe, expect, test } from "bun:test";
+import {
+	shouldReplayInitialTerminalSnapshot,
+	terminalTailDelta,
+} from "./terminalTailDelta";
+
+describe("terminalTailDelta", () => {
+	test("suppresses the first attach snapshot as a replay baseline", () => {
+		expect(terminalTailDelta(undefined, "old prompt\n")).toBe("");
+	});
+
+	test("returns only appended output for normal polling", () => {
+		expect(terminalTailDelta("prompt\n", "prompt\nls\r\nfile.txt\n")).toBe(
+			"ls\r\nfile.txt\n",
+		);
+	});
+
+	test("uses suffix-prefix overlap when the host tail window shifts", () => {
+		expect(terminalTailDelta("abc\npartial", "partial\nnext\n")).toBe(
+			"\nnext\n",
+		);
+	});
+
+	test("drops ambiguous non-overlapping tails instead of smearing stale terminal history", () => {
+		expect(
+			terminalTailDelta("old full-screen tui", "new unrelated prompt"),
+		).toBe("");
+	});
+});
+
+describe("shouldReplayInitialTerminalSnapshot", () => {
+	test("restores ordinary shell output after app reload", () => {
+		expect(
+			shouldReplayInitialTerminalSnapshot(
+				"Last login: Sun Jun 21 10:00:00\nsuperset % ",
+			),
+		).toBe(true);
+	});
+
+	test("does not restore an active alternate-screen TUI tail", () => {
+		expect(
+			shouldReplayInitialTerminalSnapshot("\u001b[?1049htop screen bytes"),
+		).toBe(false);
+	});
+
+	test("restores once alternate-screen mode has been closed", () => {
+		expect(
+			shouldReplayInitialTerminalSnapshot(
+				"\u001b[?1049hvim bytes\u001b[?1049lsuperset % ",
+			),
+		).toBe(true);
+	});
+});

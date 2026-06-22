@@ -7,8 +7,10 @@ import { listTerminalResourceSessions } from "../../../terminal/resource-session
 import {
 	createTerminalSessionInternal,
 	disposeSessionAndWait,
+	getTerminalSessionSnapshot,
 	listTerminalSessions,
 	parseThemeType,
+	resizeTerminalSession,
 	type TerminalSessionSummary,
 	writeInputToSession,
 } from "../../../terminal/terminal";
@@ -120,6 +122,43 @@ async function countWorkspaceBackgroundTerminalSessions({
 	return sessions.filter((session) => !attached.has(session.terminalId)).length;
 }
 
+async function ensureTerminalSessionForControl({
+	ctx,
+	workspaceId,
+	terminalId,
+	replayOnAdoption,
+}: {
+	ctx: HostServiceContext;
+	workspaceId: string;
+	terminalId: string;
+	replayOnAdoption: boolean;
+}): Promise<{ success: true } | { error: string }> {
+	const current = getTerminalSessionSnapshot({
+		workspaceId,
+		terminalId,
+		maxBytes: 1,
+	});
+	if (!("error" in current)) return { success: true };
+
+	const adopted = await createTerminalSessionInternal({
+		terminalId,
+		workspaceId,
+		db: ctx.db,
+		eventBus: ctx.eventBus,
+		adoptOnly: true,
+		replayOnAdoption,
+	});
+	if ("error" in adopted) return { error: adopted.error };
+	return { success: true };
+}
+
+function throwTerminalControlError(error: string): never {
+	throw new TRPCError({
+		code: "NOT_FOUND",
+		message: error,
+	});
+}
+
 // Daemon control surface — sibling to the per-workspace terminal ops above.
 // Org-scoped (one daemon per host-service); org id comes from request ctx
 // rather than env so this module can be imported in tests where env vars
@@ -197,6 +236,35 @@ export const terminalRouter = router({
 			}),
 		})),
 
+	getSnapshot: protectedProcedure
+		.input(
+			z.object({
+				terminalId: z.string(),
+				workspaceId: z.string(),
+				maxBytes: z
+					.number()
+					.int()
+					.positive()
+					.max(64 * 1024)
+					.optional(),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			const ensured = await ensureTerminalSessionForControl({
+				ctx,
+				workspaceId: input.workspaceId,
+				terminalId: input.terminalId,
+				replayOnAdoption: true,
+			});
+			if ("error" in ensured) throwTerminalControlError(ensured.error);
+
+			const result = getTerminalSessionSnapshot(input);
+			if ("error" in result) {
+				throwTerminalControlError(result.error);
+			}
+			return result;
+		}),
+
 	writeInput: protectedProcedure
 		.input(
 			z.object({
@@ -205,13 +273,43 @@ export const terminalRouter = router({
 				data: z.string(),
 			}),
 		)
-		.mutation(({ input }) => {
+		.mutation(async ({ ctx, input }) => {
+			const ensured = await ensureTerminalSessionForControl({
+				ctx,
+				workspaceId: input.workspaceId,
+				terminalId: input.terminalId,
+				replayOnAdoption: false,
+			});
+			if ("error" in ensured) throwTerminalControlError(ensured.error);
+
 			const result = writeInputToSession(input);
 			if ("error" in result) {
-				throw new TRPCError({
-					code: "NOT_FOUND",
-					message: result.error,
-				});
+				throwTerminalControlError(result.error);
+			}
+			return { success: true as const };
+		}),
+
+	resize: protectedProcedure
+		.input(
+			z.object({
+				terminalId: z.string(),
+				workspaceId: z.string(),
+				cols: z.number().int().positive(),
+				rows: z.number().int().positive(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const ensured = await ensureTerminalSessionForControl({
+				ctx,
+				workspaceId: input.workspaceId,
+				terminalId: input.terminalId,
+				replayOnAdoption: false,
+			});
+			if ("error" in ensured) throwTerminalControlError(ensured.error);
+
+			const result = resizeTerminalSession(input);
+			if ("error" in result) {
+				throwTerminalControlError(result.error);
 			}
 			return { success: true as const };
 		}),
