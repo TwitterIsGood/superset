@@ -25,6 +25,7 @@ export function ControlChatWindow() {
 	const {
 		activeSessionId,
 		setActiveSessionId,
+		startNewSession,
 		sessions,
 		session,
 		sessionQuery,
@@ -67,7 +68,11 @@ export function ControlChatWindow() {
 						className="h-7 max-w-36 rounded-md border bg-background px-2 text-xs"
 						value={activeSessionId ?? ""}
 						onChange={(event) => {
-							setActiveSessionId(event.target.value || null);
+							if (event.target.value) {
+								setActiveSessionId(event.target.value);
+							} else {
+								startNewSession();
+							}
 						}}
 						aria-label="Control Chat session"
 					>
@@ -84,7 +89,7 @@ export function ControlChatWindow() {
 						size="icon"
 						className="size-7"
 						aria-label="New Control Chat"
-						onClick={() => setActiveSessionId(null)}
+						onClick={startNewSession}
 					>
 						<Plus className="size-4" />
 					</Button>

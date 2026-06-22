@@ -12,6 +12,7 @@ beforeEach(() => {
 		isOpen: false,
 		isExpanded: false,
 		activeSessionId: null,
+		isCreatingNewSession: false,
 		width: CONTROL_CHAT_DEFAULT_WIDTH,
 		height: CONTROL_CHAT_DEFAULT_HEIGHT,
 	});
@@ -33,6 +34,21 @@ describe("control-chat store", () => {
 		expect(useControlChatStore.getState().activeSessionId).toBe(
 			"11111111-1111-4111-8111-111111111111",
 		);
+	});
+
+	it("keeps explicit new chat state separate from no restored session", () => {
+		useControlChatStore
+			.getState()
+			.setActiveSessionId("11111111-1111-4111-8111-111111111111");
+
+		useControlChatStore.getState().startNewSession();
+		expect(useControlChatStore.getState().activeSessionId).toBeNull();
+		expect(useControlChatStore.getState().isCreatingNewSession).toBe(true);
+
+		useControlChatStore
+			.getState()
+			.setActiveSessionId("22222222-2222-4222-8222-222222222222");
+		expect(useControlChatStore.getState().isCreatingNewSession).toBe(false);
 	});
 
 	it("toggles between compact and expanded dimensions", () => {

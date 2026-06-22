@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { db, dbWs } from "@superset/db/client";
 import type { ControlChatMessageContent } from "@superset/db/schema";
 import {
+	controlChatRuns,
 	controlChatToolCalls,
 	modelProviderModels,
 	modelProviders,
@@ -43,6 +44,19 @@ export interface ControlChatRunInput {
 	modelId?: string | null;
 }
 
+export interface ControlChatTurnResult {
+	content: ControlChatMessageContent[];
+	status: "completed" | "failed";
+	error: string | null;
+}
+
+export class ControlChatRunAbortedError extends Error {
+	constructor() {
+		super("Control Chat run was stopped by the user.");
+		this.name = "ControlChatRunAbortedError";
+	}
+}
+
 type ControlChatModelSelection = {
 	providerId: string;
 	protocol: "anthropic" | "openai-chat" | "openai-responses";
@@ -57,6 +71,42 @@ type ModelControlPlan = {
 };
 
 const CONTROL_CHAT_MODEL_TIMEOUT_MS = 45_000;
+
+export function isControlChatRunAbortedStatus(
+	status: string | null | undefined,
+) {
+	return status === "aborted";
+}
+
+export function resolveControlChatTurnStatus(args: {
+	hasToolFailure: boolean;
+	firstToolError: string | null;
+}): Pick<ControlChatTurnResult, "status" | "error"> {
+	if (args.hasToolFailure) {
+		return {
+			status: "failed",
+			error: args.firstToolError ?? "One or more Control Chat tools failed.",
+		};
+	}
+	return { status: "completed", error: null };
+}
+
+async function throwIfRunAborted(input: ControlChatRunInput) {
+	const [run] = await db
+		.select({ status: controlChatRuns.status })
+		.from(controlChatRuns)
+		.where(
+			and(
+				eq(controlChatRuns.id, input.runId),
+				eq(controlChatRuns.organizationId, input.organizationId),
+			),
+		)
+		.limit(1);
+
+	if (isControlChatRunAbortedStatus(run?.status)) {
+		throw new ControlChatRunAbortedError();
+	}
+}
 
 async function listAccessibleHosts(args: {
 	organizationId: string;
@@ -743,6 +793,7 @@ async function runPersistedTool(args: {
 	run: ControlChatRunInput;
 	call: PlannedToolCall;
 }): Promise<{ toolCallId: string; result: ControlChatToolResult }> {
+	await throwIfRunAborted(args.run);
 	const toolCallId = await persistToolCall(args);
 	const toolContext: ControlChatToolContext = {
 		organizationId: args.run.organizationId,
@@ -752,11 +803,13 @@ async function runPersistedTool(args: {
 		sourceInstruction: args.run.message,
 	};
 	try {
+		await throwIfRunAborted(args.run);
 		const result = await executeControlChatTool(
 			args.call.name,
 			args.call.input,
 			toolContext,
 		);
+		await throwIfRunAborted(args.run);
 		await dbWs
 			.update(controlChatToolCalls)
 			.set({
@@ -818,11 +871,13 @@ function fallbackAssistantContent(args: {
 
 export async function runControlChatTurn(
 	input: ControlChatRunInput,
-): Promise<ControlChatMessageContent[]> {
+): Promise<ControlChatTurnResult> {
+	await throwIfRunAborted(input);
 	const hosts = await listAccessibleHosts({
 		organizationId: input.organizationId,
 		userId: input.userId,
 	});
+	await throwIfRunAborted(input);
 	const modelPlan = await planToolCallsWithModel({
 		message: input.message,
 		organizationId: input.organizationId,
@@ -832,6 +887,7 @@ export async function runControlChatTurn(
 		modelProviderId: input.modelProviderId,
 		modelId: input.modelId,
 	});
+	await throwIfRunAborted(input);
 	const fallbackPlannedCalls = modelPlan?.calls.length
 		? null
 		: await planToolCalls({
@@ -839,25 +895,32 @@ export async function runControlChatTurn(
 				organizationId: input.organizationId,
 				userId: input.userId,
 			});
+	await throwIfRunAborted(input);
 	const plannedCalls = modelPlan?.calls.length
 		? modelPlan.calls
 		: (fallbackPlannedCalls ?? []);
 
 	if (plannedCalls.length === 0) {
+		const content = modelPlan?.assistantMessage
+			? [{ type: "text" as const, text: modelPlan.assistantMessage }]
+			: fallbackAssistantContent({
+					hosts,
+					rendererContext: input.rendererContext,
+				});
 		if (modelPlan?.assistantMessage) {
-			return [{ type: "text", text: modelPlan.assistantMessage }];
+			return { content, status: "completed", error: null };
 		}
-		return fallbackAssistantContent({
-			hosts,
-			rendererContext: input.rendererContext,
-		});
+		return { content, status: "completed", error: null };
 	}
 
 	const content: ControlChatMessageContent[] = [];
+	let hasToolFailure = false;
+	let firstToolError: string | null = null;
 	if (modelPlan?.assistantMessage) {
 		content.push({ type: "text", text: modelPlan.assistantMessage });
 	}
 	for (const call of plannedCalls) {
+		await throwIfRunAborted(input);
 		try {
 			const { toolCallId, result } = await runPersistedTool({
 				run: input,
@@ -870,16 +933,22 @@ export async function runControlChatTurn(
 				status: "completed",
 				summary: result.summary,
 			});
+			await throwIfRunAborted(input);
 		} catch (error) {
+			if (error instanceof ControlChatRunAbortedError) {
+				throw error;
+			}
+			hasToolFailure = true;
 			if (error instanceof TRPCError) {
+				firstToolError ??= error.message;
 				content.push({ type: "error", text: error.message });
 			} else {
+				const text =
+					error instanceof Error ? error.message : "Control Chat tool failed.";
+				firstToolError ??= text;
 				content.push({
 					type: "error",
-					text:
-						error instanceof Error
-							? error.message
-							: "Control Chat tool failed.",
+					text,
 				});
 			}
 		}
@@ -895,5 +964,8 @@ export async function runControlChatTurn(
 		});
 	}
 
-	return content;
+	return {
+		content,
+		...resolveControlChatTurnStatus({ hasToolFailure, firstToolError }),
+	};
 }

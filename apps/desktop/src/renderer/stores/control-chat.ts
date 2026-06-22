@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import { devtools, persist } from "zustand/middleware";
+import {
+	createJSONStorage,
+	devtools,
+	persist,
+	type StateStorage,
+} from "zustand/middleware";
 
 export const CONTROL_CHAT_DEFAULT_WIDTH = 420;
 export const CONTROL_CHAT_DEFAULT_HEIGHT = 620;
@@ -10,6 +15,7 @@ interface ControlChatState {
 	isOpen: boolean;
 	isExpanded: boolean;
 	activeSessionId: string | null;
+	isCreatingNewSession: boolean;
 	width: number;
 	height: number;
 	open: () => void;
@@ -17,6 +23,7 @@ interface ControlChatState {
 	toggleOpen: () => void;
 	toggleExpanded: () => void;
 	setActiveSessionId: (sessionId: string | null) => void;
+	startNewSession: () => void;
 	setSize: (size: { width: number; height: number }) => void;
 }
 
@@ -27,6 +34,27 @@ function clampSize(size: { width: number; height: number }) {
 	};
 }
 
+const fallbackStorageValues = new Map<string, string>();
+
+const fallbackStorage: StateStorage = {
+	getItem: (name) => fallbackStorageValues.get(name) ?? null,
+	setItem: (name, value) => {
+		fallbackStorageValues.set(name, value);
+	},
+	removeItem: (name) => {
+		fallbackStorageValues.delete(name);
+	},
+};
+
+function getControlChatStorage(): StateStorage {
+	try {
+		if (typeof localStorage !== "undefined") {
+			return localStorage;
+		}
+	} catch {}
+	return fallbackStorage;
+}
+
 export const useControlChatStore = create<ControlChatState>()(
 	devtools(
 		persist(
@@ -34,6 +62,7 @@ export const useControlChatStore = create<ControlChatState>()(
 				isOpen: false,
 				isExpanded: false,
 				activeSessionId: null,
+				isCreatingNewSession: false,
 				width: CONTROL_CHAT_DEFAULT_WIDTH,
 				height: CONTROL_CHAT_DEFAULT_HEIGHT,
 
@@ -52,12 +81,16 @@ export const useControlChatStore = create<ControlChatState>()(
 							: CONTROL_CHAT_DEFAULT_HEIGHT,
 					});
 				},
-				setActiveSessionId: (sessionId) => set({ activeSessionId: sessionId }),
+				setActiveSessionId: (sessionId) =>
+					set({ activeSessionId: sessionId, isCreatingNewSession: false }),
+				startNewSession: () =>
+					set({ activeSessionId: null, isCreatingNewSession: true }),
 				setSize: (size) => set(clampSize(size)),
 			}),
 			{
 				name: "control-chat-store",
 				version: 1,
+				storage: createJSONStorage(getControlChatStorage),
 				partialize: (state) => ({
 					isOpen: state.isOpen,
 					isExpanded: state.isExpanded,

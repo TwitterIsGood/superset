@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { db, dbWs } from "@superset/db/client";
 import {
-	type ControlChatMessageContent,
 	controlChatMessages,
 	controlChatRuns,
 	controlChatSessions,
@@ -12,7 +11,11 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { protectedProcedure } from "../../trpc";
 import { requireActiveOrgMembership } from "../utils/active-org";
-import { runControlChatTurn } from "./runtime";
+import {
+	ControlChatRunAbortedError,
+	type ControlChatTurnResult,
+	runControlChatTurn,
+} from "./runtime";
 import {
 	controlChatCreateSessionSchema,
 	controlChatRendererContextSchema,
@@ -226,11 +229,9 @@ export const controlChatRouter = {
 				return { sessionId: session.id, runId: run.id };
 			});
 
-			let assistantContent: ControlChatMessageContent[];
-			let status: "completed" | "failed" = "completed";
-			let error: string | null = null;
+			let turnResult: ControlChatTurnResult;
 			try {
-				assistantContent = await runControlChatTurn({
+				turnResult = await runControlChatTurn({
 					organizationId,
 					userId: ctx.session.user.id,
 					sessionId: prepared.sessionId,
@@ -241,35 +242,55 @@ export const controlChatRouter = {
 					modelId: input.modelId,
 				});
 			} catch (caught) {
-				status = "failed";
-				error =
+				if (caught instanceof ControlChatRunAbortedError) {
+					return getSessionData({
+						sessionId: prepared.sessionId,
+						organizationId,
+						userId: ctx.session.user.id,
+					});
+				}
+				const error =
 					caught instanceof Error ? caught.message : "Control Chat run failed";
-				assistantContent = [{ type: "error" as const, text: error }];
+				turnResult = {
+					content: [{ type: "error" as const, text: error }],
+					status: "failed",
+					error,
+				};
 			}
 
-			await dbWs.transaction(async (tx) => {
+			const finalization = await dbWs.transaction(async (tx) => {
 				const completedAt = new Date();
+				const [run] = await tx
+					.select({ status: controlChatRuns.status })
+					.from(controlChatRuns)
+					.where(eq(controlChatRuns.id, prepared.runId))
+					.limit(1);
+
+				if (run?.status === "aborted") {
+					return { aborted: true };
+				}
+
+				await tx
+					.update(controlChatRuns)
+					.set({
+						status: turnResult.status,
+						error: turnResult.error,
+						completedAt,
+					})
+					.where(eq(controlChatRuns.id, prepared.runId));
 				await tx.insert(controlChatMessages).values({
 					id: randomUUID(),
 					sessionId: prepared.sessionId,
 					organizationId,
 					createdByUserId: ctx.session.user.id,
 					role: "assistant",
-					content: assistantContent,
+					content: turnResult.content,
 					metadata: {
 						runId: prepared.runId,
 						permissionMode: "bypassPermissions",
 					},
 					createdAt: completedAt,
 				});
-				await tx
-					.update(controlChatRuns)
-					.set({
-						status,
-						error,
-						completedAt,
-					})
-					.where(eq(controlChatRuns.id, prepared.runId));
 				await tx
 					.update(controlChatSessions)
 					.set({
@@ -279,7 +300,17 @@ export const controlChatRouter = {
 						updatedAt: completedAt,
 					})
 					.where(eq(controlChatSessions.id, prepared.sessionId));
+
+				return { aborted: false };
 			});
+
+			if (finalization.aborted) {
+				return getSessionData({
+					sessionId: prepared.sessionId,
+					organizationId,
+					userId: ctx.session.user.id,
+				});
+			}
 
 			return getSessionData({
 				sessionId: prepared.sessionId,

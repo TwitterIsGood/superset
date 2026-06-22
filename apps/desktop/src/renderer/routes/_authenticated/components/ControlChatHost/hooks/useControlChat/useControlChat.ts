@@ -5,6 +5,7 @@ import { useEffect, useMemo } from "react";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import { useControlChatStore } from "renderer/stores/control-chat";
+import { shouldAutoSelectControlChatSession } from "./sessionSelection";
 
 type ControlChatSessionData = RouterOutputs["controlChat"]["getSession"];
 type ControlChatSession = RouterOutputs["controlChat"]["listSessions"][number];
@@ -36,9 +37,13 @@ export function useControlChat() {
 	const location = useLocation();
 	const { machineId } = useLocalHostService();
 	const activeSessionId = useControlChatStore((state) => state.activeSessionId);
+	const isCreatingNewSession = useControlChatStore(
+		(state) => state.isCreatingNewSession,
+	);
 	const setActiveSessionId = useControlChatStore(
 		(state) => state.setActiveSessionId,
 	);
+	const startNewSession = useControlChatStore((state) => state.startNewSession);
 
 	const rendererContext = useMemo(
 		() => ({
@@ -58,12 +63,20 @@ export function useControlChat() {
 	const sessions = sessionsQuery.data ?? [];
 
 	useEffect(() => {
-		if (activeSessionId) return;
+		if (
+			!shouldAutoSelectControlChatSession({
+				activeSessionId,
+				isCreatingNewSession,
+				sessionCount: sessions.length,
+			})
+		) {
+			return;
+		}
 		const firstSession = sessions[0];
 		if (firstSession) {
 			setActiveSessionId(firstSession.id);
 		}
-	}, [activeSessionId, sessions, setActiveSessionId]);
+	}, [activeSessionId, isCreatingNewSession, sessions, setActiveSessionId]);
 
 	const sessionQuery = useQuery({
 		queryKey: ["control-chat", "session", activeSessionId],
@@ -118,6 +131,7 @@ export function useControlChat() {
 	return {
 		activeSessionId,
 		setActiveSessionId,
+		startNewSession,
 		sessions,
 		sessionsQuery,
 		session: sessionQuery.data ?? null,

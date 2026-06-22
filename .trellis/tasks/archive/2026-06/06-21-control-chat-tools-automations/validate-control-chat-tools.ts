@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { db, dbWs } from "../../../packages/db/src/client";
+import { db, dbWs } from "../../../../../packages/db/src/client";
 import {
 	automationConfigVersions,
 	automations,
@@ -7,14 +7,14 @@ import {
 	capabilityPackageVersions,
 	controlChatRuns,
 	controlChatSessions,
-} from "../../../packages/db/src/schema";
-import { and, desc, eq, inArray } from "../../../packages/db/node_modules/drizzle-orm";
+} from "../../../../../packages/db/src/schema";
+import { and, desc, eq, inArray } from "../../../../../packages/db/node_modules/drizzle-orm";
 import {
 	type ControlChatToolContext,
 	executeControlChatTool,
-} from "../../../packages/trpc/src/router/control-chat/tools";
-import { buildGeneratedSkillPackage } from "../../../packages/trpc/src/router/control-chat/package-builder";
-import type { ControlChatToolName } from "../../../packages/trpc/src/router/control-chat/schema";
+} from "../../../../../packages/trpc/src/router/control-chat/tools";
+import { buildGeneratedSkillPackage } from "../../../../../packages/trpc/src/router/control-chat/package-builder";
+import type { ControlChatToolName } from "../../../../../packages/trpc/src/router/control-chat/schema";
 
 type JsonRecord = Record<string, unknown>;
 

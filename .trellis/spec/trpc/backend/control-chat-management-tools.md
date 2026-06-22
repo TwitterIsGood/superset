@@ -46,6 +46,16 @@
   organization membership, host membership, package audit, or resource access.
 - One Control Chat session may have only one active run. A second send must fail
   with a stable conflict instead of silently interleaving writes.
+- Stop is a server-side run cancellation contract, not only a renderer state
+  change. The `stop` mutation marks the active run `aborted`, clears the
+  session `active_run_id`, and the runtime must check that run status before
+  model planning, before fallback planning/tools, before each persisted tool,
+  after each persisted tool, and before assistant message persistence.
+- Aborted runs must not write a follow-up assistant message and must not be
+  overwritten back to `completed` by late runtime completion.
+- If any Control Chat tool fails and the runtime preserves assistant content for
+  user feedback, the run status must be `failed` with an actionable error. Do
+  not mark a turn `completed` merely because failure text was rendered in chat.
 - Tool inputs are validated through `controlChatToolSchemas`. Do not pass raw
   model JSON directly to service functions without schema parsing.
 - Automation writes from Control Chat must create
@@ -72,6 +82,12 @@
 
 - Missing Control Chat session or cross-org session access -> `NOT_FOUND`.
 - Sending while `control_chat_sessions.active_run_id` is set -> `CONFLICT`.
+- Stop with no active run -> `{ stopped: false }`.
+- Stop during a run -> run becomes `aborted`, session becomes `idle`, later
+  runtime checks stop further tool execution and skip assistant persistence.
+- A tool failure inside a run -> assistant content may include the failure text,
+  but `control_chat_runs.status` is `failed` and `error` contains the first
+  actionable tool error.
 - Tool input fails schema -> Zod validation error.
 - Automation id missing or outside caller ownership -> `NOT_FOUND`.
 - `automation.update.expectedUpdatedAt` stale -> `CONFLICT`.
@@ -111,6 +127,7 @@
 - Router or task-local matrix validation for every Automation and Capability
   tool name in `controlChatToolSchemas`.
 - Conflict test for one active Control Chat run per session.
+- Cancellation/status tests for stopped runs and failed-tool turns.
 - Conflict test for stale `automation.update.expectedUpdatedAt`.
 - Capability restore test for audit-passed and audit-failed versions.
 - Desktop Automation smoke for the floating panel, Bypass indicator, current
