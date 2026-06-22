@@ -895,3 +895,37 @@ Fixed Chat stop/abort handling so interrupted assistant output is retained, abor
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: Address Chat stop retention review
+
+**Date**: 2026-06-22
+**Task**: Address Chat stop retention review
+**Package**: desktop
+**Branch**: `codex/chat-abort-retention`
+
+### Summary
+
+Scoped retained stopped assistant messages by chat scope so partial output from one session cannot leak into another session or workspace after switching chats. Added standalone and workspace regression tests for the review blocker.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4d80cc25e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
