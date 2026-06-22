@@ -90,13 +90,21 @@ export const jwtProcedure = t.procedure.use(async ({ ctx, next }) => {
 					scope: typeof payload.scope === "string" ? payload.scope : undefined,
 					runId: typeof payload.runId === "string" ? payload.runId : undefined,
 				};
+				const tokenOrganizationId =
+					typeof payload.organizationId === "string"
+						? payload.organizationId
+						: null;
+				const activeOrganizationId =
+					tokenOrganizationId && organizationIds.includes(tokenOrganizationId)
+						? tokenOrganizationId
+						: (organizationIds[0] ?? null);
 				return next({
 					ctx: {
 						userId: payload.sub,
 						email: (payload.email as string) ?? "",
 						organizationIds,
-						activeOrganizationId: organizationIds[0] ?? null,
 						jwtClaims,
+						activeOrganizationId,
 					},
 				});
 			}

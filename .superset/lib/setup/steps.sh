@@ -358,7 +358,7 @@ allocate_port_base() {
   local alloc_file="$HOME/.superset/port-allocations.json"
   local lock_dir="$HOME/.superset/port-allocations.lock"
   local start=3000
-  local range=20
+  local range=25
 
   # Ensure directory and file exist
   mkdir -p "$HOME/.superset"
@@ -379,12 +379,15 @@ allocate_port_base() {
   fi
 
   if [ -n "$existing" ]; then
-    if port_base_is_safe "$existing" "$range"; then
+    if port_base_is_safe "$existing" "$range" && ! jq -e --arg k "$key" --argjson existing "$existing" --argjson range "$range" '
+      to_entries
+      | any(.key != $k and (.value | type == "number") and (.value < ($existing + $range)) and ($existing < (.value + $range)))
+    ' "$alloc_file" >/dev/null; then
       export SUPERSET_PORT_BASE="$existing"
       release_port_alloc_lock "$lock_dir"
       return 0
     fi
-    echo "  Existing port base $existing overlaps a reserved port (${SUPERSET_RESERVED_PORTS}); reallocating..."
+    echo "  Existing port base $existing overlaps a reserved port or another allocation; reallocating..."
     local tmp_file="${alloc_file}.tmp.$$"
     if ! jq --arg k "$key" 'del(.[$k])' "$alloc_file" > "$tmp_file"; then
       error "Failed to release stale port allocation"
@@ -410,7 +413,10 @@ allocate_port_base() {
 
   # Find first available slot, skipping any window that overlaps a reserved port
   local candidate=$start
-  while echo "$used" | grep -qx "$candidate" 2>/dev/null \
+  while jq -e --argjson candidate "$candidate" --argjson range "$range" '
+      to_entries
+      | any((.value | type == "number") and (.value < ($candidate + $range)) and ($candidate < (.value + $range)))
+    ' "$alloc_file" >/dev/null \
     || ! port_base_is_safe "$candidate" "$range"; do
     candidate=$((candidate + range))
   done
@@ -507,7 +513,7 @@ step_write_env() {
     local RELAY_PORT=$((BASE + 13))
 
     echo ""
-    echo "# Workspace Ports (allocated from SUPERSET_PORT_BASE=$BASE, range=20)"
+    echo "# Workspace Ports (allocated from SUPERSET_PORT_BASE=$BASE, range=25)"
     write_env_var "SUPERSET_PORT_BASE" "$BASE"
     write_env_var "WEB_PORT" "$WEB_PORT"
     write_env_var "API_PORT" "$API_PORT"
@@ -550,6 +556,7 @@ step_write_env() {
     echo "# Caddy HTTPS proxy for HTTP/2 (avoids browser 6-connection limit with Electric SSE streams)"
     write_env_var "NEXT_PUBLIC_ELECTRIC_URL" "https://localhost:$CADDY_ELECTRIC_PORT"
     write_env_var "NEXT_PUBLIC_ELECTRIC_PROXY_URL" "https://localhost:$CADDY_ELECTRIC_PORT"
+    write_env_var "EXPO_PUBLIC_ELECTRIC_URL" "https://localhost:$CADDY_ELECTRIC_PORT"
   } >> .env
 
   success "Workspace .env written"

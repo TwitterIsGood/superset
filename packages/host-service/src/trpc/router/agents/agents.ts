@@ -91,6 +91,38 @@ function rowToConfig(
 	};
 }
 
+function hasClaudePrintMode(args: string[]): boolean {
+	return args.includes("--print") || args.includes("-p");
+}
+
+function normalizePromptLaunchConfig(
+	config: ResolvedHostAgentConfig,
+): ResolvedHostAgentConfig {
+	if (
+		config.presetId === "claude" &&
+		config.command === "claude" &&
+		!hasClaudePrintMode([...config.args, ...config.promptArgs])
+	) {
+		return {
+			...config,
+			promptArgs: [...config.promptArgs, "--print"],
+		};
+	}
+
+	if (
+		config.presetId === "codex" &&
+		config.command === "codex" &&
+		![...config.args, ...config.promptArgs].includes("exec")
+	) {
+		return {
+			...config,
+			promptArgs: ["exec", ...config.promptArgs.filter((arg) => arg !== "--")],
+		};
+	}
+
+	return config;
+}
+
 /**
  * Look up a HostAgentConfig by its instance id first, then fall back to the
  * lowest-`order` row matching by presetId. Preset ids are short slugs;
@@ -105,7 +137,7 @@ export function resolveHostAgentConfig(
 		.from(hostAgentConfigs)
 		.where(eq(hostAgentConfigs.id, agent))
 		.get();
-	if (byId) return rowToConfig(byId);
+	if (byId) return normalizePromptLaunchConfig(rowToConfig(byId));
 
 	const byPreset = db
 		.select()
@@ -113,7 +145,7 @@ export function resolveHostAgentConfig(
 		.where(eq(hostAgentConfigs.presetId, agent))
 		.orderBy(asc(hostAgentConfigs.displayOrder))
 		.get();
-	if (byPreset) return rowToConfig(byPreset);
+	if (byPreset) return normalizePromptLaunchConfig(rowToConfig(byPreset));
 
 	return null;
 }
@@ -124,6 +156,33 @@ function quoteSingleShell(value: string): string {
 
 function buildArgvCommand(argv: string[]): string {
 	return argv.map(quoteSingleShell).join(" ");
+}
+
+export function terminalAgentOutputStartMarker(terminalId: string): string {
+	return `__SS_AGENT_START_${terminalId.slice(0, 8)}__`;
+}
+
+export function terminalAgentOutputEndMarker(terminalId: string): string {
+	return `__SS_AGENT_END_${terminalId.slice(0, 8)}__`;
+}
+
+export function wrapAgentCommandWithOutputMarkers({
+	command,
+	terminalId,
+}: {
+	command: string;
+	terminalId: string;
+}): string {
+	const statusVariable = "__superset_agent_status";
+	return [
+		`printf '%s\\n' ${quoteSingleShell(terminalAgentOutputStartMarker(terminalId))}`,
+		command,
+		`${statusVariable}=$?`,
+		`printf '%s:%s\\n' ${quoteSingleShell(
+			terminalAgentOutputEndMarker(terminalId),
+		)} "$${statusVariable}"`,
+		`exit "$${statusVariable}"`,
+	].join("\n");
 }
 
 /**
@@ -216,6 +275,7 @@ export interface AgentRunInput {
 	workspaceId: string;
 	agent: string;
 	prompt: string;
+	sessionId?: string;
 	attachmentIds?: string[];
 	env?: Record<string, string>;
 }
@@ -277,7 +337,7 @@ export const automationAgentRunInputSchema = z.object({
 });
 
 const SUPERSET_AGENT_ID = "superset";
-const SUPERSET_AGENT_LABEL = "Superset";
+const SUPERSET_AGENT_LABEL = "Claude Code";
 const AUTOMATION_RUN_OUTPUT_MAX = 120_000;
 const DEFAULT_AUTOMATION_AGENT_TIMEOUT_MS = 30 * 60 * 1000;
 const TERMINAL_AUTOMATION_RUN_STATUSES = new Set([
@@ -342,13 +402,15 @@ async function runChatAgent(
 	input: AgentRunInput,
 	label: string,
 ): Promise<AgentRunResult> {
-	const sessionId = crypto.randomUUID();
+	const sessionId = input.sessionId ?? crypto.randomUUID();
 	const files = await resolveAttachmentsAsFiles(input.attachmentIds ?? []);
 
-	await ctx.api.chat.createSession.mutate({
-		sessionId,
-		v2WorkspaceId: input.workspaceId,
-	});
+	if (!input.sessionId) {
+		await ctx.api.chat.createSession.mutate({
+			sessionId,
+			v2WorkspaceId: input.workspaceId,
+		});
+	}
 
 	// Errors surface via `getSnapshot.displayState.errorMessage` when a
 	// chat pane attaches.
@@ -399,10 +461,14 @@ async function runTerminalAgent(
 	}
 
 	const prompt = buildAttachmentBlock(input.prompt, resolvedAttachments);
-	const fullCommand = buildAgentLaunchCommand(config, prompt);
+	const command = buildAgentLaunchCommand(config, prompt);
 	const launchEnv = buildAgentLaunchEnv(config, input.env);
 
 	const terminalId = crypto.randomUUID();
+	const fullCommand = wrapAgentCommandWithOutputMarkers({
+		terminalId,
+		command,
+	});
 	const result = await createTerminalSessionInternal({
 		terminalId,
 		workspaceId: input.workspaceId,
@@ -868,6 +934,7 @@ export const agentsRouter = router({
 				workspaceId: z.string().uuid(),
 				agent: z.string().min(1),
 				prompt: z.string().min(1),
+				sessionId: z.string().uuid().optional(),
 				attachmentIds: z.array(z.string().uuid()).optional(),
 				env: z.record(z.string(), z.string()).optional(),
 				modelSelection: z

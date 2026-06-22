@@ -67,6 +67,9 @@ let cachedHashedId: string | null = null;
  * This is the canonical identifier for a machine acting as a host or client.
  */
 export function getHostId(): string {
+	const override = process.env.SUPERSET_HOST_ID_OVERRIDE?.trim();
+	if (override) return override;
+
 	if (!cachedHashedId) {
 		const machineId = getMachineId();
 		cachedHashedId = createHmac("sha256", APP_HOST_SALT)

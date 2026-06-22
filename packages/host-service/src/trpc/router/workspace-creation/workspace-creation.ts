@@ -1,6 +1,7 @@
 import { router } from "../../index";
 import {
 	adopt,
+	ensureLocal,
 	listProjectWorktrees,
 	searchBranches,
 	searchGitHubIssues,
@@ -11,6 +12,7 @@ import { getTrellisStatus } from "./trellis";
 export const workspaceCreationRouter = router({
 	searchBranches,
 	adopt,
+	ensureLocal,
 	getTrellisStatus,
 	listProjectWorktrees,
 	searchGitHubIssues,

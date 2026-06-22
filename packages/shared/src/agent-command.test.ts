@@ -5,7 +5,7 @@ import {
 } from "./agent-command";
 
 describe("buildAgentPromptCommand", () => {
-	it("adds `--` before codex prompt payload", () => {
+	it("uses Codex exec mode for prompt launches", () => {
 		const command = buildAgentPromptCommand({
 			prompt: "- Only modified file: runtime.ts",
 			randomId: "1234-5678",
@@ -13,12 +13,12 @@ describe("buildAgentPromptCommand", () => {
 		});
 
 		expect(command).toContain(
-			"codex --dangerously-bypass-approvals-and-sandbox -- \"$(cat <<'SUPERSET_PROMPT_12345678'",
+			"codex --dangerously-bypass-approvals-and-sandbox exec \"$(cat <<'SUPERSET_PROMPT_12345678'",
 		);
 		expect(command).toContain("- Only modified file: runtime.ts");
 	});
 
-	it("does not change non-codex commands", () => {
+	it("uses Claude print mode for prompt launches", () => {
 		const command = buildAgentPromptCommand({
 			prompt: "hello",
 			randomId: "abcd-efgh",
@@ -26,7 +26,7 @@ describe("buildAgentPromptCommand", () => {
 		});
 
 		expect(command).toStartWith(
-			"claude --dangerously-skip-permissions \"$(cat <<'SUPERSET_PROMPT_abcdefgh'",
+			"claude --dangerously-skip-permissions --print \"$(cat <<'SUPERSET_PROMPT_abcdefgh'",
 		);
 	});
 

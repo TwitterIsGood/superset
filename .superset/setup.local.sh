@@ -29,6 +29,8 @@ LOCAL_NEON_PROXY_PORT=""
 LOCAL_ELECTRIC_PORT=""
 LOCAL_REDIS_PORT=""
 LOCAL_KV_REST_PORT=""
+LOCAL_S3_PORT=""
+LOCAL_S3_CONSOLE_PORT=""
 DESKTOP_AUTOMATION_PORT=""
 
 local_ensure_env() {
@@ -85,7 +87,7 @@ local_allocate_ports() {
     LOCAL_DB_PROJECT="$(worktree_default_db_project "$PWD")"
   fi
 
-  # DB stack host ports live in the free tail of the 20-port window
+  # DB stack host ports live in the free tail of the 25-port window
   # (app ports use +0..+13; Electric reuses the +9 ELECTRIC_PORT slot).
   LOCAL_PG_PORT=$((base + 14))
   LOCAL_NEON_PROXY_PORT=$((base + 15))
@@ -93,31 +95,37 @@ local_allocate_ports() {
   LOCAL_REDIS_PORT=$((base + 16))
   LOCAL_KV_REST_PORT=$((base + 17))
   DESKTOP_AUTOMATION_PORT=$((base + 18))
+  LOCAL_S3_PORT=$((base + 19))
+  LOCAL_S3_CONSOLE_PORT=$((base + 20))
 
   # If this workspace already has a Docker stack, the existing published ports
   # are the source of truth. This prevents .env from drifting away from long-lived
   # containers after a reboot or repeated setup runs.
-  local existing_pg existing_proxy existing_electric existing_redis existing_kv
+  local existing_pg existing_proxy existing_electric existing_redis existing_kv existing_s3 existing_s3_console
   existing_pg="$(local_existing_host_port postgres 5432/tcp)"
   existing_proxy="$(local_existing_host_port neon-proxy 4444/tcp)"
   existing_electric="$(local_existing_host_port electric 3000/tcp)"
   existing_redis="$(local_existing_host_port redis 6379/tcp)"
   existing_kv="$(local_existing_host_port kv-rest 80/tcp)"
+  existing_s3="$(local_existing_host_port minio 9000/tcp)"
+  existing_s3_console="$(local_existing_host_port minio 9001/tcp)"
   [ -n "$existing_pg" ] && LOCAL_PG_PORT="$existing_pg"
   [ -n "$existing_proxy" ] && LOCAL_NEON_PROXY_PORT="$existing_proxy"
   [ -n "$existing_electric" ] && LOCAL_ELECTRIC_PORT="$existing_electric"
   [ -n "$existing_redis" ] && LOCAL_REDIS_PORT="$existing_redis"
   [ -n "$existing_kv" ] && LOCAL_KV_REST_PORT="$existing_kv"
+  [ -n "$existing_s3" ] && LOCAL_S3_PORT="$existing_s3"
+  [ -n "$existing_s3_console" ] && LOCAL_S3_CONSOLE_PORT="$existing_s3_console"
 
   export SUPERSET_WORKTREE_ID SUPERSET_WORKTREE_ROOT SUPERSET_WORKSPACE_NAME LOCAL_DB_PROJECT
   export LOCAL_PG_PORT LOCAL_NEON_PROXY_PORT LOCAL_ELECTRIC_PORT
-  export LOCAL_REDIS_PORT LOCAL_KV_REST_PORT
+  export LOCAL_REDIS_PORT LOCAL_KV_REST_PORT LOCAL_S3_PORT LOCAL_S3_CONSOLE_PORT
   export DESKTOP_AUTOMATION_PORT
   # Export so migrate/seed (child bun processes) use these — an inherited env
   # var beats the .env file, so this overrides any stale DATABASE_URL.
   export DATABASE_URL="postgres://postgres:postgres@localhost:$LOCAL_NEON_PROXY_PORT/main"
   export DATABASE_URL_UNPOOLED="postgres://postgres:postgres@localhost:$LOCAL_PG_PORT/main"
-  success "Base $base → pg=$LOCAL_PG_PORT proxy=$LOCAL_NEON_PROXY_PORT electric=$LOCAL_ELECTRIC_PORT redis=$LOCAL_REDIS_PORT kv=$LOCAL_KV_REST_PORT cdp=$DESKTOP_AUTOMATION_PORT (project $LOCAL_DB_PROJECT)"
+  success "Base $base → pg=$LOCAL_PG_PORT proxy=$LOCAL_NEON_PROXY_PORT electric=$LOCAL_ELECTRIC_PORT redis=$LOCAL_REDIS_PORT kv=$LOCAL_KV_REST_PORT s3=$LOCAL_S3_PORT s3-console=$LOCAL_S3_CONSOLE_PORT cdp=$DESKTOP_AUTOMATION_PORT (project $LOCAL_DB_PROJECT)"
   return 0
 }
 
@@ -242,6 +250,8 @@ local_write_env() {
     write_env_var "LOCAL_ELECTRIC_PORT" "$LOCAL_ELECTRIC_PORT"
     write_env_var "LOCAL_REDIS_PORT" "$LOCAL_REDIS_PORT"
     write_env_var "LOCAL_KV_REST_PORT" "$LOCAL_KV_REST_PORT"
+    write_env_var "LOCAL_S3_PORT" "$LOCAL_S3_PORT"
+    write_env_var "LOCAL_S3_CONSOLE_PORT" "$LOCAL_S3_CONSOLE_PORT"
     write_env_var "DATABASE_URL" "$DATABASE_URL"
     write_env_var "DATABASE_URL_UNPOOLED" "$DATABASE_URL_UNPOOLED"
     write_env_var "KV_REST_API_URL" "http://localhost:$LOCAL_KV_REST_PORT"
@@ -268,7 +278,9 @@ local_write_env() {
     echo ""
     echo "# Cross-app URLs (allocated ports)"
     write_env_var "NEXT_PUBLIC_API_URL" "http://localhost:$API_PORT"
+    write_env_var "EXPO_PUBLIC_API_URL" "http://localhost:$API_PORT"
     write_env_var "NEXT_PUBLIC_WEB_URL" "http://localhost:$WEB_PORT"
+    write_env_var "EXPO_PUBLIC_WEB_URL" "http://localhost:$WEB_PORT"
     write_env_var "NEXT_PUBLIC_MARKETING_URL" "http://localhost:$MARKETING_PORT"
     write_env_var "NEXT_PUBLIC_ADMIN_URL" "http://localhost:$ADMIN_PORT"
     write_env_var "NEXT_PUBLIC_DOCS_URL" "http://localhost:$DOCS_PORT"
@@ -281,12 +293,14 @@ local_write_env() {
     write_env_var "PORT" "$STREAMS_PORT"
     write_env_var "STREAMS_URL" "http://localhost:$STREAMS_PORT"
     write_env_var "NEXT_PUBLIC_STREAMS_URL" "http://localhost:$STREAMS_PORT"
+    write_env_var "EXPO_PUBLIC_STREAMS_URL" "http://localhost:$STREAMS_PORT"
     write_env_var "STREAMS_INTERNAL_URL" "http://127.0.0.1:$STREAMS_INTERNAL_PORT"
     echo ""
     echo "# Electric URLs (per-workspace Electric :$LOCAL_ELECTRIC_PORT, auth proxy :$WRANGLER_PORT)"
     write_env_var "ELECTRIC_URL" "http://localhost:$LOCAL_ELECTRIC_PORT/v1/shape"
     write_env_var "NEXT_PUBLIC_ELECTRIC_URL" "$ELECTRIC_PROXY_PUBLIC_URL"
     write_env_var "NEXT_PUBLIC_ELECTRIC_PROXY_URL" "$ELECTRIC_PROXY_PUBLIC_URL"
+    write_env_var "EXPO_PUBLIC_ELECTRIC_URL" "$ELECTRIC_PROXY_PUBLIC_URL"
   } >> .env
 
   cat > Caddyfile <<-CADDYEOF
@@ -309,6 +323,8 @@ ELECTRIC_SOURCE_ID=
 ELECTRIC_SOURCE_SECRET=
 DEVVARS
 
+  local_write_mobile_env "$API_PORT" "$WRANGLER_PORT" "$STREAMS_PORT" "$WEB_PORT"
+
   cat > "$SUPERSET_SCRIPT_DIR/ports.json" <<PORTSJSON
 {
   "ports": [
@@ -327,13 +343,41 @@ DEVVARS
     { "port": $LOCAL_PG_PORT, "label": "Postgres" },
     { "port": $LOCAL_NEON_PROXY_PORT, "label": "Neon Proxy" },
     { "port": $LOCAL_REDIS_PORT, "label": "Redis" },
-    { "port": $LOCAL_KV_REST_PORT, "label": "KV REST" }
+    { "port": $LOCAL_KV_REST_PORT, "label": "KV REST" },
+    { "port": $LOCAL_S3_PORT, "label": "S3" },
+    { "port": $LOCAL_S3_CONSOLE_PORT, "label": "S3 Console" }
   ]
 }
 PORTSJSON
 
   success "Workspace .env, Caddyfile, electric-proxy/.dev.vars, ports.json written"
   return 0
+}
+
+local_write_mobile_env() {
+  local api_port="$1"
+  local wrangler_port="$2"
+  local streams_port="$3"
+  local web_port="$4"
+  local mobile_env="apps/mobile/.env.local"
+  local tmp_env
+  tmp_env="$(mktemp)"
+
+  if [ -f "$mobile_env" ]; then
+    awk '
+      !/^(EXPO_PUBLIC_API_URL|EXPO_PUBLIC_ELECTRIC_URL|EXPO_PUBLIC_STREAMS_URL|EXPO_PUBLIC_WEB_URL)=/
+    ' "$mobile_env" > "$tmp_env"
+  else
+    : > "$tmp_env"
+  fi
+
+  {
+    printf 'EXPO_PUBLIC_API_URL="http://localhost:%s"\n' "$api_port"
+    printf 'EXPO_PUBLIC_ELECTRIC_URL="http://localhost:%s"\n' "$wrangler_port"
+    printf 'EXPO_PUBLIC_STREAMS_URL="http://localhost:%s"\n' "$streams_port"
+    printf 'EXPO_PUBLIC_WEB_URL="http://localhost:%s"\n' "$web_port"
+  } >> "$tmp_env"
+  mv "$tmp_env" "$mobile_env"
 }
 
 local_strip_managed_env_blocks() {

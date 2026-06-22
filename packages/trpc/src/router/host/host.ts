@@ -13,9 +13,74 @@ import {
 } from "@superset/shared/billing";
 import { parseHostRoutingKey } from "@superset/shared/host-routing";
 import { TRPCError, type TRPCRouterRecord } from "@trpc/server";
+import { Redis } from "@upstash/redis";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { env } from "../../env";
 import { jwtProcedure, protectedProcedure } from "../../trpc";
+
+const RELAY_TTL_KEY = "relay:tunnel-ttl";
+
+const relayDirectoryRedis =
+	env.KV_REST_API_URL && env.KV_REST_API_TOKEN
+		? new Redis({
+				url: env.KV_REST_API_URL,
+				token: env.KV_REST_API_TOKEN,
+			})
+		: null;
+
+function getBearerToken(headers: Headers): string | null {
+	const authorization = headers.get("authorization");
+	const match = authorization?.match(/^Bearer\s+(.+)$/i);
+	return match?.[1] ?? null;
+}
+
+async function listRelayConnectedHostIds(): Promise<Set<string> | null> {
+	if (!relayDirectoryRedis) return null;
+	try {
+		const connected = await relayDirectoryRedis.zrange<string[]>(
+			RELAY_TTL_KEY,
+			Date.now(),
+			"+inf",
+			{ byScore: true },
+		);
+		return new Set(connected);
+	} catch (error) {
+		console.warn("[host.list] relay directory read failed:", error);
+		return null;
+	}
+}
+
+async function probeRelayConnectedHostIds({
+	hostIds,
+	token,
+}: {
+	hostIds: string[];
+	token: string | null;
+}): Promise<Set<string>> {
+	if (!token || hostIds.length === 0) return new Set();
+
+	const connected = new Set<string>();
+	await Promise.all(
+		hostIds.map(async (hostId) => {
+			try {
+				const url = new URL(
+					`/hosts/${encodeURIComponent(hostId)}/_whoowns`,
+					env.RELAY_URL,
+				);
+				const response = await fetch(url, {
+					headers: { authorization: `Bearer ${token}` },
+					signal: AbortSignal.timeout(1000),
+				});
+				if (response.ok) connected.add(hostId);
+			} catch {
+				// Directory state remains the authoritative cross-instance signal.
+				// The probe is a best-effort correction for local/dev relay memory.
+			}
+		}),
+	);
+	return connected;
+}
 
 export const hostRouter = {
 	list: jwtProcedure
@@ -34,6 +99,7 @@ export const hostRouter = {
 					name: v2Hosts.name,
 					isOnline: v2Hosts.isOnline,
 					organizationId: v2Hosts.organizationId,
+					updatedAt: v2Hosts.updatedAt,
 				})
 				.from(v2Hosts)
 				.innerJoin(
@@ -50,11 +116,38 @@ export const hostRouter = {
 					),
 				);
 
+			const relayConnectedHostIds = await listRelayConnectedHostIds();
+			const relayProbeCandidates =
+				relayConnectedHostIds === null
+					? rows
+					: rows.filter(
+							(row) =>
+								row.isOnline &&
+								!relayConnectedHostIds.has(
+									`${row.organizationId}:${row.machineId}`,
+								),
+						);
+			const relayProbedHostIds = await probeRelayConnectedHostIds({
+				hostIds: relayProbeCandidates.map(
+					(row) => `${row.organizationId}:${row.machineId}`,
+				),
+				token: getBearerToken(ctx.headers),
+			});
+
 			return rows.map((row) => ({
 				id: row.machineId,
 				name: row.name,
-				online: row.isOnline,
+				online: (() => {
+					if (!row.isOnline) return false;
+					const routingKey = `${row.organizationId}:${row.machineId}`;
+					if (relayConnectedHostIds === null) return true;
+					return (
+						relayConnectedHostIds.has(routingKey) ||
+						relayProbedHostIds.has(routingKey)
+					);
+				})(),
 				organizationId: row.organizationId,
+				updatedAt: row.updatedAt,
 			}));
 		}),
 

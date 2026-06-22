@@ -12,6 +12,7 @@ import { env } from "renderer/env.renderer";
 import { track } from "renderer/lib/analytics";
 import { authClient, setAuthToken, setJwt } from "renderer/lib/auth-client";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { getJwtExpiresAt } from "renderer/providers/AuthProvider/utils/authJwt";
 import { SupersetLogo } from "./components/SupersetLogo";
 import { useSessionRecovery } from "./hooks/useSessionRecovery";
 
@@ -63,6 +64,8 @@ function getEmailAuthError(data: EmailAuthResponse, status: number): string {
 function SignInPage() {
 	const signInMutation = electronTrpc.auth.signIn.useMutation();
 	const persistToken = electronTrpc.auth.persistToken.useMutation();
+	const syncCliAuthConfigWithToken =
+		electronTrpc.auth.syncCliAuthConfigWithToken.useMutation();
 	const navigate = useNavigate();
 	const [mode, setMode] = useState<AuthMode>("sign-in");
 	const [name, setName] = useState("");
@@ -105,6 +108,11 @@ function SignInPage() {
 		setAuthToken(token);
 		const jwt = await authClient.token().catch(() => null);
 		if (jwt?.data?.token) {
+			const jwtExpiresAt = getJwtExpiresAt(jwt.data.token);
+			await syncCliAuthConfigWithToken.mutateAsync({
+				token: jwt.data.token,
+				expiresAt: jwtExpiresAt,
+			});
 			setJwt(jwt.data.token);
 		}
 	};
@@ -166,7 +174,10 @@ function SignInPage() {
 	};
 
 	const isBusy =
-		isSubmitting || signInMutation.isPending || persistToken.isPending;
+		isSubmitting ||
+		signInMutation.isPending ||
+		persistToken.isPending ||
+		syncCliAuthConfigWithToken.isPending;
 
 	return (
 		<div className="flex flex-col h-full w-full bg-background">

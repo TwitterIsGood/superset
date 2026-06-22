@@ -1,4 +1,8 @@
-import { auth, type Session } from "@superset/auth/server";
+import {
+	auth,
+	resolveSessionOrganizationState,
+	type Session,
+} from "@superset/auth/server";
 import { db } from "@superset/db/client";
 import * as authSchema from "@superset/db/schema/auth";
 import { createTRPCContext } from "@superset/trpc";
@@ -15,32 +19,21 @@ function looksLikeJwt(token: string): boolean {
 	return parts.length === 3 && parts.every(Boolean);
 }
 
-async function sessionFromOAuthBearer(
-	headers: Headers,
-): Promise<Session | null> {
+function getBearerToken(headers: Headers): string | null {
 	const authorization = headers.get("authorization");
 	const match = authorization?.match(/^Bearer\s+(.+)$/i);
-	const token = match?.[1];
-	if (!token || !looksLikeJwt(token)) return null;
+	return match?.[1] ?? null;
+}
 
-	let payload: Record<string, unknown>;
-	try {
-		payload = (await verifyAccessToken(token, {
-			jwksUrl: `${apiUrl}/api/auth/jwks`,
-			verifyOptions: {
-				issuer: apiUrl,
-				audience: [apiUrl, `${apiUrl}/`],
-			},
-		})) as Record<string, unknown>;
-	} catch {
-		return null;
-	}
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-	const authorizedClientId =
-		typeof payload.azp === "string" ? payload.azp : null;
-	if (authorizedClientId && !TRUSTED_API_CLIENTS.has(authorizedClientId)) {
-		return null;
-	}
+async function sessionFromJwtPayload(
+	token: string,
+	payload: unknown,
+): Promise<Session | null> {
+	if (!isRecord(payload)) return null;
 
 	const userId = typeof payload.sub === "string" ? payload.sub : null;
 	if (!userId) return null;
@@ -50,9 +43,27 @@ async function sessionFromOAuthBearer(
 	});
 	if (!user) return null;
 
-	const activeOrganizationId =
+	const organizationIds = Array.isArray(payload.organizationIds)
+		? payload.organizationIds.filter(
+				(organizationId): organizationId is string =>
+					typeof organizationId === "string",
+			)
+		: [];
+	const tokenOrganizationId =
 		typeof payload.organizationId === "string" ? payload.organizationId : null;
+	const activeOrganizationId =
+		tokenOrganizationId &&
+		(organizationIds.length === 0 ||
+			organizationIds.includes(tokenOrganizationId))
+			? tokenOrganizationId
+			: (organizationIds[0] ?? null);
 
+	const issuedAt =
+		typeof payload.iat === "number" ? new Date(payload.iat * 1000) : new Date();
+	const expiresAt =
+		typeof payload.exp === "number"
+			? new Date(payload.exp * 1000)
+			: new Date(Date.now() + 60 * 60 * 1000);
 	const sessionId = typeof payload.sid === "string" ? payload.sid : userId;
 
 	return {
@@ -61,14 +72,85 @@ async function sessionFromOAuthBearer(
 			id: sessionId,
 			userId,
 			activeOrganizationId,
-			expiresAt: new Date(((payload.exp as number) ?? 0) * 1000),
-			token: token,
+			expiresAt,
+			token,
 			ipAddress: null,
 			userAgent: null,
-			createdAt: new Date(((payload.iat as number) ?? 0) * 1000),
-			updatedAt: new Date(((payload.iat as number) ?? 0) * 1000),
+			createdAt: issuedAt,
+			updatedAt: issuedAt,
 		},
 	} as unknown as Session;
+}
+
+async function sessionFromBetterAuthJwtBearer(
+	headers: Headers,
+): Promise<Session | null> {
+	const token = getBearerToken(headers);
+	if (!token || !looksLikeJwt(token)) return null;
+
+	try {
+		const { payload } = await auth.api.verifyJWT({
+			body: { token },
+		});
+		return sessionFromJwtPayload(token, payload);
+	} catch {
+		return null;
+	}
+}
+
+async function sessionFromOAuthBearer(
+	headers: Headers,
+): Promise<Session | null> {
+	const token = getBearerToken(headers);
+	if (!token || !looksLikeJwt(token)) return null;
+
+	let payload: unknown;
+	try {
+		payload = await verifyAccessToken(token, {
+			jwksUrl: `${apiUrl}/api/auth/jwks`,
+			verifyOptions: {
+				issuer: apiUrl,
+				audience: [apiUrl, `${apiUrl}/`],
+			},
+		});
+	} catch {
+		return null;
+	}
+	if (!isRecord(payload)) return null;
+
+	const authorizedClientId =
+		typeof payload.azp === "string" ? payload.azp : null;
+	if (authorizedClientId && !TRUSTED_API_CLIENTS.has(authorizedClientId)) {
+		return null;
+	}
+
+	return sessionFromJwtPayload(token, payload);
+}
+
+async function resolveActiveOrganizationForSession(
+	session: Session | null,
+): Promise<Session | null> {
+	if (!session) return null;
+
+	const { activeOrganizationId } = await resolveSessionOrganizationState({
+		userId: session.user.id,
+		session: {
+			id: session.session.id,
+			activeOrganizationId: session.session.activeOrganizationId,
+		},
+	});
+
+	if (activeOrganizationId === session.session.activeOrganizationId) {
+		return session;
+	}
+
+	return {
+		...session,
+		session: {
+			...session.session,
+			activeOrganizationId,
+		},
+	};
 }
 
 export const createContext = async ({
@@ -82,8 +164,12 @@ export const createContext = async ({
 	});
 
 	if (!session) {
-		session = await sessionFromOAuthBearer(req.headers);
+		session =
+			(await sessionFromBetterAuthJwtBearer(req.headers)) ??
+			(await sessionFromOAuthBearer(req.headers));
 	}
+
+	session = await resolveActiveOrganizationForSession(session);
 
 	return createTRPCContext({
 		session,

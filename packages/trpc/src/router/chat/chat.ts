@@ -8,7 +8,7 @@ import { z } from "zod";
 import { protectedProcedure } from "../../trpc";
 import { uploadChatAttachment } from "./utils/upload-chat-attachment";
 
-const AVAILABLE_MODELS = [
+export const AVAILABLE_MODELS = [
 	{
 		id: "claude-code-default",
 		name: "Claude Code Default",

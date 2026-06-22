@@ -36,7 +36,7 @@ export function LocalHostServiceProvider({
 }) {
 	const { data: session } = authClient.useSession();
 	const collections = useCollections();
-	const { mutate: startHostService } =
+	const { mutateAsync: startHostService } =
 		electronTrpc.hostServiceCoordinator.start.useMutation();
 
 	const activeOrganizationId = env.SKIP_ENV_VALIDATION
@@ -63,7 +63,12 @@ export function LocalHostServiceProvider({
 
 	useEffect(() => {
 		for (const organizationId of organizationIdsToStart) {
-			startHostService({ organizationId });
+			void startHostService({ organizationId }).catch((error) => {
+				console.error(
+					`[LocalHostServiceProvider] Failed to start host-service for organization ${organizationId}`,
+					error,
+				);
+			});
 		}
 	}, [organizationIdsToStart, startHostService]);
 

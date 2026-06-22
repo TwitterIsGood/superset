@@ -67,6 +67,17 @@ const generateTaskDraftSchema = z.object({
 	prompt: z.string().trim().min(1).max(6000),
 });
 
+function claudeCodeDefaultModel() {
+	return {
+		id: "claude-code-default",
+		name: "Claude Code Default",
+		provider: "Claude Code",
+		providerId: "claude-code",
+		protocol: "claude-code",
+		modelId: "claude-code-default",
+	};
+}
+
 const claudeConfigSchema = z.object({
 	workspaceId: z.string().min(1),
 	providerId: z.string().min(1),
@@ -139,8 +150,8 @@ export const modelProvidersRouter = router({
 			),
 		),
 
-	listChatModels: queryProcedure.query(({ ctx }) =>
-		listModelProviders(ctx.db)
+	listChatModels: queryProcedure.query(async ({ ctx }) => {
+		const providerModels = listModelProviders(ctx.db)
 			.filter((provider) => provider.enabled && provider.hasSecret)
 			.flatMap((provider) =>
 				provider.models
@@ -156,8 +167,12 @@ export const modelProvidersRouter = router({
 						protocol: provider.protocol,
 						modelId: model.modelId,
 					})),
-			),
-	),
+			);
+		if (providerModels.length > 0) return providerModels;
+
+		const chat = await ctx.runtime.getChat();
+		return (await chat.hasUsableRuntimeEnv()) ? [claudeCodeDefaultModel()] : [];
+	}),
 
 	upsert: protectedProcedure
 		.input(upsertProviderSchema)

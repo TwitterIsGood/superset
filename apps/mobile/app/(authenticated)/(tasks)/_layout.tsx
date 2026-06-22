@@ -2,9 +2,16 @@ import { Stack } from "expo-router";
 
 export default function TasksLayout() {
 	return (
-		<Stack>
-			<Stack.Screen name="index" options={{ title: "Tasks" }} />
-			<Stack.Screen name="[id]" options={{ title: "Task" }} />
+		<Stack
+			screenOptions={{
+				headerStyle: { backgroundColor: "#090a0c" },
+				headerShadowVisible: false,
+				headerTintColor: "#f8fafc",
+				headerTitleStyle: { color: "#f8fafc" },
+			}}
+		>
+			<Stack.Screen name="index" options={{ headerShown: false }} />
+			<Stack.Screen name="[id]" options={{ headerShown: false }} />
 		</Stack>
 	);
 }

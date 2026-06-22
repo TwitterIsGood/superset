@@ -19,6 +19,7 @@ final class TabBarProps: ExpoSwiftUI.ViewProps {
   @Field var menuActions: [MenuAction] = []
   @Field var selectedTab: String = ""
   @Field var organizationName: String = ""
+  @Field var hidden: Bool = false
   var onTabSelect = EventDispatcher()
   var onMenuActionPress = EventDispatcher()
   var onSettingsPress = EventDispatcher()

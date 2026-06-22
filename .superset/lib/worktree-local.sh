@@ -100,6 +100,8 @@ worktree_env_requires_local_setup() {
     LOCAL_ELECTRIC_PORT \
     LOCAL_REDIS_PORT \
     LOCAL_KV_REST_PORT \
+    LOCAL_S3_PORT \
+    LOCAL_S3_CONSOLE_PORT \
     DATABASE_URL \
     DATABASE_URL_UNPOOLED \
     KV_REST_API_URL \
@@ -114,12 +116,14 @@ worktree_env_requires_local_setup() {
     [ -n "$(worktree_env_value "$env_path" "$required_key")" ] || return 0
   done
 
-  local local_pg local_neon local_electric local_redis local_kv api_port desktop_port wrangler_port relay_port
+  local local_pg local_neon local_electric local_redis local_kv local_s3 local_s3_console api_port desktop_port wrangler_port relay_port
   local_pg="$(worktree_env_value "$env_path" LOCAL_PG_PORT)"
   local_neon="$(worktree_env_value "$env_path" LOCAL_NEON_PROXY_PORT)"
   local_electric="$(worktree_env_value "$env_path" LOCAL_ELECTRIC_PORT)"
   local_redis="$(worktree_env_value "$env_path" LOCAL_REDIS_PORT)"
   local_kv="$(worktree_env_value "$env_path" LOCAL_KV_REST_PORT)"
+  local_s3="$(worktree_env_value "$env_path" LOCAL_S3_PORT)"
+  local_s3_console="$(worktree_env_value "$env_path" LOCAL_S3_CONSOLE_PORT)"
   api_port="$(worktree_env_value "$env_path" API_PORT)"
   desktop_port="$(worktree_env_value "$env_path" DESKTOP_VITE_PORT)"
   wrangler_port="$(worktree_env_value "$env_path" WRANGLER_PORT)"
@@ -134,6 +138,8 @@ worktree_env_requires_local_setup() {
   worktree_url_uses_port "$(worktree_env_value "$env_path" KV_REST_API_URL)" "$local_kv" || return 0
   worktree_url_uses_port "$(worktree_env_value "$env_path" KV_URL)" "$local_redis" || return 0
   worktree_url_uses_port "$(worktree_env_value "$env_path" ELECTRIC_URL)" "$local_electric" || return 0
+  [ -n "$local_s3" ] || return 0
+  [ -n "$local_s3_console" ] || return 0
   worktree_url_uses_port "$(worktree_env_value "$env_path" NEXT_PUBLIC_API_URL)" "$api_port" || return 0
   worktree_url_uses_port "$(worktree_env_value "$env_path" NEXT_PUBLIC_DESKTOP_URL)" "$desktop_port" || return 0
   worktree_url_uses_port "$(worktree_env_value "$env_path" RELAY_URL)" "$relay_port" || return 0

@@ -52,6 +52,10 @@
 			"types": "./src/host-agent-presets.ts",
 			"default": "./src/host-agent-presets.ts"
 		},
+		"./default-terminal-presets": {
+			"types": "./src/default-terminal-presets.ts",
+			"default": "./src/default-terminal-presets.ts"
+		},
 		"./agent-launch": {
 			"types": "./src/agent-launch.ts",
 			"default": "./src/agent-launch.ts"

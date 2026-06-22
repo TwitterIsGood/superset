@@ -25,6 +25,8 @@
 		"dev:worktree:status": "./.superset/worktree-dev.sh status",
 		"dev:worktree:stop": "./.superset/worktree-dev.sh stop",
 		"dev:worktree:cleanup": "./.superset/worktree-dev.sh cleanup",
+		"dev:worktree": "bun run scripts/dev-worktree.ts",
+		"dev:prepare": "bun run scripts/dev-worktree.ts --prepare-only",
 		"dev:caddy": "dotenv -- caddy run --config Caddyfile",
 		"e2e:workspace-fixture": "bun run scripts/e2e-workspace-fixture.ts",
 		"mcp:desktop": "bun run packages/desktop-mcp/src/bin.ts",

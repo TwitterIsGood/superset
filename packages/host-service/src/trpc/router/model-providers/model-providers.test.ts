@@ -24,6 +24,11 @@ function createCaller() {
 		db,
 		isAuthenticated: true,
 		hostServiceBaseUrl: "http://127.0.0.1:4879",
+		runtime: {
+			getChat: mock(async () => ({
+				hasUsableRuntimeEnv: mock(async () => false),
+			})),
+		},
 	} as unknown as HostServiceContext;
 	return { caller: modelProvidersRouter.createCaller(ctx), db };
 }
@@ -59,6 +64,37 @@ describe("modelProvidersRouter", () => {
 		expect(chatModels[0]?.id).toStartWith("anthropic/superset:");
 		expect(chatModels[0]?.provider).toBe("Gateway");
 		expect(chatModels[0]?.modelId).toBe("gpt-5.5");
+	});
+
+	it("exposes Claude Code default only when the local chat runtime is usable", async () => {
+		const db = createTestDb();
+		const ctx = {
+			db,
+			isAuthenticated: true,
+			hostServiceBaseUrl: "http://127.0.0.1:4879",
+			runtime: {
+				getChat: mock(async () => ({
+					hasUsableRuntimeEnv: mock(async () => true),
+				})),
+			},
+		} as unknown as HostServiceContext;
+		const caller = modelProvidersRouter.createCaller(ctx);
+
+		expect(await caller.listChatModels()).toEqual([
+			{
+				id: "claude-code-default",
+				name: "Claude Code Default",
+				provider: "Claude Code",
+				providerId: "claude-code",
+				protocol: "claude-code",
+				modelId: "claude-code-default",
+			},
+		]);
+	});
+
+	it("returns no chat models when no provider or local runtime is usable", async () => {
+		const { caller } = createCaller();
+		expect(await caller.listChatModels()).toEqual([]);
 	});
 
 	it("fetches remote models with saved credentials and sanitized errors", async () => {

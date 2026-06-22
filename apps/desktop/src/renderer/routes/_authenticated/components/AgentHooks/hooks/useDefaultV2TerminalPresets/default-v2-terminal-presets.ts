@@ -1,14 +1,8 @@
 import type { HostAgentConfig } from "@superset/host-service/settings";
+import { DEFAULT_V2_TERMINAL_PRESET_IDS } from "@superset/shared/default-terminal-presets";
 import { getPresetById } from "@superset/shared/host-agent-presets";
 import { getAgentCommandText } from "renderer/lib/agent-launch-command";
 import type { V2TerminalPresetRow } from "renderer/routes/_authenticated/providers/CollectionsProvider/dashboardSidebarLocal/schema";
-
-export const DEFAULT_V2_TERMINAL_PRESET_IDS = [
-	"claude",
-	"codex",
-	"opencode",
-	"copilot",
-] as const;
 
 interface CreateDefaultV2TerminalPresetRowsInput {
 	agents: readonly HostAgentConfig[];

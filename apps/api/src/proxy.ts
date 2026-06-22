@@ -26,7 +26,10 @@ function getAllowedOrigins(deploymentOrigin: string) {
 
 function getCorsHeaders(origin: string | null, deploymentOrigin: string) {
 	const allowedOrigins = getAllowedOrigins(deploymentOrigin);
-	const isAllowed = origin && allowedOrigins.includes(origin);
+	const isAllowed =
+		origin &&
+		(allowedOrigins.includes(origin) ||
+			/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin));
 	return {
 		"Access-Control-Allow-Origin": isAllowed ? origin : "",
 		"Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",

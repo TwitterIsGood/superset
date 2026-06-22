@@ -17,6 +17,7 @@ export interface TabBarViewProps {
 	menuActions?: MenuAction[];
 	selectedTab: string;
 	organizationName: string;
+	hidden?: boolean;
 	style?: import("react-native").StyleProp<import("react-native").ViewStyle>;
 	onTabSelect?: (tab: string) => void;
 	onMenuActionPress?: (action: string) => void;

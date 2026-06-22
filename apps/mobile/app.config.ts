@@ -27,6 +27,7 @@ export default ({ config }: ConfigContext) => ({
 		supportsTablet: true,
 		bundleIdentifier: "sh.superset.mobile",
 		infoPlist: {
+			EXDevMenuShowFloatingActionButton: false,
 			ITSAppUsesNonExemptEncryption: false,
 		},
 	},

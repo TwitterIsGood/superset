@@ -77,7 +77,8 @@ app.commandLine.appendSwitch("force-color-profile", "srgb");
 const cdpPort =
 	env.NODE_ENV === "development"
 		? (process.env.DESKTOP_AUTOMATION_PORT ??
-			process.env.RENDERER_REMOTE_DEBUG_PORT)
+			process.env.RENDERER_REMOTE_DEBUG_PORT ??
+			"9322")
 		: undefined;
 
 if (cdpPort) {

@@ -63,6 +63,7 @@ export const BUILTIN_TERMINAL_AGENTS = [
 		description:
 			"Anthropic's coding agent for reading code, editing files, and running terminal workflows.",
 		command: "claude --dangerously-skip-permissions",
+		promptCommand: "claude --dangerously-skip-permissions --print",
 		includeInDefaultTerminalPresets: true,
 	}),
 	createBuiltinTerminalAgent({
@@ -80,7 +81,7 @@ export const BUILTIN_TERMINAL_AGENTS = [
 		description:
 			"OpenAI's coding agent for reading, modifying, and running code across tasks.",
 		command: "codex --dangerously-bypass-approvals-and-sandbox",
-		promptCommand: "codex --dangerously-bypass-approvals-and-sandbox --",
+		promptCommand: "codex --dangerously-bypass-approvals-and-sandbox exec",
 		includeInDefaultTerminalPresets: true,
 	}),
 	createBuiltinTerminalAgent({

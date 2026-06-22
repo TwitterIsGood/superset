@@ -34,6 +34,7 @@ export interface Host {
 	name: string;
 	online: boolean;
 	organizationId: string;
+	updatedAt: Date;
 }
 
 export type HostListResponse = Array<Host>;

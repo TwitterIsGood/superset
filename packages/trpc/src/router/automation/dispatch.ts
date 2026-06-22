@@ -591,7 +591,7 @@ async function listAgentConfigsOnHost(args: {
 	hostId: string;
 	jwt: string;
 }): Promise<HostAgentConfig[]> {
-	return relayQuery<HostAgentConfig[]>(
+	return relayQuery<undefined, HostAgentConfig[]>(
 		{
 			relayUrl: args.relayUrl,
 			hostId: args.hostId,
@@ -599,6 +599,7 @@ async function listAgentConfigsOnHost(args: {
 			timeoutMs: 20_000,
 		},
 		"settings.agentConfigs.list",
+		undefined,
 	);
 }
 
