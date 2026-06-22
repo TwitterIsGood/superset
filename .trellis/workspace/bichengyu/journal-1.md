@@ -861,3 +861,37 @@ Moved capability package artifacts to server-owned object storage with internal 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 26: Fix Chat stop and resend handling
+
+**Date**: 2026-06-22
+**Task**: Fix Chat stop and resend handling
+**Package**: desktop
+**Branch**: `codex/chat-abort-retention`
+
+### Summary
+
+Fixed Chat stop/abort handling so interrupted assistant output is retained, abort errors are suppressed, running state clears before resending, and standalone/workspace runtimes persist stopped turns. Verified with focused tests, lint, typecheck, and desktop worktree E2E.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8096f61d8` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
