@@ -245,3 +245,37 @@ Fixed PR #16 review blockers: generated Control Chat migration, added runtime ab
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: PR16 CI Test Follow-up
+
+**Date**: 2026-06-22
+**Task**: PR16 CI Test Follow-up
+**Package**: desktop
+**Branch**: `codex/control-chat-tools-automations`
+
+### Summary
+
+Fixed GitHub CI Test failure by moving Control Chat runtime status helpers into a pure module so runtime status tests do not import the DB-backed runtime without DATABASE_URL; verified DATABASE_URL= packages/trpc tests plus lint/typecheck/full test locally.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `94af05a0d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
