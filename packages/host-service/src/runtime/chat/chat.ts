@@ -112,6 +112,21 @@ interface RuntimeSession {
 	pendingQuestionResponses: Map<string, Promise<RuntimeQuestionResult>>;
 }
 
+type HarnessWithOptionalStreamIdle = {
+	waitForCurrentThreadStreamIdle?: () => Promise<void>;
+};
+
+async function abortAndWaitForIdle(runtime: RuntimeSession): Promise<void> {
+	runtime.harness.abort();
+	const waitForIdle = (
+		runtime.harness as unknown as HarnessWithOptionalStreamIdle
+	).waitForCurrentThreadStreamIdle;
+	if (waitForIdle) {
+		await waitForIdle.call(runtime.harness);
+	}
+	runtime.lastErrorMessage = null;
+}
+
 function respondToQuestionWithOptimisticState(
 	runtime: RuntimeSession,
 	payload: ChatQuestionPayload,
@@ -514,6 +529,9 @@ export class ChatRuntimeManager {
 				runtime.pendingSandboxQuestion = null;
 				runtime.answeredQuestionIds.clear();
 				runtime.pendingQuestionResponses.clear();
+				if (event.reason === "aborted") {
+					runtime.lastErrorMessage = null;
+				}
 			}
 		});
 	}
@@ -834,7 +852,7 @@ When you need to ask the user ANY question — including simple yes/no, confirma
 			input.sessionId,
 			input.workspaceId,
 		);
-		runtime.harness.abort();
+		await abortAndWaitForIdle(runtime);
 	}
 
 	async respondToApproval(input: {

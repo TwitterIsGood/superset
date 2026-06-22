@@ -1,1 +1,5 @@
-export { type ChatSendMessageInput, toSendFailureMessage } from "./sendMessage";
+export {
+	type ChatSendMessageInput,
+	isChatAbortError,
+	toSendFailureMessage,
+} from "./sendMessage";

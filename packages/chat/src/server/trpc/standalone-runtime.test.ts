@@ -280,6 +280,192 @@ describe("StandaloneChatRuntimeManager title generation", () => {
 		).toContainEqual({ type: "text", text: "第一段第二段" });
 	});
 
+	it("returns cloned message snapshots that cannot mutate runtime state", async () => {
+		let finishProvider!: () => void;
+		const provider: StandaloneChatProvider = {
+			sendTurn: mock(async (args) => {
+				args.onEvent({ type: "text-delta", text: "流式内容" });
+				await new Promise<void>((resolve) => {
+					finishProvider = resolve;
+				});
+				return { text: "流式内容", reasoningText: "" };
+			}),
+		};
+		const manager = new StandaloneChatRuntimeManager(
+			createApiClient(),
+			provider,
+		);
+
+		const sendPromise = manager.sendMessage({
+			sessionId: SESSION_ID,
+			payload: { content: "测试克隆边界。" },
+			metadata: { model: "gpt-5.5" },
+		});
+
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		const currentMessage = manager.getDisplayState(SESSION_ID).currentMessage;
+		const currentTextPart = currentMessage?.content.find(
+			(part) => part.type === "text",
+		);
+		if (currentTextPart?.type === "text") {
+			currentTextPart.text = "被调用方篡改";
+		}
+		const freshCurrentTextPart = manager
+			.getDisplayState(SESSION_ID)
+			.currentMessage?.content.find((part) => part.type === "text");
+		expect(freshCurrentTextPart).toEqual({
+			type: "text",
+			text: "流式内容",
+		});
+
+		finishProvider();
+		await sendPromise;
+
+		const returnedMessages = await manager.listMessages(SESSION_ID);
+		const returnedAssistantText = returnedMessages
+			.at(-1)
+			?.content.find((part) => part.type === "text");
+		if (returnedAssistantText?.type === "text") {
+			returnedAssistantText.text = "被调用方篡改";
+		}
+		const freshAssistantText = (await manager.listMessages(SESSION_ID))
+			.at(-1)
+			?.content.find((part) => part.type === "text");
+		expect(freshAssistantText).toEqual({
+			type: "text",
+			text: "流式内容",
+		});
+	});
+
+	it("persists streamed content as an aborted assistant turn when the user stops", async () => {
+		const appendMessageInputs: Array<unknown> = [];
+		const provider: StandaloneChatProvider = {
+			sendTurn: mock(async (args) => {
+				args.onEvent({ type: "text-delta", text: "已经输出的内容" });
+				return await new Promise<never>((_resolve, reject) => {
+					args.signal.addEventListener(
+						"abort",
+						() => reject(new Error("Chat request was aborted.")),
+						{ once: true },
+					);
+				});
+			}),
+		};
+		const manager = new StandaloneChatRuntimeManager(
+			createApiClient({ appendMessageInputs }),
+			provider,
+		);
+
+		const sendPromise = manager.sendMessage({
+			sessionId: SESSION_ID,
+			payload: { content: "开始长回复。" },
+			metadata: { model: "gpt-5.5" },
+		});
+
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(manager.getDisplayState(SESSION_ID).isRunning).toBe(true);
+
+		await manager.abort(SESSION_ID);
+		await expect(sendPromise).resolves.toBeUndefined();
+
+		const displayState = manager.getDisplayState(SESSION_ID);
+		expect(displayState.isRunning).toBe(false);
+		expect(displayState.currentMessage).toBeNull();
+		expect(displayState.errorMessage).toBeNull();
+		expect((await manager.listMessages(SESSION_ID)).at(-1)).toMatchObject({
+			role: "assistant",
+			stopReason: "aborted",
+			content: expect.arrayContaining([
+				{ type: "text", text: "已经输出的内容" },
+			]),
+		});
+		expect(appendMessageInputs.at(-1)).toMatchObject({
+			role: "assistant",
+			stopReason: "aborted",
+			content: expect.arrayContaining([
+				{ type: "text", text: "已经输出的内容" },
+			]),
+		});
+	});
+
+	it("does not let a stopped turn clear a newer in-flight turn", async () => {
+		let callCount = 0;
+		let rejectFirstTurn!: (error: Error) => void;
+		let finishSecondTurn!: () => void;
+		const provider: StandaloneChatProvider = {
+			sendTurn: mock(async (args) => {
+				callCount += 1;
+				if (callCount === 1) {
+					args.onEvent({ type: "text-delta", text: "第一条 partial" });
+					return await new Promise<never>((_resolve, reject) => {
+						rejectFirstTurn = reject;
+					});
+				}
+
+				args.onEvent({ type: "text-delta", text: "第二条 partial" });
+				await new Promise<void>((resolve) => {
+					finishSecondTurn = resolve;
+				});
+				return { text: "第二条完成", reasoningText: "" };
+			}),
+		};
+		const manager = new StandaloneChatRuntimeManager(
+			createApiClient(),
+			provider,
+		);
+
+		const firstSend = manager.sendMessage({
+			sessionId: SESSION_ID,
+			payload: { content: "第一条。" },
+			metadata: { model: "gpt-5.5" },
+		});
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		await manager.abort(SESSION_ID);
+
+		const secondSend = manager.sendMessage({
+			sessionId: SESSION_ID,
+			payload: { content: "第二条。" },
+			metadata: { model: "gpt-5.5" },
+		});
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		rejectFirstTurn(new Error("Chat request was aborted."));
+		await expect(firstSend).resolves.toBeUndefined();
+		expect(manager.getDisplayState(SESSION_ID)).toMatchObject({
+			isRunning: true,
+			currentMessage: {
+				role: "assistant",
+				content: expect.arrayContaining([
+					{ type: "text", text: "第二条 partial" },
+				]),
+			},
+			errorMessage: null,
+		});
+
+		finishSecondTurn();
+		await secondSend;
+
+		const messages = await manager.listMessages(SESSION_ID);
+		expect(messages).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					role: "assistant",
+					stopReason: "aborted",
+					content: expect.arrayContaining([
+						{ type: "text", text: "第一条 partial" },
+					]),
+				}),
+				expect.objectContaining({
+					role: "assistant",
+					stopReason: "end_turn",
+					content: expect.arrayContaining([
+						{ type: "text", text: "第二条完成" },
+					]),
+				}),
+			]),
+		);
+	});
+
 	it("persists reasoning content with the completed assistant turn", async () => {
 		const provider: StandaloneChatProvider = {
 			sendTurn: mock(async (args) => {

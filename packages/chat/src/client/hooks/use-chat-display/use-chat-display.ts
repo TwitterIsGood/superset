@@ -15,6 +15,7 @@ type ListMessagesOutput = SessionOutputs["listMessages"];
 type HistoryMessage = ListMessagesOutput[number];
 type HistoryMessagePart = HistoryMessage["content"][number];
 type HistoryMessageContent = HistoryMessagePart[];
+type CurrentMessage = DisplayStateOutput["currentMessage"];
 
 export type ChatDisplayState = DisplayStateOutput;
 export type ChatHistoryMessages = ListMessagesOutput;
@@ -120,6 +121,72 @@ function countFileMessages(messages: ListMessagesOutput): number {
 	).length;
 }
 
+function toMessageTimestamp(message: { createdAt?: unknown }): number {
+	const value = message.createdAt;
+	if (value instanceof Date) return value.getTime();
+	if (typeof value === "string" || typeof value === "number") {
+		const timestamp = new Date(value).getTime();
+		if (Number.isFinite(timestamp)) return timestamp;
+	}
+	return 0;
+}
+
+function getMessageContentSignature(message: {
+	role?: string;
+	content?: unknown;
+}): string | null {
+	if (message.role !== "assistant") return null;
+	if (!Array.isArray(message.content) || message.content.length === 0) {
+		return null;
+	}
+	return JSON.stringify(message.content);
+}
+
+export function mergeRetainedAbortedMessages(
+	messages: ListMessagesOutput,
+	retainedMessages: ListMessagesOutput,
+): ListMessagesOutput {
+	if (retainedMessages.length === 0) return messages;
+
+	const merged = [...messages];
+	for (const retainedMessage of retainedMessages) {
+		const retainedSignature = getMessageContentSignature(retainedMessage);
+		if (!retainedSignature) continue;
+		const alreadyPresent = merged.some(
+			(message) =>
+				message.id === retainedMessage.id ||
+				getMessageContentSignature(message) === retainedSignature,
+		);
+		if (alreadyPresent) continue;
+
+		const retainedTimestamp = toMessageTimestamp(retainedMessage);
+		const insertIndex = merged.findIndex(
+			(message) => toMessageTimestamp(message) > retainedTimestamp,
+		);
+		if (insertIndex === -1) {
+			merged.push(retainedMessage);
+		} else {
+			merged.splice(insertIndex, 0, retainedMessage);
+		}
+	}
+
+	return merged as ListMessagesOutput;
+}
+
+export function toRetainedAbortedMessage(
+	currentMessage: CurrentMessage | null,
+): HistoryMessage | null {
+	if (!currentMessage || currentMessage.role !== "assistant") return null;
+	if (currentMessage.content.length === 0) return null;
+
+	const retainedMessage = {
+		...currentMessage,
+		stopReason: "aborted",
+	} as HistoryMessage & { errorMessage?: string | null };
+	delete retainedMessage.errorMessage;
+	return retainedMessage;
+}
+
 function getLegacyImagePayload(
 	payload: SessionInputs["sendMessage"]["payload"],
 ): Array<{ data: string; mimeType: string }> {
@@ -138,6 +205,8 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 	const { sessionId, cwd, enabled = true, fps = 4 } = options;
 	const utils = chatRuntimeServiceTrpc.useUtils();
 	const [commandError, setCommandError] = useState<unknown>(null);
+	const [retainedAbortedMessages, setRetainedAbortedMessages] =
+		useState<ListMessagesOutput>([]);
 	const sessionCommandInput =
 		sessionId === null ? null : { sessionId, ...(cwd ? { cwd } : {}) };
 	const queryInput = sessionCommandInput ?? skipToken;
@@ -190,9 +259,14 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 		messagesQuery.data === undefined &&
 		messagesQuery.isLoading;
 	const historicalMessages = sessionId ? (messagesQuery.data ?? []) : [];
+	const retainedHistoricalMessages = useMemo(
+		() =>
+			mergeRetainedAbortedMessages(historicalMessages, retainedAbortedMessages),
+		[historicalMessages, retainedAbortedMessages],
+	);
 	const latestAssistantErrorMessage = isRunning
 		? null
-		: findLatestAssistantErrorMessage(historicalMessages);
+		: findLatestAssistantErrorMessage(retainedHistoricalMessages);
 	const [optimisticUserMessage, setOptimisticUserMessage] = useState<
 		ListMessagesOutput[number] | null
 	>(null);
@@ -206,7 +280,7 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 		const optimisticText = optimisticTextRef.current;
 
 		const found = optimisticText
-			? historicalMessages.some(
+			? retainedHistoricalMessages.some(
 					(message: HistoryMessage) =>
 						message.role === "user" &&
 						message.content.some(
@@ -217,7 +291,9 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 						),
 				)
 			: (() => {
-					const currentFileMessageCount = countFileMessages(historicalMessages);
+					const currentFileMessageCount = countFileMessages(
+						retainedHistoricalMessages,
+					);
 					return (
 						fileMessageCountAtSendRef.current !== null &&
 						currentFileMessageCount > fileMessageCountAtSendRef.current
@@ -229,18 +305,27 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 		optimisticTextRef.current = null;
 		optimisticIdRef.current = null;
 		fileMessageCountAtSendRef.current = null;
-	}, [historicalMessages]);
+	}, [retainedHistoricalMessages]);
+
+	useEffect(() => {
+		setRetainedAbortedMessages([]);
+	}, []);
 
 	const messages = useMemo(() => {
 		const withOptimistic = optimisticUserMessage
-			? [...historicalMessages, optimisticUserMessage]
-			: historicalMessages;
+			? [...retainedHistoricalMessages, optimisticUserMessage]
+			: retainedHistoricalMessages;
 		return withoutActiveTurnAssistantHistory({
 			messages: withOptimistic,
 			currentMessage,
 			isRunning,
 		});
-	}, [historicalMessages, optimisticUserMessage, currentMessage, isRunning]);
+	}, [
+		retainedHistoricalMessages,
+		optimisticUserMessage,
+		currentMessage,
+		isRunning,
+	]);
 
 	const commands = useMemo(
 		() => ({
@@ -271,8 +356,9 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 					optimisticTextRef.current = text || null;
 					optimisticIdRef.current = optimisticId;
 					if (!text) {
-						fileMessageCountAtSendRef.current =
-							countFileMessages(historicalMessages);
+						fileMessageCountAtSendRef.current = countFileMessages(
+							retainedHistoricalMessages,
+						);
 					}
 					const content: HistoryMessageContent = [];
 					for (const file of files) {
@@ -331,8 +417,31 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 			stop: async () => {
 				if (!sessionCommandInput) return;
 				setCommandError(null);
+				const retainedMessage = toRetainedAbortedMessage(currentMessage);
+				const nextRetainedMessages = retainedMessage
+					? mergeRetainedAbortedMessages(retainedAbortedMessages, [
+							retainedMessage,
+						] as ListMessagesOutput)
+					: retainedAbortedMessages;
+				if (retainedMessage) {
+					setRetainedAbortedMessages(nextRetainedMessages);
+				}
 				try {
-					return await utils.client.session.stop.mutate(sessionCommandInput);
+					const result =
+						await utils.client.session.stop.mutate(sessionCommandInput);
+					const [nextMessages, nextDisplayState] = await Promise.all([
+						utils.client.session.listMessages.query(sessionCommandInput),
+						utils.client.session.getDisplayState.query(sessionCommandInput),
+					]);
+					utils.session.listMessages.setData(
+						sessionCommandInput,
+						mergeRetainedAbortedMessages(nextMessages, nextRetainedMessages),
+					);
+					utils.session.getDisplayState.setData(
+						sessionCommandInput,
+						nextDisplayState,
+					);
+					return result;
 				} catch (error) {
 					setCommandError(error);
 					return;
@@ -341,8 +450,31 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 			abort: async () => {
 				if (!sessionCommandInput) return;
 				setCommandError(null);
+				const retainedMessage = toRetainedAbortedMessage(currentMessage);
+				const nextRetainedMessages = retainedMessage
+					? mergeRetainedAbortedMessages(retainedAbortedMessages, [
+							retainedMessage,
+						] as ListMessagesOutput)
+					: retainedAbortedMessages;
+				if (retainedMessage) {
+					setRetainedAbortedMessages(nextRetainedMessages);
+				}
 				try {
-					return await utils.client.session.abort.mutate(sessionCommandInput);
+					const result =
+						await utils.client.session.abort.mutate(sessionCommandInput);
+					const [nextMessages, nextDisplayState] = await Promise.all([
+						utils.client.session.listMessages.query(sessionCommandInput),
+						utils.client.session.getDisplayState.query(sessionCommandInput),
+					]);
+					utils.session.listMessages.setData(
+						sessionCommandInput,
+						mergeRetainedAbortedMessages(nextMessages, nextRetainedMessages),
+					);
+					utils.session.getDisplayState.setData(
+						sessionCommandInput,
+						nextDisplayState,
+					);
+					return result;
 				} catch (error) {
 					setCommandError(error);
 					return;
@@ -394,7 +526,15 @@ export function useChatDisplay(options: UseChatDisplayOptions) {
 				}
 			},
 		}),
-		[cwd, historicalMessages, sessionCommandInput, sessionId, utils],
+		[
+			cwd,
+			currentMessage,
+			retainedAbortedMessages,
+			retainedHistoricalMessages,
+			sessionCommandInput,
+			sessionId,
+			utils,
+		],
 	);
 
 	return {

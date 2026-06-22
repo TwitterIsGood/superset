@@ -3,6 +3,8 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { ChatRuntimeServiceRouter } from "../../../server/trpc";
 import {
 	findLatestAssistantErrorMessage,
+	mergeRetainedAbortedMessages,
+	toRetainedAbortedMessage,
 	withoutActiveTurnAssistantHistory,
 } from "./use-chat-display";
 
@@ -20,6 +22,17 @@ function userMessage(id: string, text: string): ListMessagesOutput[number] {
 	} as unknown as ListMessagesOutput[number];
 }
 
+function userMessageAt(
+	id: string,
+	text: string,
+	createdAt: string,
+): ListMessagesOutput[number] {
+	return {
+		...userMessage(id, text),
+		createdAt: new Date(createdAt),
+	} as unknown as ListMessagesOutput[number];
+}
+
 function assistantMessage(
 	id: string,
 	text: string,
@@ -29,6 +42,17 @@ function assistantMessage(
 		role: "assistant",
 		content: [{ type: "text", text }],
 		createdAt: new Date("2026-02-26T00:00:00.000Z"),
+	} as unknown as ListMessagesOutput[number];
+}
+
+function assistantMessageAt(
+	id: string,
+	text: string,
+	createdAt: string,
+): ListMessagesOutput[number] {
+	return {
+		...assistantMessage(id, text),
+		createdAt: new Date(createdAt),
 	} as unknown as ListMessagesOutput[number];
 }
 
@@ -120,5 +144,56 @@ describe("findLatestAssistantErrorMessage", () => {
 		]);
 
 		expect(error).toBeNull();
+	});
+});
+
+describe("retained aborted messages", () => {
+	it("keeps an interrupted assistant turn ordered before a later user message", () => {
+		const retained = toRetainedAbortedMessage(
+			asCurrentMessage(
+				assistantMessageAt(
+					"a_interrupted",
+					"partial answer",
+					"2026-02-26T00:00:01.000Z",
+				),
+			),
+		);
+		expect(retained).not.toBeNull();
+
+		const merged = mergeRetainedAbortedMessages(
+			[
+				userMessageAt("u_1", "first", "2026-02-26T00:00:00.000Z"),
+				userMessageAt("u_2", "next", "2026-02-26T00:00:02.000Z"),
+			],
+			[retained as ListMessagesOutput[number]],
+		);
+
+		expect(merged.map((message) => message.id)).toEqual([
+			"u_1",
+			"a_interrupted",
+			"u_2",
+		]);
+		expect(merged[1]).toMatchObject({
+			role: "assistant",
+			stopReason: "aborted",
+			content: [{ type: "text", text: "partial answer" }],
+		});
+	});
+
+	it("does not duplicate a retained turn already present in history", () => {
+		const retained = {
+			...assistantMessage("a_interrupted", "partial answer"),
+			stopReason: "aborted",
+		} as unknown as ListMessagesOutput[number];
+
+		const merged = mergeRetainedAbortedMessages(
+			[userMessage("u_1", "first"), retained],
+			[retained],
+		);
+
+		expect(merged.map((message) => message.id)).toEqual([
+			"u_1",
+			"a_interrupted",
+		]);
 	});
 });
