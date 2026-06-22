@@ -3,7 +3,7 @@ import {
 	ControlChatRunAbortedError,
 	isControlChatRunAbortedStatus,
 	resolveControlChatTurnStatus,
-} from "./runtime";
+} from "./runtime-status";
 
 describe("control chat runtime status", () => {
 	it("marks a turn failed when any tool failed", () => {

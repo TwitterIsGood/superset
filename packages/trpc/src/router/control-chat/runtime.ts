@@ -14,6 +14,12 @@ import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { decryptSecret } from "../project/secrets/utils/crypto";
 import { getControlChatIntentFlags } from "./intent";
 import {
+	ControlChatRunAbortedError,
+	type ControlChatTurnResult,
+	isControlChatRunAbortedStatus,
+	resolveControlChatTurnStatus,
+} from "./runtime-status";
+import {
 	type ControlChatRendererContext,
 	type ControlChatToolName,
 	controlChatToolSchemas,
@@ -44,19 +50,6 @@ export interface ControlChatRunInput {
 	modelId?: string | null;
 }
 
-export interface ControlChatTurnResult {
-	content: ControlChatMessageContent[];
-	status: "completed" | "failed";
-	error: string | null;
-}
-
-export class ControlChatRunAbortedError extends Error {
-	constructor() {
-		super("Control Chat run was stopped by the user.");
-		this.name = "ControlChatRunAbortedError";
-	}
-}
-
 type ControlChatModelSelection = {
 	providerId: string;
 	protocol: "anthropic" | "openai-chat" | "openai-responses";
@@ -71,25 +64,6 @@ type ModelControlPlan = {
 };
 
 const CONTROL_CHAT_MODEL_TIMEOUT_MS = 45_000;
-
-export function isControlChatRunAbortedStatus(
-	status: string | null | undefined,
-) {
-	return status === "aborted";
-}
-
-export function resolveControlChatTurnStatus(args: {
-	hasToolFailure: boolean;
-	firstToolError: string | null;
-}): Pick<ControlChatTurnResult, "status" | "error"> {
-	if (args.hasToolFailure) {
-		return {
-			status: "failed",
-			error: args.firstToolError ?? "One or more Control Chat tools failed.",
-		};
-	}
-	return { status: "completed", error: null };
-}
 
 async function throwIfRunAborted(input: ControlChatRunInput) {
 	const [run] = await db

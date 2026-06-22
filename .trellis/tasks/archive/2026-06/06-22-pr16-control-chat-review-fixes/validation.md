@@ -29,6 +29,8 @@ No review finding was rejected.
   state until the user sends or selects a session.
 - Added safe Zustand persistence storage for non-browser test/runtime contexts.
 - Added failed-turn status resolution so tool failures persist as failed runs.
+- Split Control Chat runtime status helpers into a pure module so CI unit tests
+  do not import the DB-backed runtime when no `DATABASE_URL` is present.
 
 ## Commands Run
 
@@ -43,6 +45,13 @@ bun test packages/trpc/src/router/control-chat/intent.test.ts packages/trpc/src/
 ```
 
 Result: passed; 17 tests passed.
+
+```bash
+DATABASE_URL= bun run --cwd packages/trpc test
+```
+
+Result: passed; 95 tests passed. This covers the GitHub CI environment where
+`packages/trpc` tests run without database connection env vars.
 
 ```bash
 bun run lint
