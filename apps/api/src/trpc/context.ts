@@ -9,25 +9,16 @@ import { createTRPCContext } from "@superset/trpc";
 import { verifyAccessToken } from "better-auth/oauth2";
 import { eq } from "drizzle-orm";
 import { env } from "@/env";
+import {
+	getBearerToken,
+	isRecord,
+	looksLikeJwt,
+	sessionFromVerifiedBetterAuthJwtBearer,
+} from "./better-auth-jwt-session";
 
 const apiUrl = env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "");
 
 const TRUSTED_API_CLIENTS = new Set(["superset-cli"]);
-
-function looksLikeJwt(token: string): boolean {
-	const parts = token.split(".");
-	return parts.length === 3 && parts.every(Boolean);
-}
-
-function getBearerToken(headers: Headers): string | null {
-	const authorization = headers.get("authorization");
-	const match = authorization?.match(/^Bearer\s+(.+)$/i);
-	return match?.[1] ?? null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 async function sessionFromJwtPayload(
 	token: string,
@@ -85,17 +76,15 @@ async function sessionFromJwtPayload(
 async function sessionFromBetterAuthJwtBearer(
 	headers: Headers,
 ): Promise<Session | null> {
-	const token = getBearerToken(headers);
-	if (!token || !looksLikeJwt(token)) return null;
-
-	try {
-		const { payload } = await auth.api.verifyJWT({
-			body: { token },
-		});
-		return sessionFromJwtPayload(token, payload);
-	} catch {
-		return null;
-	}
+	return sessionFromVerifiedBetterAuthJwtBearer(headers, {
+		verifyJwt: async (token) => {
+			const { payload } = await auth.api.verifyJWT({
+				body: { token },
+			});
+			return payload;
+		},
+		sessionFromJwtPayload,
+	});
 }
 
 async function sessionFromOAuthBearer(

@@ -124,8 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 					return;
 				}
 
-				setAuthToken(null);
-				await authClient.signOut({ fetchOptions: { throw: false } });
 				setAuthToken(data.token);
 				setJwt(null);
 				try {

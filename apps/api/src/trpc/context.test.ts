@@ -8,6 +8,7 @@ describe("api tRPC context", () => {
 	it("accepts Better Auth JWT bearer tokens for protected mobile tRPC calls", () => {
 		expect(SOURCE).toContain("sessionFromBetterAuthJwtBearer");
 		expect(SOURCE).toContain("auth.api.verifyJWT");
+		expect(SOURCE).toContain("sessionFromVerifiedBetterAuthJwtBearer");
 		expect(SOURCE).toContain("sessionFromJwtPayload");
 		expect(SOURCE).toContain("sessionFromOAuthBearer");
 	});
@@ -21,7 +22,7 @@ describe("api tRPC context", () => {
 	});
 
 	it("treats empty JWT payloads as unauthenticated instead of throwing", () => {
-		expect(SOURCE).toContain("function isRecord");
+		expect(SOURCE).toContain("isRecord");
 		expect(SOURCE).toContain("payload: unknown");
 		expect(SOURCE).toContain("if (!isRecord(payload)) return null");
 	});
