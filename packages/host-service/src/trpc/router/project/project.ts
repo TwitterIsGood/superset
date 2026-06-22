@@ -13,6 +13,7 @@ import { createUserSimpleGit } from "../../../runtime/git/simple-git";
 import { protectedProcedure, router } from "../../index";
 import { normalizeWorktreeBaseDir } from "../workspace-creation/shared/worktree-paths";
 import {
+	cancelProjectCreate,
 	createFromClone,
 	createFromEmpty,
 	createFromImportLocal,
@@ -410,6 +411,7 @@ export const projectRouter = router({
 		.input(
 			z.object({
 				name: z.string().min(1),
+				progressRequestId: z.string().min(1).optional(),
 				mode: z.discriminatedUnion("kind", [
 					z.object({
 						kind: z.literal("empty"),
@@ -459,6 +461,7 @@ export const projectRouter = router({
 						name: input.name,
 						parentDir: input.mode.parentDir,
 						url: input.mode.url,
+						progressRequestId: input.progressRequestId,
 					});
 				case "importLocal":
 					return createFromImportLocal(ctx, {
@@ -468,6 +471,14 @@ export const projectRouter = router({
 					});
 			}
 		}),
+
+	cancelCreate: protectedProcedure
+		.input(
+			z.object({
+				progressRequestId: z.string().min(1),
+			}),
+		)
+		.mutation(({ ctx, input }) => cancelProjectCreate(ctx, input)),
 
 	setup: protectedProcedure
 		.input(

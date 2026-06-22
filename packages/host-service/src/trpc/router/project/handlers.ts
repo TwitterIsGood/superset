@@ -4,6 +4,7 @@ import type { SelectV2Project, SelectV2Workspace } from "@superset/db/schema";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { projects } from "../../../db/schema";
+import type { ProjectCreateProgressStage } from "../../../events";
 import type { HostServiceContext } from "../../../types";
 import { ensureMainWorkspaceStrict } from "./utils/ensure-main-workspace";
 import { persistLocalProject } from "./utils/persist-project";
@@ -12,6 +13,7 @@ import {
 	cloneTemplateInto,
 	initEmptyRepo,
 	initLocalRepoInPlace,
+	isCloneCanceledError,
 	type ResolvedRepo,
 	resolveLocalRepo,
 	tryRevParseGitRoot,
@@ -52,6 +54,74 @@ interface CreateResult {
 	mainWorkspaceId: string;
 	project: SelectV2Project;
 	mainWorkspace: SelectV2Workspace;
+}
+
+export type CancelProjectCreateResult =
+	| { status: "canceling" }
+	| { status: "not_found" };
+
+interface InFlightProjectCreate {
+	controller: AbortController;
+	canceling: boolean;
+	cancel: () => CancelProjectCreateResult;
+}
+
+const inFlightProjectCreates = new Map<string, InFlightProjectCreate>();
+
+function emitProjectCreateProgress(
+	ctx: HostServiceContext,
+	requestId: string | undefined,
+	stage: ProjectCreateProgressStage,
+	message: string,
+	percent: number | null = null,
+): void {
+	if (!requestId) return;
+	ctx.eventBus.broadcastProjectCreateProgress({
+		requestId,
+		stage,
+		message,
+		percent,
+		occurredAt: Date.now(),
+	});
+}
+
+function registerCancelableClone(
+	ctx: HostServiceContext,
+	requestId: string | undefined,
+): { signal?: AbortSignal; dispose: () => void } {
+	if (!requestId) return { dispose: () => {} };
+
+	const controller = new AbortController();
+	const entry: InFlightProjectCreate = {
+		controller,
+		canceling: false,
+		cancel: () => {
+			if (entry.canceling) return { status: "canceling" };
+			entry.canceling = true;
+			emitProjectCreateProgress(ctx, requestId, "canceling", "Stopping clone");
+			controller.abort();
+			return { status: "canceling" };
+		},
+	};
+	inFlightProjectCreates.set(requestId, entry);
+
+	return {
+		signal: controller.signal,
+		dispose: () => {
+			if (inFlightProjectCreates.get(requestId) === entry) {
+				inFlightProjectCreates.delete(requestId);
+			}
+		},
+	};
+}
+
+export function cancelProjectCreate(
+	_ctx: HostServiceContext,
+	args: { progressRequestId: string },
+): CancelProjectCreateResult {
+	const entry = inFlightProjectCreates.get(args.progressRequestId);
+	if (!entry) return { status: "not_found" };
+	return entry.cancel();
 }
 
 // Cloud v2Project.create catches v2_projects_org_slug_unique and re-throws
@@ -194,18 +264,92 @@ async function persistFromResolved(
 
 export async function createFromClone(
 	ctx: HostServiceContext,
-	args: { name: string; parentDir: string; url: string },
+	args: {
+		name: string;
+		parentDir: string;
+		url: string;
+		progressRequestId?: string;
+	},
 ): Promise<CreateResult> {
-	const resolved = await cloneRepoInto(args.url, args.parentDir);
-	return persistFromResolved(ctx, {
-		name: args.name,
-		resolved,
-		cleanupRepoPathOnFailure: true,
-		// Only forward to cloud if the cloned repo actually has a parseable
-		// GitHub remote — non-GitHub URLs and local paths become local-only
-		// projects with no cloud repoCloneUrl.
-		repoCloneUrlForCloud: resolved.parsed?.url,
-	});
+	const cancelableClone = registerCancelableClone(ctx, args.progressRequestId);
+	try {
+		emitProjectCreateProgress(
+			ctx,
+			args.progressRequestId,
+			"cloning_repository",
+			"Cloning repository",
+			0,
+		);
+		let resolved: ResolvedRepo;
+		try {
+			resolved = await cloneRepoInto(args.url, args.parentDir, {
+				signal: cancelableClone.signal,
+				onProgress: (progress) => {
+					emitProjectCreateProgress(
+						ctx,
+						args.progressRequestId,
+						"cloning_repository",
+						progress.message,
+						progress.percent,
+					);
+				},
+			});
+		} finally {
+			cancelableClone.dispose();
+		}
+		emitProjectCreateProgress(
+			ctx,
+			args.progressRequestId,
+			"repository_ready",
+			"Repository cloned",
+			100,
+		);
+		emitProjectCreateProgress(
+			ctx,
+			args.progressRequestId,
+			"registering_project",
+			"Registering project",
+		);
+		const result = await persistFromResolved(ctx, {
+			name: args.name,
+			resolved,
+			cleanupRepoPathOnFailure: true,
+			// Only forward to cloud if the cloned repo actually has a parseable
+			// GitHub remote — non-GitHub URLs and local paths become local-only
+			// projects with no cloud repoCloneUrl.
+			repoCloneUrlForCloud: resolved.parsed?.url,
+		});
+		emitProjectCreateProgress(
+			ctx,
+			args.progressRequestId,
+			"ready",
+			"Project ready",
+			100,
+		);
+		return result;
+	} catch (err) {
+		cancelableClone.dispose();
+		if (isCloneCanceledError(err)) {
+			emitProjectCreateProgress(
+				ctx,
+				args.progressRequestId,
+				"canceled",
+				"Clone stopped",
+			);
+			throw new TRPCError({
+				code: "CLIENT_CLOSED_REQUEST",
+				message: "Clone stopped",
+				cause: err,
+			});
+		}
+		emitProjectCreateProgress(
+			ctx,
+			args.progressRequestId,
+			"failed",
+			err instanceof Error ? err.message : String(err),
+		);
+		throw err;
+	}
 }
 
 /**
