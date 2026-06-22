@@ -177,3 +177,37 @@ Added Stop for project clone: renderer modal/toast cancellation, host-service gi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Control Chat management tools
+
+**Date**: 2026-06-22
+**Task**: Control Chat management tools
+**Package**: desktop
+**Branch**: `codex/control-chat-tools-automations`
+
+### Summary
+
+Implemented global Control Chat for Automation and Capability management, including typed tools, versioning, floating desktop panel, validation matrix, and task archive.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d3a03fd16` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
-- **Last Active**: 2026-06-21
+- **Total Sessions**: 6
+- **Last Active**: 2026-06-22
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~179 | Active |
+| `journal-1.md` | ~213 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-06-22 | Control Chat management tools | `d3a03fd16` | `codex/control-chat-tools-automations` |
 | 5 | 2026-06-21 | Stop project clone | `e45b742a1` | `codex/worktree-dev-startup-cleanup` |
 | 4 | 2026-06-21 | Fix project clone progress modal | `4768ae6ab` | `codex/worktree-dev-startup-cleanup` |
 | 3 | 2026-06-21 | PR14 worktree Electric URL follow-up | `956e55490` | `codex/worktree-dev-startup-cleanup` |
