@@ -161,17 +161,6 @@ export function NewProjectModal({
 
 		const toastId = `project-clone-${requestId}`;
 		setStoppingState(true);
-		setProgress((current) =>
-			current
-				? {
-						...current,
-						stage: "canceling",
-						message: "Stopping clone",
-						percent: null,
-						occurredAt: Date.now(),
-					}
-				: current,
-		);
 		toast.loading("Stopping clone", {
 			id: toastId,
 			description: "Cleaning up partial clone",
@@ -182,6 +171,19 @@ export function NewProjectModal({
 			const result = await client.project.cancelCreate.mutate({
 				progressRequestId: requestId,
 			});
+			if (result.status === "canceling") {
+				setProgress((current) =>
+					current
+						? {
+								...current,
+								stage: "canceling",
+								message: "Stopping clone",
+								percent: null,
+								occurredAt: Date.now(),
+							}
+						: current,
+				);
+			}
 			if (result.status === "not_found") {
 				toast.info("Clone is no longer running", {
 					id: toastId,
@@ -287,10 +289,6 @@ export function NewProjectModal({
 				mode: { kind: "clone", parentDir: trimmedParent, url: trimmedUrl },
 			});
 			finalizeSetup(activeHostUrl, result);
-			toast.success("Project created", {
-				id: toastId,
-				description: trimmedName,
-			});
 			onSuccess?.({ projectId: result.projectId });
 			reset();
 			onOpenChange(false);

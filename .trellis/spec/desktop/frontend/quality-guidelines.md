@@ -51,12 +51,14 @@
 - The host-service cancellation registry is process-local and cancelable only during the clone phase. After the clone resolves and project registration begins, stop requests should return `not_found` instead of deleting registered work.
 - `cloneRepoInto` owns the claimed target directory and is responsible for removing it on cancellation. Renderer state must not try to remove clone directories directly.
 - `NewProjectModal` should show Stop in the modal while the clone is cancelable, show a Stop action in the progress toast for hidden/background clones, and show a disabled/stopping state after Stop is requested.
+- Renderer state must only switch `progress.stage` to `canceling` after `project.cancelCreate` confirms `{ status: "canceling" }` or after the matching progress event arrives. A `{ status: "not_found" }` stop response must clear local stopping UI instead of leaving the modal stuck on "Stopping".
 
 ### 4. Validation & Error Matrix
 
 - Active clone + Stop -> emit `canceling`, kill the git process tree, remove the partial target directory, emit `canceled`, and surface "Clone stopped".
 - Stop clicked twice -> the second request is ignored in the renderer or returns `canceling` / `not_found`; it must not show a generic create failure.
 - Stop after clone phase -> return `not_found`; do not delete the cloned repo or any registered project/workspace rows.
+- Stop after clone phase in the renderer -> do not keep a locally-forced `canceling` progress state; restore/keep the latest real progress and make the UI retryable or allow normal completion.
 - Host-service unavailable while stopping -> show a stop-specific failure toast and leave the current progress state visible.
 - Real clone failure -> keep the existing failed progress behavior and call the parent error path; do not classify real git failures as canceled.
 

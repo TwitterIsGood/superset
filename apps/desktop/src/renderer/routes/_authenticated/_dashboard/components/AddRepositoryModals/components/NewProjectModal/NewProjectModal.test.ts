@@ -28,4 +28,24 @@ describe("NewProjectModal clone progress wiring", () => {
 		expect(source).toContain("cloneWasCanceled");
 		expect(source).not.toContain('onError?.("Clone stopped")');
 	});
+
+	test("only marks progress as canceling after the backend accepts Stop", () => {
+		const acceptedStopIndex = source.indexOf(
+			'if (result.status === "canceling")',
+		);
+		const cancelingProgressIndex = source.indexOf(
+			'stage: "canceling"',
+			acceptedStopIndex,
+		);
+		const notFoundIndex = source.indexOf('if (result.status === "not_found")');
+
+		expect(acceptedStopIndex).toBeGreaterThan(-1);
+		expect(cancelingProgressIndex).toBeGreaterThan(acceptedStopIndex);
+		expect(notFoundIndex).toBeGreaterThan(cancelingProgressIndex);
+	});
+
+	test("leaves the success toast to the parent modal owner", () => {
+		expect(source).not.toContain('toast.success("Project created"');
+		expect(source).toContain("onSuccess?.({ projectId: result.projectId })");
+	});
 });
