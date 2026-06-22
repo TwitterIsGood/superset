@@ -211,3 +211,37 @@ Implemented global Control Chat for Automation and Capability management, includ
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: PR16 Control Chat Review Fixes
+
+**Date**: 2026-06-22
+**Task**: PR16 Control Chat Review Fixes
+**Package**: desktop
+**Branch**: `codex/control-chat-tools-automations`
+
+### Summary
+
+Fixed PR #16 review blockers: generated Control Chat migration, added runtime abort checks, fixed new-chat session state and CI-safe store persistence, marked failed tool turns as failed runs, updated specs, and verified lint/typecheck/tests/tool matrix.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fa4a11d70` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
