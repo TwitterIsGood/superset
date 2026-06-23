@@ -5,7 +5,7 @@ import type { ConfigContext } from "expo/config";
 // Load .env file
 config({
 	path: path.resolve(__dirname, "../../.env"),
-	override: true,
+	override: false,
 	quiet: true,
 });
 
@@ -29,6 +29,16 @@ export default ({ config }: ConfigContext) => ({
 		infoPlist: {
 			EXDevMenuShowFloatingActionButton: false,
 			ITSAppUsesNonExemptEncryption: false,
+			NSAppTransportSecurity: {
+				NSAllowsArbitraryLoads: false,
+				NSAllowsLocalNetworking: true,
+				NSExceptionDomains: {
+					"bj1.v.lhb.ink": {
+						NSExceptionAllowsInsecureHTTPLoads: true,
+						NSIncludesSubdomains: true,
+					},
+				},
+			},
 		},
 	},
 	android: {

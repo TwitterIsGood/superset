@@ -29,11 +29,8 @@ ONLINE_KV_REST_PORT="43017"
 ONLINE_S3_PORT="43018"
 ONLINE_S3_CONSOLE_PORT="43019"
 
-PUBLIC_WEB_URL="http://bj1.v.lhb.ink:63000"
-PUBLIC_API_URL="http://bj1.v.lhb.ink:63001"
-PUBLIC_ELECTRIC_URL="http://bj1.v.lhb.ink:63012"
-PUBLIC_RELAY_URL="http://bj1.v.lhb.ink:63013"
-PUBLIC_DOMAIN="bj1.v.lhb.ink"
+PUBLIC_DEFAULT_DOMAIN="bj1.v.lhb.ink"
+MOBILE_ENV_PATH="${SUPERSET_ONLINE_MOBILE_ENV_FILE:-$ROOT_DIR/apps/mobile/.env.local}"
 
 ONLINE_SESSIONS=(
 	"superset-online-api"
@@ -66,6 +63,15 @@ load_base_env() {
 		source "$BASE_ENV_PATH"
 		set +a
 	fi
+}
+
+apply_public_env_defaults() {
+	PUBLIC_SCHEME="${SUPERSET_PUBLIC_SCHEME:-http}"
+	PUBLIC_DOMAIN="${SUPERSET_PUBLIC_DOMAIN:-$PUBLIC_DEFAULT_DOMAIN}"
+	PUBLIC_WEB_URL="${SUPERSET_PUBLIC_WEB_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63000}"
+	PUBLIC_API_URL="${SUPERSET_PUBLIC_API_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63001}"
+	PUBLIC_ELECTRIC_URL="${SUPERSET_PUBLIC_ELECTRIC_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63012}"
+	PUBLIC_RELAY_URL="${SUPERSET_PUBLIC_RELAY_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63013}"
 }
 
 apply_online_env() {
@@ -129,9 +135,11 @@ apply_online_env() {
 
 prepare_env() {
 	load_base_env
+	apply_public_env_defaults
 	apply_online_env
 	mkdir -p "$LOG_DIR" "$LAUNCH_SUPPORT_DIR" "$SUPERSET_HOME_DIR"
 	write_electric_proxy_env_file
+	write_mobile_env_file
 }
 
 ensure_prereqs() {
@@ -306,6 +314,48 @@ ELECTRIC_SECRET=$ELECTRIC_SECRET
 ELECTRIC_SOURCE_ID=${ELECTRIC_SOURCE_ID:-}
 ELECTRIC_SOURCE_SECRET=${ELECTRIC_SOURCE_SECRET:-}
 VARS
+}
+
+escape_env_value() {
+	local value="$1"
+	value="${value//\\/\\\\}"
+	value="${value//\"/\\\"}"
+	value="${value//\$/\\\$}"
+	value="${value//\`/\\\`}"
+	printf '%s' "$value"
+}
+
+write_mobile_env_var() {
+	local key="$1"
+	local value="$2"
+	printf '%s="%s"\n' "$key" "$(escape_env_value "$value")"
+}
+
+write_mobile_env_file() {
+	local mobile_dir
+	mobile_dir="$(dirname "$MOBILE_ENV_PATH")"
+	if [[ ! -d "$mobile_dir" ]]; then
+		return
+	fi
+
+	local current=""
+	if [[ -f "$MOBILE_ENV_PATH" ]]; then
+		current="$(
+			awk '
+				/^[[:space:]]*(export[[:space:]]+)?(EXPO_PUBLIC_API_URL|EXPO_PUBLIC_ELECTRIC_URL|EXPO_PUBLIC_WEB_URL)=/ { next }
+				{ print }
+			' "$MOBILE_ENV_PATH"
+		)"
+	fi
+
+	{
+		if [[ -n "$current" ]]; then
+			printf '%s\n' "$current"
+		fi
+		write_mobile_env_var "EXPO_PUBLIC_API_URL" "$PUBLIC_API_URL"
+		write_mobile_env_var "EXPO_PUBLIC_ELECTRIC_URL" "$PUBLIC_ELECTRIC_URL"
+		write_mobile_env_var "EXPO_PUBLIC_WEB_URL" "$PUBLIC_WEB_URL"
+	} > "$MOBILE_ENV_PATH"
 }
 
 tmux_session_exists() {
