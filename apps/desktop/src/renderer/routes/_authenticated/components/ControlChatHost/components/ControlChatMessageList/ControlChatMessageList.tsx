@@ -33,6 +33,11 @@ function getErrorMessage(error: unknown): string {
 		: "Control Chat failed to load.";
 }
 
+const safeTextClassName =
+	"min-w-0 max-w-full break-words [overflow-wrap:anywhere]";
+const safeMultilineTextClassName = `${safeTextClassName} whitespace-pre-wrap`;
+const boundedPartClassName = "min-w-0 max-w-full overflow-hidden";
+
 function ToolStatusIcon({ status }: { status: ControlChatToolCall["status"] }) {
 	if (status === "completed") {
 		return <CheckCircle2 className="size-3.5 text-emerald-600" />;
@@ -54,13 +59,23 @@ function MessagePart({
 	toolCallsById: Map<string, ControlChatToolCall>;
 }) {
 	if (part.type === "text") {
-		return <p className="whitespace-pre-wrap break-words">{part.text}</p>;
+		return <p className={safeMultilineTextClassName}>{part.text}</p>;
 	}
 	if (part.type === "error") {
 		return (
-			<div className="flex gap-2 rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-destructive">
+			<div
+				className={cn(
+					boundedPartClassName,
+					"flex gap-2 rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-destructive",
+				)}
+			>
 				<AlertTriangle className="mt-0.5 size-4 shrink-0" />
-				<p className="select-text cursor-text whitespace-pre-wrap break-words">
+				<p
+					className={cn(
+						safeMultilineTextClassName,
+						"flex-1 select-text cursor-text",
+					)}
+				>
 					{part.text}
 				</p>
 			</div>
@@ -68,14 +83,21 @@ function MessagePart({
 	}
 	if (part.type === "context_summary") {
 		return (
-			<div className="rounded-md border bg-muted/40 px-3 py-2 text-xs">
-				<div className="mb-1 flex items-center gap-1.5 font-medium">
-					<Info className="size-3.5" />
-					{part.title}
+			<div
+				className={cn(
+					boundedPartClassName,
+					"rounded-md border bg-muted/40 px-3 py-2 text-xs",
+				)}
+			>
+				<div className="mb-1 flex min-w-0 items-center gap-1.5 font-medium">
+					<Info className="size-3.5 shrink-0" />
+					<span className={safeTextClassName}>{part.title}</span>
 				</div>
-				<ul className="space-y-1 text-muted-foreground">
+				<ul className="min-w-0 space-y-1 text-muted-foreground">
 					{part.items.map((item) => (
-						<li key={item}>{item}</li>
+						<li className={safeTextClassName} key={item}>
+							{item}
+						</li>
 					))}
 				</ul>
 			</div>
@@ -84,21 +106,38 @@ function MessagePart({
 
 	const toolCall = toolCallsById.get(part.toolCallId);
 	return (
-		<div className="rounded-md border bg-background px-3 py-2 text-xs">
-			<div className="flex items-center gap-2">
+		<div
+			className={cn(
+				boundedPartClassName,
+				"rounded-md border bg-background px-3 py-2 text-xs",
+			)}
+		>
+			<div className="flex min-w-0 items-center gap-2">
 				{toolCall ? (
 					<ToolStatusIcon status={toolCall.status} />
 				) : (
-					<Wrench className="size-3.5 text-muted-foreground" />
+					<Wrench className="size-3.5 shrink-0 text-muted-foreground" />
 				)}
-				<span className="font-medium">{part.toolName}</span>
-				<Badge variant="secondary" className="ml-auto h-5 rounded-sm px-1.5">
+				<span className={cn(safeTextClassName, "font-medium")}>
+					{part.toolName}
+				</span>
+				<Badge
+					variant="secondary"
+					className="ml-auto h-5 shrink-0 rounded-sm px-1.5"
+				>
 					{toolCall?.status ?? part.status}
 				</Badge>
 			</div>
-			<p className="mt-1 text-muted-foreground">{part.summary}</p>
+			<p className={cn(safeTextClassName, "mt-1 text-muted-foreground")}>
+				{part.summary}
+			</p>
 			{toolCall?.error && (
-				<p className="mt-1 select-text cursor-text text-destructive">
+				<p
+					className={cn(
+						safeMultilineTextClassName,
+						"mt-1 select-text cursor-text text-destructive",
+					)}
+				>
 					{toolCall.error}
 				</p>
 			)}
@@ -117,13 +156,13 @@ function MessageRow({
 	return (
 		<div
 			className={cn(
-				"flex flex-col gap-1",
+				"flex min-w-0 max-w-full flex-col gap-1",
 				isUser ? "items-end" : "items-start",
 			)}
 		>
 			<div
 				className={cn(
-					"max-w-[88%] space-y-2 rounded-lg px-3 py-2 text-sm shadow-sm",
+					"min-w-0 max-w-[88%] space-y-2 overflow-hidden rounded-lg px-3 py-2 text-sm shadow-sm",
 					isUser
 						? "bg-primary text-primary-foreground"
 						: "border bg-card text-card-foreground",
@@ -152,10 +191,15 @@ export function ControlChatMessageList({
 	const toolCallsById = new Map(data?.toolCalls.map((call) => [call.id, call]));
 
 	return (
-		<ScrollArea className="min-h-0 flex-1">
-			<div className="space-y-4 p-4">
+		<ScrollArea className="min-h-0 min-w-0 flex-1 overflow-hidden">
+			<div className="min-w-0 max-w-full space-y-4 p-4">
 				{error ? (
-					<div className="select-text cursor-text rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+					<div
+						className={cn(
+							safeMultilineTextClassName,
+							"select-text cursor-text rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive",
+						)}
+					>
 						{getErrorMessage(error)}
 					</div>
 				) : null}

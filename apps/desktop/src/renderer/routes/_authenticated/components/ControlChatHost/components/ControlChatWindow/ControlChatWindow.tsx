@@ -50,10 +50,10 @@ export function ControlChatWindow() {
 			)}
 			style={{ width, height }}
 		>
-			<div className="flex min-h-0 flex-1 flex-col">
-				<div className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
+				<div className="flex h-12 min-w-0 shrink-0 items-center gap-2 border-b px-3">
 					<div className="min-w-0 flex-1">
-						<div className="flex items-center gap-2">
+						<div className="flex min-w-0 items-center gap-2">
 							<h2 className="truncate font-medium text-sm">Control Chat</h2>
 							<Badge
 								variant="secondary"
@@ -65,7 +65,7 @@ export function ControlChatWindow() {
 						</div>
 					</div>
 					<select
-						className="h-7 max-w-36 rounded-md border bg-background px-2 text-xs"
+						className="h-7 min-w-0 max-w-36 shrink rounded-md border bg-background px-2 text-xs"
 						value={activeSessionId ?? ""}
 						onChange={(event) => {
 							if (event.target.value) {
@@ -87,7 +87,7 @@ export function ControlChatWindow() {
 						type="button"
 						variant="ghost"
 						size="icon"
-						className="size-7"
+						className="size-7 shrink-0"
 						aria-label="New Control Chat"
 						onClick={startNewSession}
 					>
@@ -97,7 +97,7 @@ export function ControlChatWindow() {
 						type="button"
 						variant="ghost"
 						size="icon"
-						className="size-7"
+						className="size-7 shrink-0"
 						aria-label={
 							isExpanded ? "Compact Control Chat" : "Expand Control Chat"
 						}
@@ -113,7 +113,7 @@ export function ControlChatWindow() {
 						type="button"
 						variant="ghost"
 						size="icon"
-						className="size-7"
+						className="size-7 shrink-0"
 						aria-label="Minimize Control Chat"
 						onClick={close}
 					>

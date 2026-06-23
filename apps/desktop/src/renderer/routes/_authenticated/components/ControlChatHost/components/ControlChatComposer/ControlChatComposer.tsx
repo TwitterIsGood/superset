@@ -35,8 +35,11 @@ export function ControlChatComposer({
 	};
 
 	return (
-		<form className="border-t bg-background p-3" onSubmit={handleSubmit}>
-			<div className="flex gap-2">
+		<form
+			className="min-w-0 overflow-hidden border-t bg-background p-3"
+			onSubmit={handleSubmit}
+		>
+			<div className="flex min-w-0 gap-2">
 				<Textarea
 					value={value}
 					onChange={(event) => setValue(event.target.value)}
@@ -47,10 +50,10 @@ export function ControlChatComposer({
 						}
 					}}
 					placeholder="Manage automations, Tools & Skills, hosts..."
-					className="min-h-20 resize-none text-sm"
+					className="min-h-20 min-w-0 flex-1 resize-none text-sm"
 					disabled={disabled}
 				/>
-				<div className="flex flex-col gap-2">
+				<div className="flex shrink-0 flex-col gap-2">
 					<Button
 						type="submit"
 						size="icon"

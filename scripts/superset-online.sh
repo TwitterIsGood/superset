@@ -205,9 +205,95 @@ wait_for_db_proxy_query() {
 run_migrations_and_seed() {
 	log "running database migrations against online database"
 	bun run --cwd "$ROOT_DIR/packages/db" migrate
+	assert_online_schema_ready
 	if [[ "${ONLINE_SEED_DEV:-1}" != "0" ]]; then
 		log "ensuring development admin account exists"
 		bun run --cwd "$ROOT_DIR" db:seed-dev
+	fi
+}
+
+query_online_schema_missing() {
+	compose exec -T postgres psql -U postgres -d main -At -v ON_ERROR_STOP=1 <<'SQL'
+WITH checks(name, ok) AS (
+	VALUES
+		('table public.automation_config_versions', to_regclass('public.automation_config_versions') IS NOT NULL),
+		('table public.control_chat_messages', to_regclass('public.control_chat_messages') IS NOT NULL),
+		('table public.control_chat_runs', to_regclass('public.control_chat_runs') IS NOT NULL),
+		('table public.control_chat_sessions', to_regclass('public.control_chat_sessions') IS NOT NULL),
+		('table public.control_chat_tool_calls', to_regclass('public.control_chat_tool_calls') IS NOT NULL),
+		(
+			'column capability_package_versions.control_chat_run_id',
+			EXISTS (
+				SELECT 1
+				FROM information_schema.columns
+				WHERE table_schema = 'public'
+					AND table_name = 'capability_package_versions'
+					AND column_name = 'control_chat_run_id'
+			)
+		),
+		(
+			'column capability_package_versions.control_chat_session_id',
+			EXISTS (
+				SELECT 1
+				FROM information_schema.columns
+				WHERE table_schema = 'public'
+					AND table_name = 'capability_package_versions'
+					AND column_name = 'control_chat_session_id'
+			)
+		),
+		(
+			'column capability_package_versions.source_instruction',
+			EXISTS (
+				SELECT 1
+				FROM information_schema.columns
+				WHERE table_schema = 'public'
+					AND table_name = 'capability_package_versions'
+					AND column_name = 'source_instruction'
+			)
+		),
+		(
+			'column capability_package_versions.source_summary',
+			EXISTS (
+				SELECT 1
+				FROM information_schema.columns
+				WHERE table_schema = 'public'
+					AND table_name = 'capability_package_versions'
+					AND column_name = 'source_summary'
+			)
+		),
+		(
+			'enum control_chat_session_status.running',
+			EXISTS (
+				SELECT 1
+				FROM pg_type t
+				JOIN pg_enum e ON t.oid = e.enumtypid
+				WHERE t.typname = 'control_chat_session_status'
+					AND e.enumlabel = 'running'
+			)
+		),
+		(
+			'enum control_chat_run_status.aborted',
+			EXISTS (
+				SELECT 1
+				FROM pg_type t
+				JOIN pg_enum e ON t.oid = e.enumtypid
+				WHERE t.typname = 'control_chat_run_status'
+					AND e.enumlabel = 'aborted'
+			)
+		)
+)
+SELECT COALESCE(string_agg(name, ', ' ORDER BY name), '')
+FROM checks
+WHERE NOT ok;
+SQL
+}
+
+assert_online_schema_ready() {
+	log "checking online database schema guard"
+	local missing
+	missing="$(query_online_schema_missing)"
+	if [[ -n "$missing" ]]; then
+		fail "online database schema is missing: $missing. Migration ledger may be out of sync; repair the online database before starting app services."
 	fi
 }
 
@@ -319,6 +405,15 @@ probe_db_proxy_query() {
 	fi
 }
 
+probe_online_schema_guard() {
+	local missing
+	if missing="$(query_online_schema_missing 2>/dev/null)" && [[ -z "$missing" ]]; then
+		printf '  ✓ %-24s %s\n' "schema guard" "ready"
+	else
+		printf '  ✗ %-24s %s\n' "schema guard" "${missing:-failed}"
+	fi
+}
+
 wait_for_probe() {
 	local label="$1"
 	local url="$2"
@@ -401,6 +496,7 @@ print_status() {
 	echo
 	echo "local probes:"
 	probe_db_proxy_query
+	probe_online_schema_guard
 	probe_url "object storage" "http://localhost:${ONLINE_S3_PORT}/minio/health/live" "200"
 	probe_url "web /sign-in" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200"
 	probe_url "api session" "http://localhost:${ONLINE_API_PORT}/api/auth/get-session" "200"

@@ -12,7 +12,10 @@ import {
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { decryptSecret } from "../project/secrets/utils/crypto";
-import { getControlChatIntentFlags } from "./intent";
+import {
+	getControlChatIntentFlags,
+	hasControlChatListOrCountIntent,
+} from "./intent";
 import {
 	ControlChatRunAbortedError,
 	type ControlChatTurnResult,
@@ -572,23 +575,11 @@ async function planToolCalls(args: {
 		];
 	}
 
-	if (
-		asksAutomation &&
-		(lower.includes("list") ||
-			lower.includes("show") ||
-			message.includes("列出") ||
-			message.includes("有哪些"))
-	) {
+	if (asksAutomation && hasControlChatListOrCountIntent(message)) {
 		return [{ name: "automation.list", input: {} }];
 	}
 
-	if (
-		asksCapability &&
-		(lower.includes("list") ||
-			lower.includes("show") ||
-			message.includes("列出") ||
-			message.includes("有哪些"))
-	) {
+	if (asksCapability && hasControlChatListOrCountIntent(message)) {
 		return [{ name: "capability.list", input: {} }];
 	}
 
@@ -932,9 +923,15 @@ export async function runControlChatTurn(
 		(part) => part.type === "tool_summary",
 	);
 	if (allToolSummaries) {
+		const summaryText = content
+			.filter((part) => part.type === "tool_summary")
+			.map((part) => part.summary)
+			.join("\n");
 		(content as ControlChatMessageContent[]).unshift({
 			type: "text",
-			text: "Done. I used Superset management tools and recorded the change in this Control Chat session.",
+			text:
+				summaryText ||
+				"Done. I used Superset management tools and recorded the change in this Control Chat session.",
 		});
 	}
 
