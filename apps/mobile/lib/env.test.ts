@@ -21,6 +21,27 @@ describe("parseMobileEnv", () => {
 		expect(parseMobileEnv(baseEnv)).toMatchObject(baseEnv);
 	});
 
+	test("does not require PostHog for mobile startup", () => {
+		const envWithoutPostHog: Record<string, unknown> = { ...baseEnv };
+		delete envWithoutPostHog.EXPO_PUBLIC_POSTHOG_KEY;
+
+		const parsedEnvWithoutPostHog = parseMobileEnv(envWithoutPostHog);
+		expect(parsedEnvWithoutPostHog).toMatchObject({
+			EXPO_PUBLIC_API_URL: baseEnv.EXPO_PUBLIC_API_URL,
+			EXPO_PUBLIC_ELECTRIC_URL: baseEnv.EXPO_PUBLIC_ELECTRIC_URL,
+			EXPO_PUBLIC_WEB_URL: baseEnv.EXPO_PUBLIC_WEB_URL,
+		});
+		expect(parsedEnvWithoutPostHog).not.toHaveProperty(
+			"EXPO_PUBLIC_POSTHOG_KEY",
+		);
+
+		const parsedEnvWithEmptyPostHog = parseMobileEnv({
+			...envWithoutPostHog,
+			EXPO_PUBLIC_POSTHOG_KEY: "",
+		});
+		expect(parsedEnvWithEmptyPostHog.EXPO_PUBLIC_POSTHOG_KEY).toBeUndefined();
+	});
+
 	test("allows http only for local development hosts", () => {
 		expect(
 			parseMobileEnv({

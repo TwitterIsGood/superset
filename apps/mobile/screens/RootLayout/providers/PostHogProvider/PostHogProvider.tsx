@@ -25,6 +25,10 @@ function PostHogInitializer({ children }: { children: ReactNode }) {
 }
 
 export function PostHogProvider({ children }: PostHogProviderProps) {
+	if (!posthogConfig.enabled || !posthogConfig.apiKey) {
+		return <>{children}</>;
+	}
+
 	return (
 		<PHProvider
 			apiKey={posthogConfig.apiKey}

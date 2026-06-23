@@ -15,4 +15,9 @@ describe("PostHogProvider", () => {
 		expect(SOURCE).toContain("captureTouches: true");
 		expect(SOURCE).not.toContain("usePathname");
 	});
+
+	test("skips the native PostHog SDK when the public key is not configured", () => {
+		expect(SOURCE).toContain("!posthogConfig.enabled");
+		expect(SOURCE).toContain("return <>{children}</>;");
+	});
 });

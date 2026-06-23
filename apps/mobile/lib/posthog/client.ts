@@ -2,6 +2,7 @@ import { env } from "../env";
 
 export const posthogConfig = {
 	apiKey: env.EXPO_PUBLIC_POSTHOG_KEY,
+	enabled: Boolean(env.EXPO_PUBLIC_POSTHOG_KEY),
 	host: env.EXPO_PUBLIC_POSTHOG_HOST,
 	options: {
 		enableSessionReplay: false,

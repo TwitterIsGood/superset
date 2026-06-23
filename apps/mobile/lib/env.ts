@@ -24,6 +24,12 @@ export const mobilePublicUrlSchema = z.url().refine(isHttpsOrLocalHttpUrl, {
 	message: "Mobile HTTP URLs are only allowed for approved hosts.",
 });
 
+const optionalNonEmptyStringSchema = z.preprocess(
+	(value) =>
+		typeof value === "string" && value.trim().length === 0 ? undefined : value,
+	z.string().trim().min(1).optional(),
+);
+
 const envSchema = z.object({
 	NODE_ENV: z
 		.enum(["development", "production", "test"])
@@ -35,7 +41,7 @@ const envSchema = z.object({
 	EXPO_PUBLIC_WEB_URL: mobilePublicUrlSchema.optional(),
 	EXPO_PUBLIC_DEEP_LINK_SCHEME: z.string().default("superset"),
 	EXPO_PUBLIC_DEEP_LINK_DOMAIN: z.string().optional(),
-	EXPO_PUBLIC_POSTHOG_KEY: z.string(),
+	EXPO_PUBLIC_POSTHOG_KEY: optionalNonEmptyStringSchema,
 	EXPO_PUBLIC_POSTHOG_HOST: z.url().default("https://us.i.posthog.com"),
 });
 

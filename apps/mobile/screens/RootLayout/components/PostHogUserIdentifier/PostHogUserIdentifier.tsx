@@ -1,8 +1,9 @@
 import { usePostHog } from "posthog-react-native";
 import { useEffect } from "react";
 import { useSession } from "@/lib/auth/client";
+import { posthogConfig } from "@/lib/posthog";
 
-export function PostHogUserIdentifier() {
+function EnabledPostHogUserIdentifier() {
 	const { data: session } = useSession();
 	const posthog = usePostHog();
 
@@ -18,4 +19,12 @@ export function PostHogUserIdentifier() {
 	}, [session, posthog]);
 
 	return null;
+}
+
+export function PostHogUserIdentifier() {
+	if (!posthogConfig.enabled) {
+		return null;
+	}
+
+	return <EnabledPostHogUserIdentifier />;
 }
