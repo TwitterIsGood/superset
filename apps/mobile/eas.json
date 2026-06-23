@@ -6,13 +6,48 @@
 	"build": {
 		"development": {
 			"developmentClient": true,
-			"distribution": "internal"
+			"distribution": "internal",
+			"env": {
+				"SUPERSET_MOBILE_PROFILE": "development",
+				"EXPO_PUBLIC_SUPERSET_PROFILE": "development",
+				"EXPO_PUBLIC_DEEP_LINK_SCHEME": "superset"
+			}
 		},
 		"preview": {
-			"distribution": "internal"
+			"distribution": "internal",
+			"env": {
+				"SUPERSET_MOBILE_PROFILE": "online-canary",
+				"EXPO_PUBLIC_SUPERSET_PROFILE": "online-canary",
+				"EXPO_PUBLIC_API_URL": "http://bj1.v.lhb.ink:63001",
+				"EXPO_PUBLIC_ELECTRIC_URL": "http://bj1.v.lhb.ink:63012",
+				"EXPO_PUBLIC_WEB_URL": "http://bj1.v.lhb.ink:63000",
+				"EXPO_PUBLIC_RELAY_URL": "http://bj1.v.lhb.ink:63013",
+				"EXPO_PUBLIC_DEEP_LINK_SCHEME": "superset"
+			}
+		},
+		"online-canary": {
+			"distribution": "internal",
+			"env": {
+				"SUPERSET_MOBILE_PROFILE": "online-canary",
+				"EXPO_PUBLIC_SUPERSET_PROFILE": "online-canary",
+				"EXPO_PUBLIC_API_URL": "http://bj1.v.lhb.ink:63001",
+				"EXPO_PUBLIC_ELECTRIC_URL": "http://bj1.v.lhb.ink:63012",
+				"EXPO_PUBLIC_WEB_URL": "http://bj1.v.lhb.ink:63000",
+				"EXPO_PUBLIC_RELAY_URL": "http://bj1.v.lhb.ink:63013",
+				"EXPO_PUBLIC_DEEP_LINK_SCHEME": "superset"
+			}
 		},
 		"production": {
-			"autoIncrement": true
+			"autoIncrement": true,
+			"env": {
+				"SUPERSET_MOBILE_PROFILE": "production",
+				"EXPO_PUBLIC_SUPERSET_PROFILE": "production",
+				"EXPO_PUBLIC_API_URL": "http://bj1.v.lhb.ink:63001",
+				"EXPO_PUBLIC_ELECTRIC_URL": "http://bj1.v.lhb.ink:63012",
+				"EXPO_PUBLIC_WEB_URL": "http://bj1.v.lhb.ink:63000",
+				"EXPO_PUBLIC_RELAY_URL": "http://bj1.v.lhb.ink:63013",
+				"EXPO_PUBLIC_DEEP_LINK_SCHEME": "superset"
+			}
 		}
 	},
 	"submit": {

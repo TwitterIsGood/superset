@@ -4,15 +4,19 @@ import { describe, expect, test } from "bun:test";
 
 process.env.EXPO_PUBLIC_API_URL = "http://localhost:3001";
 process.env.EXPO_PUBLIC_ELECTRIC_URL = "http://localhost:3012";
+process.env.EXPO_PUBLIC_RELAY_URL = "http://localhost:3013";
 process.env.EXPO_PUBLIC_POSTHOG_KEY = "test-posthog-key";
 
 const { parseMobileEnv } = await import("./env");
 
 const baseEnv = {
 	NODE_ENV: "development",
+	SUPERSET_MOBILE_PROFILE: "online-canary",
+	EXPO_PUBLIC_SUPERSET_PROFILE: "online-canary",
 	EXPO_PUBLIC_API_URL: "http://bj1.v.lhb.ink:63001",
 	EXPO_PUBLIC_ELECTRIC_URL: "http://bj1.v.lhb.ink:63012",
 	EXPO_PUBLIC_WEB_URL: "http://bj1.v.lhb.ink:63000",
+	EXPO_PUBLIC_RELAY_URL: "http://bj1.v.lhb.ink:63013",
 	EXPO_PUBLIC_POSTHOG_KEY: "test-posthog-key",
 };
 
@@ -49,11 +53,13 @@ describe("parseMobileEnv", () => {
 				EXPO_PUBLIC_API_URL: "http://localhost:3001",
 				EXPO_PUBLIC_ELECTRIC_URL: "http://127.0.0.1:3012",
 				EXPO_PUBLIC_WEB_URL: "http://[::1]:3000",
+				EXPO_PUBLIC_RELAY_URL: "http://localhost:3013",
 			}),
 		).toMatchObject({
 			EXPO_PUBLIC_API_URL: "http://localhost:3001",
 			EXPO_PUBLIC_ELECTRIC_URL: "http://127.0.0.1:3012",
 			EXPO_PUBLIC_WEB_URL: "http://[::1]:3000",
+			EXPO_PUBLIC_RELAY_URL: "http://localhost:3013",
 		});
 	});
 

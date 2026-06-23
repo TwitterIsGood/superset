@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": "apps/mobile/config/mobile-env.cjs", "reason": "Shared mobile env resolver runtime for Expo config and build scripts"}
+{"file": "apps/mobile/config/mobile-env.ts", "reason": "Typed wrapper for mobile env resolver used by app code and tests"}
+{"file": "apps/mobile/scripts/build-ios-unsigned.ts", "reason": "Stable local unsigned IPA build and ATS verification command"}

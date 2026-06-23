@@ -30,9 +30,6 @@ describe("RootLayout development chrome", () => {
 		);
 		expect(APP_CONFIG_SOURCE).toContain("override: false");
 		expect(APP_CONFIG_SOURCE).toContain("NSExceptionDomains");
-		expect(APP_CONFIG_SOURCE).toContain('"bj1.v.lhb.ink"');
-		expect(APP_CONFIG_SOURCE).toContain(
-			"NSExceptionAllowsInsecureHTTPLoads: true",
-		);
+		expect(APP_CONFIG_SOURCE).toContain("getIosAtsExceptionDomains(mobileEnv)");
 	});
 });

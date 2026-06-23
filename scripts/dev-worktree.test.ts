@@ -299,8 +299,11 @@ EXPO_PUBLIC_ELECTRIC_URL=http://localhost:3012
 EXPO_PUBLIC_POSTHOG_KEY=keep-me
 `,
 			{
+				SUPERSET_MOBILE_PROFILE: "development",
+				EXPO_PUBLIC_SUPERSET_PROFILE: "development",
 				EXPO_PUBLIC_API_URL: "http://localhost:3141",
 				EXPO_PUBLIC_ELECTRIC_URL: "http://localhost:3152",
+				EXPO_PUBLIC_RELAY_URL: "http://localhost:3153",
 				EXPO_PUBLIC_WEB_URL: "http://localhost:3140",
 				EXPO_PUBLIC_STREAMS_URL: "http://localhost:3147",
 			},
@@ -309,9 +312,12 @@ EXPO_PUBLIC_POSTHOG_KEY=keep-me
 		expect(output).toContain("EXPO_PUBLIC_POSTHOG_KEY=keep-me");
 		expect(output).not.toContain("http://localhost:3001");
 		expect(output).not.toContain("http://localhost:3012");
+		expect(output).toContain('SUPERSET_MOBILE_PROFILE="development"');
+		expect(output).toContain('EXPO_PUBLIC_SUPERSET_PROFILE="development"');
 		expect(output).toContain('EXPO_PUBLIC_API_URL="http://localhost:3141"');
 		expect(output).toContain(
 			'EXPO_PUBLIC_ELECTRIC_URL="http://localhost:3152"',
 		);
+		expect(output).toContain('EXPO_PUBLIC_RELAY_URL="http://localhost:3153"');
 	});
 });

@@ -21,9 +21,12 @@ describe("superset online public URL defaults", () => {
 
 	test("syncs only mobile public URL keys into apps/mobile/.env.local", () => {
 		expect(SOURCE).toContain("write_mobile_env_file");
+		expect(SOURCE).toContain("SUPERSET_MOBILE_PROFILE");
+		expect(SOURCE).toContain("EXPO_PUBLIC_SUPERSET_PROFILE");
 		expect(SOURCE).toContain("EXPO_PUBLIC_API_URL");
 		expect(SOURCE).toContain("EXPO_PUBLIC_ELECTRIC_URL");
 		expect(SOURCE).toContain("EXPO_PUBLIC_WEB_URL");
+		expect(SOURCE).toContain("EXPO_PUBLIC_RELAY_URL");
 		expect(SOURCE).not.toContain("EXPO_PUBLIC_POSTHOG_KEY=");
 	});
 });

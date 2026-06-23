@@ -22,8 +22,11 @@ export const MANAGED_ENV_END = "# <<< superset worktree dev managed";
 export const LEGACY_LOCAL_OVERRIDE_MARKER =
 	"# ===== Local workspace overrides (setup.local.sh) =====";
 export const MOBILE_ENV_MANAGED_KEYS = new Set([
+	"SUPERSET_MOBILE_PROFILE",
+	"EXPO_PUBLIC_SUPERSET_PROFILE",
 	"EXPO_PUBLIC_API_URL",
 	"EXPO_PUBLIC_ELECTRIC_URL",
+	"EXPO_PUBLIC_RELAY_URL",
 	"EXPO_PUBLIC_STREAMS_URL",
 	"EXPO_PUBLIC_WEB_URL",
 ]);
@@ -55,7 +58,9 @@ const MANAGED_ENV_KEYS = new Set([
 	"ELECTRIC_URL",
 	"EXPO_PUBLIC_API_URL",
 	"EXPO_PUBLIC_ELECTRIC_URL",
+	"EXPO_PUBLIC_RELAY_URL",
 	"EXPO_PUBLIC_STREAMS_URL",
+	"EXPO_PUBLIC_SUPERSET_PROFILE",
 	"EXPO_PUBLIC_WEB_URL",
 	"KV_REST_API_TOKEN",
 	"KV_REST_API_URL",
@@ -86,6 +91,7 @@ const MANAGED_ENV_KEYS = new Set([
 	"STREAMS_URL",
 	"SUPERSET_DEV_DATA_MODE",
 	"SUPERSET_HOME_DIR",
+	"SUPERSET_MOBILE_PROFILE",
 	"SUPERSET_PORT_BASE",
 	"SUPERSET_PRIMARY_ROOT",
 	"SUPERSET_WEB_URL",
@@ -572,6 +578,7 @@ export function buildWorktreeDevPlan(input: {
 	const env: Record<string, string> = {
 		SUPERSET_WORKSPACE_NAME: workspaceName,
 		SUPERSET_HOME_DIR: join(input.worktree.currentRoot, "superset-dev-data"),
+		SUPERSET_MOBILE_PROFILE: "development",
 		SUPERSET_PORT_BASE: String(input.portBase),
 		SUPERSET_WORKTREE_ROLE: input.worktree.role,
 		SUPERSET_PRIMARY_ROOT: input.worktree.primaryRoot,
@@ -617,7 +624,9 @@ export function buildWorktreeDevPlan(input: {
 		NEXT_PUBLIC_RELAY_URL: urls.relay,
 		SUPERSET_WEB_URL: urls.web,
 		EXPO_PUBLIC_WEB_URL: urls.web,
+		EXPO_PUBLIC_SUPERSET_PROFILE: "development",
 		EXPO_PUBLIC_API_URL: urls.api,
+		EXPO_PUBLIC_RELAY_URL: urls.relay,
 
 		PORT: String(ports.STREAMS_PORT),
 		STREAMS_URL: urls.streams,
