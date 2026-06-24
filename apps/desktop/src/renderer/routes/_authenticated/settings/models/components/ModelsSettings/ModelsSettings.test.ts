@@ -16,4 +16,15 @@ describe("ModelsSettings provider cache invalidation", () => {
 		expect(source).toContain("invalidateProviderCaches");
 		expect(source.match(/await invalidateProviderCaches\(\)/g)?.length).toBe(2);
 	});
+
+	test("keeps New provider mode from being auto-selected back to the first provider", () => {
+		expect(source).toContain(
+			"const [isCreatingProvider, setIsCreatingProvider] = useState(false)",
+		);
+		expect(source).toContain(
+			"if (isCreatingProvider || form.id !== null) return;",
+		);
+		expect(source).toContain("setIsCreatingProvider(true)");
+		expect(source).toContain("setIsCreatingProvider(false)");
+	});
 });

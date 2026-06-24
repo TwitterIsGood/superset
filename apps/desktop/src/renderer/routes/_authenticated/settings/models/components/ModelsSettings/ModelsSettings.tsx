@@ -136,6 +136,7 @@ export function ModelsSettings({ visibleItems }: ModelsSettingsProps) {
 	const { activeHostUrl, hostServiceStatus } = useLocalHostService();
 	const queryClient = useQueryClient();
 	const [form, setForm] = useState<ProviderForm>(EMPTY_FORM);
+	const [isCreatingProvider, setIsCreatingProvider] = useState(false);
 	const [modelInput, setModelInput] = useState("");
 	const queryKey = useMemo(
 		() => modelProvidersQueryKey(activeHostUrl),
@@ -173,7 +174,7 @@ export function ModelsSettings({ visibleItems }: ModelsSettingsProps) {
 	const providers = providersQuery.data ?? [];
 
 	useEffect(() => {
-		if (form.id !== null) return;
+		if (isCreatingProvider || form.id !== null) return;
 		const first = providers[0];
 		if (!first) return;
 		setForm({
@@ -185,7 +186,7 @@ export function ModelsSettings({ visibleItems }: ModelsSettingsProps) {
 			secret: "",
 			models: formModelsFromProvider(first.models),
 		});
-	}, [form.id, providers]);
+	}, [form.id, isCreatingProvider, providers]);
 
 	const upsertMutation = useMutation({
 		mutationFn: async (nextForm: ProviderForm) => {
@@ -211,6 +212,7 @@ export function ModelsSettings({ visibleItems }: ModelsSettingsProps) {
 				});
 			}
 			await invalidateProviderCaches();
+			setIsCreatingProvider(false);
 			setForm({
 				id: saved.id,
 				name: saved.name,
@@ -267,6 +269,7 @@ export function ModelsSettings({ visibleItems }: ModelsSettingsProps) {
 				});
 			}
 			await invalidateProviderCaches();
+			setIsCreatingProvider(false);
 			setForm(EMPTY_FORM);
 			toast.success("Model provider deleted");
 		},
@@ -296,6 +299,7 @@ export function ModelsSettings({ visibleItems }: ModelsSettingsProps) {
 		(Boolean(form.secret.trim()) || Boolean(selectedProvider?.hasSecret));
 
 	function selectProvider(provider: (typeof providers)[number]) {
+		setIsCreatingProvider(false);
 		setForm({
 			id: provider.id,
 			name: provider.name,
@@ -345,9 +349,11 @@ export function ModelsSettings({ visibleItems }: ModelsSettingsProps) {
 					}
 					action={
 						<Button
+							type="button"
 							size="sm"
 							variant="outline"
 							onClick={() => {
+								setIsCreatingProvider(true);
 								setForm(EMPTY_FORM);
 								setModelInput("");
 							}}
