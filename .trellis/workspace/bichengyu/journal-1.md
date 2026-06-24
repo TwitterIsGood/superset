@@ -929,3 +929,37 @@ Scoped retained stopped assistant messages by chat scope so partial output from 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 28: Mobile terminal snapshot stabilization
+
+**Date**: 2026-06-24
+**Task**: Mobile terminal snapshot stabilization
+**Package**: desktop
+**Branch**: `main`
+
+### Summary
+
+Root-fixed mobile remote terminal rendering by using host-owned screen snapshots, preserved desktop PTY dimensions during mobile observe/control, scoped desktop pane tabs per worktree, reused newest mobile terminal tabs, validated focused tests/typechecks/lint and produced a fresh unsigned IPA.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d9abfe785` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
