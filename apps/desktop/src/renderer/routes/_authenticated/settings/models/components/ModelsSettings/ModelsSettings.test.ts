@@ -27,4 +27,14 @@ describe("ModelsSettings provider cache invalidation", () => {
 		expect(source).toContain("setIsCreatingProvider(true)");
 		expect(source).toContain("setIsCreatingProvider(false)");
 	});
+
+	test("shows real loading affordances for provider list and saves", () => {
+		expect(source).toContain(
+			"providers.length === 0 && providersQuery.isLoading",
+		);
+		expect(source).toContain("<output");
+		expect(source).toContain("upsertMutation.isPending");
+		expect(source).toContain("Saving...");
+		expect(source.match(/<Loader2Icon/g)?.length).toBeGreaterThanOrEqual(2);
+	});
 });

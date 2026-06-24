@@ -11,7 +11,13 @@ import {
 } from "@superset/ui/select";
 import { toast } from "@superset/ui/sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlusIcon, RefreshCwIcon, Trash2Icon, XIcon } from "lucide-react";
+import {
+	Loader2Icon,
+	PlusIcon,
+	RefreshCwIcon,
+	Trash2Icon,
+	XIcon,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
 	groupModelsByModelFamily,
@@ -172,6 +178,8 @@ export function ModelsSettings({ visibleItems }: ModelsSettingsProps) {
 		},
 	});
 	const providers = providersQuery.data ?? [];
+	const isProvidersInitialLoading =
+		providers.length === 0 && providersQuery.isLoading;
 
 	useEffect(() => {
 		if (isCreatingProvider || form.id !== null) return;
@@ -364,7 +372,14 @@ export function ModelsSettings({ visibleItems }: ModelsSettingsProps) {
 					}
 				>
 					<div className="space-y-2">
-						{providers.length === 0 ? (
+						{isProvidersInitialLoading ? (
+							<output className="block rounded-md border border-dashed p-4 text-muted-foreground text-sm">
+								<div className="flex items-center gap-2">
+									<Loader2Icon className="size-3.5 animate-spin" />
+									<span>Loading providers...</span>
+								</div>
+							</output>
+						) : providers.length === 0 ? (
 							<div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
 								No providers configured.
 							</div>
@@ -597,7 +612,10 @@ export function ModelsSettings({ visibleItems }: ModelsSettingsProps) {
 									onClick={() => upsertMutation.mutate(form)}
 									disabled={!canSave || upsertMutation.isPending}
 								>
-									Save provider
+									{upsertMutation.isPending ? (
+										<Loader2Icon className="size-4 animate-spin" />
+									) : null}
+									{upsertMutation.isPending ? "Saving..." : "Save provider"}
 								</Button>
 								<Button
 									variant="outline"
