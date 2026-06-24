@@ -34,8 +34,9 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 
 	test("does not replay stale terminal tail when attaching existing TUI sessions", () => {
 		expect(SOURCE).toContain("suppressReplayUntilDelta");
-		expect(SOURCE).toContain("terminalTailDelta");
-		expect(SOURCE).toContain("./utils/terminalTailDelta");
+		expect(SOURCE).toContain("usesScreenSnapshotBaseline");
+		expect(SOURCE).toContain("mergeTerminalSnapshotState");
+		expect(SOURCE).toContain("./utils/terminalSnapshotMerge");
 		expect(SOURCE).toContain("terminalRawTailByIdRef");
 		expect(SOURCE).toContain("redrawnTerminalIdsRef");
 		expect(SOURCE).toContain('data: "\\u000c"');
@@ -64,18 +65,19 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 			SOURCE.indexOf("const handleSelectPanel", createTerminalIndex),
 		);
 		expect(createTerminal).toContain("suppressReplayUntilDelta: true");
+		expect(createTerminal).toContain("usesScreenSnapshotBaseline: false");
 		expect(SOURCE).toContain("replayInitialSnapshot");
 		expect(SOURCE).toContain('liveSocket.state === "error"');
 		expect(SOURCE).toContain("suppressReplayUntilDelta: false");
 	});
 
 	test("does not clear ordinary desktop shell history before initial snapshot replay", () => {
-		expect(SOURCE).toContain("shouldReplayInitialTerminalSnapshot");
+		expect(SOURCE).toContain("mergeTerminalSnapshotState(current, snapshot");
 		expect(SOURCE).toContain(
-			"outputTail: shouldReplayInitialSnapshot\n\t\t\t\t\t\t\t? snapshot.outputTail",
+			"previousRawTail: terminalRawTailByIdRef.current.get(current.terminalId)",
 		);
 		expect(SOURCE).toContain(
-			"suppressReplayUntilDelta: !shouldReplayInitialSnapshot",
+			"terminalRawTailByIdRef.current.set(\n\t\t\t\tcurrent.terminalId,\n\t\t\t\tresult.nextRawTail",
 		);
 		expect(SOURCE).not.toContain(
 			"const shouldRequestRedraw = !redrawnTerminalIdsRef.current.has",
@@ -250,6 +252,44 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 		expect(SOURCE).toContain("selectTerminalSession(latestTerminal)");
 		expect(SOURCE).toContain("terminalListError");
 		expect(SOURCE).toContain("loadingTerminals");
+	});
+
+	test("waits for terminal discovery before auto-creating a mobile terminal", () => {
+		expect(SOURCE).toContain("terminalDiscoveryReadyWorkspaceId");
+		expect(SOURCE).toContain(
+			"terminalDiscoveryReadyWorkspaceId === workspace.id",
+		);
+		expect(SOURCE).toContain("setTerminalDiscoveryReadyWorkspaceId(null)");
+		expect(SOURCE).toContain(
+			"setTerminalDiscoveryReadyWorkspaceId(workspace.id)",
+		);
+
+		const autoCreateStart = SOURCE.indexOf(
+			'if (activeSurfaceKind !== "terminal" || activeTerminalRun) return;',
+		);
+		expect(autoCreateStart).toBeGreaterThan(0);
+		const autoCreateEnd = SOURCE.indexOf(
+			"void handleCreateTerminalSession();",
+			autoCreateStart,
+		);
+		expect(autoCreateEnd).toBeGreaterThan(autoCreateStart);
+		const autoCreateEffect = SOURCE.slice(
+			autoCreateStart,
+			autoCreateEnd + "void handleCreateTerminalSession();".length,
+		);
+
+		expect(autoCreateEffect).toContain("!terminalDiscoveryReady");
+		expect(autoCreateEffect).toContain("loadingTerminals");
+		expect(autoCreateEffect).toContain("terminalListError");
+		expect(autoCreateEffect).toContain("selectTerminalSession(latestTerminal)");
+		expect(autoCreateEffect.indexOf("!terminalDiscoveryReady")).toBeLessThan(
+			autoCreateEffect.indexOf("void handleCreateTerminalSession();"),
+		);
+		expect(
+			autoCreateEffect.indexOf("selectTerminalSession(latestTerminal)"),
+		).toBeLessThan(
+			autoCreateEffect.indexOf("void handleCreateTerminalSession();"),
+		);
 	});
 
 	test("supports native worktree session management including terminal deletion", () => {
@@ -579,14 +619,23 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 			"restoreRevision={activeTerminalRun.restoreRevision}",
 		);
 		expect(terminalSurface).toContain("inputCommand={terminalInputCommand}");
+		expect(terminalSurface).toContain(
+			"terminalDimensions={activeTerminalRun.terminalDimensions}",
+		);
+		expect(terminalSurface).toContain(
+			"screenSnapshot={activeTerminalRun.screenSnapshot}",
+		);
 		expect(terminalSurface).toContain("onInput");
+		expect(terminalSurface).toContain(
+			"onLocalResize={handleTerminalLocalResize}",
+		);
 		expect(terminalSurface).toContain("onResize={handleTerminalResize}");
 		expect(SOURCE).toContain("apiClient.v2Workspace.createTerminal.mutate");
-		expect(SOURCE).toContain("apiClient.v2Workspace.resizeTerminal");
 		expect(SOURCE).toContain("handleCreateTerminalSession");
 		expect(SOURCE).toContain('accessibilityLabel="New terminal"');
 		expect(SOURCE).toContain("apiClient.v2Workspace.createTerminal.mutate");
 		expect(SOURCE).toContain("handleTerminalResize");
+		expect(SOURCE).toContain("handleTerminalLocalResize");
 		expect(SOURCE).toContain("handleSendTerminalData");
 		expect(SOURCE).toContain("../TerminalEmulator");
 		expect(terminalSurface).toContain("font-mono");
@@ -612,6 +661,7 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 		);
 		expect(SOURCE).toContain("new WebSocket(descriptor.webSocketUrl)");
 		expect(SOURCE).toContain('socket.binaryType = "arraybuffer"');
+		expect(SOURCE).toContain("terminalDimensionsFromRecord(message)");
 		expect(SOURCE).toContain("terminalLiveTransportIsActive");
 		expect(SOURCE).toContain("terminalLiveTransportCanReplacePolling");
 		expect(SOURCE).toContain("shouldShowTerminalWaitingIndicator");
@@ -628,12 +678,13 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 		expect(SOURCE).toContain("terminalLiveSnapshotReconcileIntervalMs");
 		expect(SOURCE).toContain("terminalSnapshotPollIntervalMs");
 		expect(SOURCE).toContain("current.outputTail + frame.text");
+		expect(SOURCE).toContain("replay: false");
+		expect(SOURCE).not.toContain("replay: !liveRef.receivedBytes");
 		expect(SOURCE).toContain(
-			"terminalRawTailByIdRef.current.set(terminalId, snapshot.outputTail)",
+			"terminalRawTailByIdRef.current.set(\n\t\t\t\tcurrent.terminalId,\n\t\t\t\tresult.nextRawTail",
 		);
-		expect(SOURCE).toContain(
-			"terminalRawTailByIdRef.current.set(terminalId, outputTail)",
-		);
+		expect(SOURCE).toContain("previousRawTail + frame.text");
+		expect(SOURCE).toContain("current.usesScreenSnapshotBaseline");
 		expect(SOURCE).not.toContain(
 			"const restoreRevision = current.restoreRevision + 1",
 		);
@@ -644,6 +695,31 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 		expect(SOURCE).toContain('"reconnecting"');
 		expect(SOURCE).toContain("getTerminalSnapshot");
 		expect(SOURCE).not.toContain("terminalLiveTextMessage");
+	});
+
+	test("uses host terminal dimensions for mobile observer rendering without resizing the host PTY", () => {
+		expect(SOURCE).toContain("type TerminalDimensions");
+		expect(SOURCE).toContain("type TerminalScreenSnapshot");
+		expect(SOURCE).toContain("screenSnapshot: TerminalScreenSnapshot | null");
+		expect(SOURCE).toContain("terminalDimensionsFromRecord");
+		expect(SOURCE).toContain("mergeTerminalSnapshotState");
+		expect(SOURCE).toContain(
+			"screenSnapshot={activeTerminalRun.screenSnapshot}",
+		);
+		expect(SOURCE).toContain(
+			"terminalDimensions: terminalDimensionsFromRecord(terminal)",
+		);
+		expect(SOURCE).toContain("terminalDimensionsFromRecord(message)");
+		expect(SOURCE).toContain("cols: terminalDimensions?.cols");
+		expect(SOURCE).toContain("rows: terminalDimensions?.rows");
+		expect(SOURCE).toContain(
+			"terminalDimensions={activeTerminalRun.terminalDimensions}",
+		);
+		expect(SOURCE).toContain("onLocalResize={handleTerminalLocalResize}");
+		expect(SOURCE).not.toContain("apiClient.v2Workspace.resizeTerminal");
+		expect(SOURCE).not.toContain(
+			'type TerminalSocketClientMessage =\\n\\t| { type: "input"; data: string }\\n\\t| { type: "resize"; cols: number; rows: number };',
+		);
 	});
 
 	test("renders terminal unavailable states as Codex-style mobile states instead of debug text", () => {
@@ -720,10 +796,11 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 		expect(terminalSurface).not.toContain("TextInput");
 	});
 
-	test("serializes xterm input writes so PTY bytes stay in typed order", () => {
+	test("sends xterm input through the live terminal socket before serialized RPC fallback", () => {
 		expect(SOURCE).toContain("const terminalInputQueueRef = useRef");
 		expect(SOURCE).toContain("Promise.resolve()");
 		expect(SOURCE).toContain("const sendTerminalLiveMessage =");
+		expect(SOURCE).toContain("webSocketOpenReadyState");
 		expect(SOURCE).toContain("liveSocket.socket.send(JSON.stringify(message))");
 		expect(SOURCE).not.toContain("const lastTerminalInputChunkRef = useRef");
 		expect(SOURCE).not.toContain("duplicateTerminalInputWindowMs");
@@ -747,6 +824,10 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 			"const terminalId = activeTerminalRun.terminalId",
 		);
 		expect(sendTerminalData).toContain("const workspaceId = workspace.id");
+		expect(sendTerminalData).toContain(
+			'sendTerminalLiveMessage(terminalId, { type: "input", data })',
+		);
+		expect(sendTerminalData).toContain("return;");
 		expect(sendTerminalData).not.toContain("data.length > 1");
 		expect(sendTerminalData).not.toContain("lastInput");
 		expect(sendTerminalData).not.toContain("sentAt");
@@ -762,11 +843,31 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 			"terminalInputQueueRef.current = queuedWrite.then",
 		);
 		expect(sendTerminalData).not.toContain(
-			'sendTerminalLiveMessage(terminalId, { type: "input", data })',
-		);
-		expect(sendTerminalData).not.toContain(
 			"const handleSendTerminalData = async",
 		);
+	});
+
+	test("does not let a mobile xterm fit resize the shared host PTY", () => {
+		expect(SOURCE).not.toContain("apiClient.v2Workspace.resizeTerminal");
+		expect(SOURCE).not.toContain("lastTerminalResizeKeyRef");
+
+		const localResizeStart = SOURCE.indexOf(
+			"const handleTerminalLocalResize =",
+		);
+		const resizeStart = SOURCE.indexOf("const handleTerminalResize =");
+		const nextEffect = SOURCE.indexOf("useEffect(() =>", resizeStart);
+		expect(localResizeStart).toBeGreaterThan(0);
+		expect(resizeStart).toBeGreaterThan(0);
+		expect(nextEffect).toBeGreaterThan(resizeStart);
+		const localResizeHandler = SOURCE.slice(localResizeStart, resizeStart);
+		expect(localResizeHandler).toContain("terminalSizeRef.current = size");
+		const resizeHandler = SOURCE.slice(resizeStart, nextEffect);
+		expect(resizeHandler).toContain("handleTerminalLocalResize(size)");
+		expect(resizeHandler).toContain("shouldRequestRedraw");
+		expect(resizeHandler).toContain("requestTerminalRedraw");
+		expect(resizeHandler).not.toContain("resizeTerminal");
+		expect(resizeHandler).not.toContain("sendTerminalLiveMessage");
+		expect(resizeHandler).not.toContain('type: "resize"');
 	});
 
 	test("renders mobile ACP pending actions with native iOS permission actions", () => {
@@ -977,9 +1078,9 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 		expect(SOURCE).toContain('} from "@expo/ui/swift-ui/modifiers";');
 		expect(SOURCE).toContain("background");
 		expect(SOURCE).toContain("environment");
-		expect(SOURCE).toContain("interactiveDismissDisabled");
-		expect(SOURCE).toContain("presentationDetents");
-		expect(SOURCE).toContain("presentationDragIndicator");
+		expect(SOURCE).not.toContain("interactiveDismissDisabled");
+		expect(SOURCE).not.toContain("presentationDetents");
+		expect(SOURCE).not.toContain("presentationDragIndicator");
 		const terminalActionsIndex = SOURCE.indexOf(
 			"const showNativeTerminalActions = () =>",
 		);
@@ -1011,15 +1112,15 @@ describe("WorkspaceMobileShell ACP and terminal boundaries", () => {
 		expect(terminalSheet).toContain("<SwiftUIGroup");
 		expect(terminalSheet).toContain("<RNHostView>");
 		expect(terminalSheet).toContain("terminalActionsSheetBackground");
-		expect(terminalSheet).toContain("terminalActionsSheetDetents");
-		expect(terminalSheet).toContain("terminalActionsSheetExpandedDetent");
-		expect(terminalSheet).toContain("selectedTerminalActionsSheetDetent");
+		expect(terminalSheet).not.toContain("terminalActionsSheetDetents");
+		expect(terminalSheet).not.toContain("terminalActionsSheetExpandedDetent");
+		expect(terminalSheet).not.toContain("selectedTerminalActionsSheetDetent");
 		expect(terminalSheet).toContain('environment("colorScheme", "dark")');
-		expect(terminalSheet).toContain(
+		expect(terminalSheet).not.toContain(
 			"presentationDetents(terminalActionsSheetDetents",
 		);
-		expect(terminalSheet).toContain('presentationDragIndicator("hidden")');
-		expect(terminalSheet).toContain("interactiveDismissDisabled(false)");
+		expect(terminalSheet).not.toContain('presentationDragIndicator("hidden")');
+		expect(terminalSheet).not.toContain("interactiveDismissDisabled(false)");
 		expect(terminalSheet).toContain(
 			"background(terminalActionsSheetBackground)",
 		);

@@ -1,9 +1,5 @@
 import { BottomSheet, Group, Host, RNHostView } from "@expo/ui/swift-ui";
-import {
-	background,
-	environment,
-	presentationDragIndicator,
-} from "@expo/ui/swift-ui/modifiers";
+import { background, environment } from "@expo/ui/swift-ui/modifiers";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, View } from "react-native";
 import { Text } from "@/components/ui/text";
@@ -44,7 +40,6 @@ export function OrganizationSwitcherSheet({
 				<Group
 					modifiers={[
 						environment("colorScheme", "dark"),
-						presentationDragIndicator("visible"),
 						background(theme.background),
 					]}
 				>

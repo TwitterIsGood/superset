@@ -1,0 +1,28 @@
+{
+  "id": "mobile-terminal-desktop-tab-ux",
+  "name": "mobile-terminal-desktop-tab-ux",
+  "title": "修复移动端 Terminal 与桌面 Worktree 选项卡体验问题",
+  "description": "Fix iPhone terminal input latency and remote PTY resize side effects, and persist selected worktree tab per worktree on desktop.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "frontend",
+  "package": "mobile+desktop",
+  "priority": "P1",
+  "creator": "bichengyu",
+  "assignee": "bichengyu",
+  "createdAt": "2026-06-23",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "06-23-mobile-terminal-screen-snapshot-root-fix"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "Spans apps/mobile terminal UX, apps/desktop v2 workspace tab state, and the terminal resize ownership contract. Mobile must not resize shared PTY sessions owned by the host/desktop.",
+  "meta": {}
+}

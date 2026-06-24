@@ -389,6 +389,8 @@ describe("terminal router integration", () => {
 				createdAt: expect.any(Number),
 				pid: 123,
 				title: "Claude Code",
+				cols: 80,
+				rows: 24,
 			},
 		]);
 	});
@@ -438,6 +440,8 @@ describe("terminal router integration", () => {
 				exitCode: 0,
 				attached: false,
 				title: null,
+				cols: 80,
+				rows: 24,
 			},
 		]);
 		expect(count.count).toBe(1);

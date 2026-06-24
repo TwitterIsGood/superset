@@ -251,9 +251,9 @@ export class TunnelClient {
 
 			const body = await response.text();
 			const headers: Record<string, string> = {};
-			for (const [key, value] of response.headers.entries()) {
+			response.headers.forEach((value, key) => {
 				headers[key] = value;
-			}
+			});
 
 			this.send({
 				type: "http:response",

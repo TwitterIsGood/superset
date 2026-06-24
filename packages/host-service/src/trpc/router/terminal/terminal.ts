@@ -96,6 +96,8 @@ async function listWorkspaceTerminalSessions({
 				exitCode: 0,
 				attached: false,
 				title: resourceSession.title,
+				cols: resourceSession.cols,
+				rows: resourceSession.rows,
 			});
 		}
 	} catch (error) {

@@ -18,24 +18,16 @@ import { type OpenChatFn, usePRFlowDispatch } from "./hooks/usePRFlowDispatch";
 import { usePRFlowState } from "./hooks/usePRFlowState";
 import { useReviewTab } from "./hooks/useReviewTab";
 import type { SidebarTabDefinition } from "./types";
+import {
+	isSidebarTabId,
+	resolveWorkspaceSidebarActiveTab,
+	type SidebarTabId,
+} from "./workspaceSidebarTabs";
 
 // Gates the "Create PR" button only — the chat-driven create flow doesn't
 // exist in v2 yet. The PR status group (link + merge dropdown for an open PR)
 // always renders so users can see PR state and merge once a PR exists.
 const CREATE_PR_BUTTON_ENABLED = false;
-
-type SidebarTabId = "changes" | "files" | "review" | "models";
-
-const VALID_TAB_IDS: readonly SidebarTabId[] = [
-	"changes",
-	"files",
-	"review",
-	"models",
-];
-
-function isSidebarTabId(tab: string): tab is SidebarTabId {
-	return (VALID_TAB_IDS as readonly string[]).includes(tab);
-}
 
 export interface PendingReveal {
 	path: string;
@@ -103,10 +95,9 @@ export function WorkspaceSidebar({
 				.where(({ localState }) => eq(localState.workspaceId, workspaceId)),
 		[collections, workspaceId],
 	);
-	const activeTab: SidebarTabId =
-		localState && isSidebarTabId(localState.sidebarState.activeTab)
-			? localState.sidebarState.activeTab
-			: "changes";
+	const activeTab: SidebarTabId = resolveWorkspaceSidebarActiveTab(
+		localState?.sidebarState.activeTab,
+	);
 
 	function setActiveTab(tab: string) {
 		if (!isSidebarTabId(tab)) return;

@@ -2,6 +2,7 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+	replayableInitialTerminalSnapshot,
 	shouldReplayInitialTerminalSnapshot,
 	terminalTailDelta,
 } from "./terminalTailDelta";
@@ -42,6 +43,31 @@ describe("shouldReplayInitialTerminalSnapshot", () => {
 	test("does not restore an active alternate-screen TUI tail", () => {
 		expect(
 			shouldReplayInitialTerminalSnapshot("\u001b[?1049htop screen bytes"),
+		).toBe(false);
+	});
+
+	test("does not restore bounded raw tails that contain prompt repaint controls", () => {
+		expect(
+			shouldReplayInitialTerminalSnapshot(
+				"└  ~/.superset/worktrees/demo\r\n › p\bprintf 'OK\\n'\r\nOK\r\n\u001b[J",
+			),
+		).toBe(false);
+	});
+
+	test("restores only the last hard clear-screen boundary for legacy shell redraw tails", () => {
+		const replayable = replayableInitialTerminalSnapshot(
+			"stale mid-frame\u001b[J\r\n\u001b[H\u001b[2J└  ~/.superset/worktrees/demo\r\n › \u001b[K",
+		);
+		expect(replayable).toBe(
+			"\u001b[H\u001b[2J└  ~/.superset/worktrees/demo\r\n › \u001b[K",
+		);
+	});
+
+	test("does not restore bounded raw tails that contain cursor movement rewrites", () => {
+		expect(
+			shouldReplayInitialTerminalSnapshot(
+				" › printf 'STILL_LL_\u001b[16Dprintf 'STILL_LL_OK\\n'\r\nSTILL_LL_OK\r\n",
+			),
 		).toBe(false);
 	});
 

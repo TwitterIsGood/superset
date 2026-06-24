@@ -112,6 +112,10 @@ describe("v2Workspace mobile host control recovery", () => {
 		expect(before).toContain("getWorkspaceHostControlAccess");
 		expect(before).toContain("buildHostRoutingKey");
 		expect(before).toContain("WorkspaceTerminalSnapshot");
+		expect(SOURCE).toContain("type WorkspaceTerminalScreenSnapshot");
+		expect(SOURCE).toContain(
+			"screenSnapshot?: WorkspaceTerminalScreenSnapshot",
+		);
 
 		const aroundList = SOURCE.slice(
 			Math.max(0, listIndex - 900),

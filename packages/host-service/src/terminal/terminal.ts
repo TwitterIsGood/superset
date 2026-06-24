@@ -39,6 +39,11 @@ import {
 	createModeTracker,
 	type ModeTracker,
 } from "./terminal-mode-tracker.ts";
+import {
+	createTerminalScreenTracker,
+	type TerminalScreenSnapshot,
+	type TerminalScreenTracker,
+} from "./terminal-screen-tracker.ts";
 
 /**
  * Thin adapter exposing approximately the IPty surface that the rest of
@@ -154,7 +159,13 @@ type TerminalClientMessage =
 // on attach) is a binary frame too; the renderer doesn't distinguish it
 // from live data.
 type TerminalServerMessage =
-	| { type: "attached"; terminalId: string; canResize?: boolean }
+	| {
+			type: "attached";
+			terminalId: string;
+			canResize?: boolean;
+			cols?: number;
+			rows?: number;
+	  }
 	| { type: "error"; message: string }
 	| { type: "exit"; exitCode: number; signal: number }
 	| { type: "title"; title: string | null };
@@ -250,6 +261,13 @@ interface TerminalSession {
 	 * paste, focus, mouse, etc. that the FIFO can't restore on its own.
 	 */
 	modeTracker: ModeTracker;
+	/**
+	 * Mirrors PTY output through a bounded headless xterm screen model so
+	 * mobile/remote clients can restore the current screen instead of replaying
+	 * an arbitrary raw output tail.
+	 */
+	screenTracker: TerminalScreenTracker | null;
+	screenTrackerWarningLogged: boolean;
 }
 
 /** PTY lifetime is independent of socket lifetime — sockets detach/reattach freely. */
@@ -292,6 +310,7 @@ onDaemonDisconnect((err) => {
 		} catch {
 			// best-effort
 		}
+		disposeScreenTracker(session);
 	}
 	sessions.clear();
 });
@@ -318,6 +337,7 @@ export function __resetSessionsForTesting(): void {
 		} catch {
 			// best-effort
 		}
+		disposeScreenTracker(session);
 	}
 	sessions.clear();
 }
@@ -345,11 +365,14 @@ export interface TerminalSessionSummary {
 	exitCode: number;
 	attached: boolean;
 	title: string | null;
+	cols: number;
+	rows: number;
 }
 
 export interface TerminalSessionSnapshot extends TerminalSessionSummary {
 	outputTail: string;
 	bufferBytes: number;
+	screenSnapshot?: TerminalScreenSnapshot;
 }
 
 export function listTerminalSessions(
@@ -373,6 +396,8 @@ export function listTerminalSessions(
 			exitCode: session.exitCode,
 			attached: pruneAndCountOpenSockets(session) > 0,
 			title: session.title,
+			cols: session.cols,
+			rows: session.rows,
 		}));
 }
 
@@ -404,6 +429,8 @@ export function getTerminalSessionSnapshot({
 			? combined.subarray(combined.byteLength - maxBytes)
 			: combined;
 
+	const screenSnapshot = getTerminalScreenSnapshot(session);
+
 	return {
 		terminalId: session.terminalId,
 		workspaceId: session.workspaceId,
@@ -412,8 +439,11 @@ export function getTerminalSessionSnapshot({
 		exitCode: session.exitCode,
 		attached: pruneAndCountOpenSockets(session) > 0,
 		title: session.title,
+		cols: session.cols,
+		rows: session.rows,
 		outputTail: tail.toString("utf8"),
 		bufferBytes: session.bufferBytes,
+		...(screenSnapshot ? { screenSnapshot } : {}),
 	};
 }
 
@@ -504,6 +534,7 @@ export function resizeTerminalSession({
 	);
 	session.pty.resize(normalizedCols, normalizedRows);
 	session.modeTracker.resize(normalizedCols, normalizedRows);
+	resizeScreenTracker(session, normalizedCols, normalizedRows);
 	session.cols = normalizedCols;
 	session.rows = normalizedRows;
 	return { success: true };
@@ -561,6 +592,81 @@ function normalizeTerminalDimension(
 ): number {
 	if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
 	return Math.max(min, Math.floor(value));
+}
+
+function createOptionalScreenTracker(
+	cols: number,
+	rows: number,
+): TerminalScreenTracker | null {
+	try {
+		return createTerminalScreenTracker(cols, rows);
+	} catch (error) {
+		console.warn("[terminal] screen snapshot tracker unavailable", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+		return null;
+	}
+}
+
+function disposeScreenTracker(session: TerminalSession): void {
+	if (!session.screenTracker) return;
+	try {
+		session.screenTracker.dispose();
+	} catch {
+		// best-effort
+	} finally {
+		session.screenTracker = null;
+	}
+}
+
+function disableScreenTracker(
+	session: TerminalSession,
+	error: unknown,
+	operation: "feed" | "resize" | "snapshot",
+): void {
+	if (!session.screenTrackerWarningLogged) {
+		session.screenTrackerWarningLogged = true;
+		console.warn("[terminal] disabling screen snapshot tracker", {
+			terminalId: session.terminalId,
+			operation,
+			error: error instanceof Error ? error.message : String(error),
+		});
+	}
+	disposeScreenTracker(session);
+}
+
+function feedScreenTracker(session: TerminalSession, bytes: Uint8Array): void {
+	if (!session.screenTracker) return;
+	try {
+		session.screenTracker.feed(bytes);
+	} catch (error) {
+		disableScreenTracker(session, error, "feed");
+	}
+}
+
+function resizeScreenTracker(
+	session: TerminalSession,
+	cols: number,
+	rows: number,
+): void {
+	if (!session.screenTracker) return;
+	try {
+		session.screenTracker.resize(cols, rows);
+	} catch (error) {
+		disableScreenTracker(session, error, "resize");
+	}
+}
+
+function getTerminalScreenSnapshot(
+	session: TerminalSession,
+): TerminalScreenSnapshot | null {
+	if (!session.screenTracker) return null;
+	try {
+		return session.screenTracker.getSnapshot();
+	} catch (error) {
+		disableScreenTracker(session, error, "snapshot");
+		return null;
+	}
 }
 
 // All bytes we send here are ArrayBuffer-backed at runtime (node Buffers,
@@ -653,6 +759,7 @@ function resolveShellReady(
 	if (session.scanState.heldBytes.length > 0) {
 		const heldBytes = Uint8Array.from(session.scanState.heldBytes);
 		session.modeTracker.feed(heldBytes);
+		feedScreenTracker(session, heldBytes);
 		bufferOutput(session, heldBytes);
 		session.scanState.heldBytes.length = 0;
 	}
@@ -809,6 +916,7 @@ export async function disposeSessionAndWait(
 		} catch {
 			// best-effort
 		}
+		disposeScreenTracker(session);
 		sessions.delete(terminalId);
 	} else {
 		closePromise = closeDaemonSessionById(terminalId, "SIGHUP");
@@ -1148,6 +1256,8 @@ export async function createTerminalSessionInternal({
 		initialCommandQueued: isAdopted,
 		portHintDecoder: new StringDecoder("utf8"),
 		modeTracker: createModeTracker(cols, rows),
+		screenTracker: createOptionalScreenTracker(cols, rows),
+		screenTrackerWarningLogged: false,
 	};
 	sessions.set(terminalId, session);
 	portManager.upsertSession(terminalId, workspaceId, pty.pid);
@@ -1206,6 +1316,7 @@ export async function createTerminalSessionInternal({
 				// Feed the tracker on every byte so startup mode escapes are available
 				// to every newly attached xterm.
 				session.modeTracker.feed(bytes);
+				feedScreenTracker(session, bytes);
 				broadcastBytes(session, bytes);
 			},
 			onExit({ code, signal }) {
@@ -1344,7 +1455,13 @@ export function registerWorkspaceTerminalRoute({
 				if (session.sockets.has(ws)) return false;
 				const canResize = pruneAndCountOpenSockets(session) === 0;
 				session.sockets.add(ws);
-				sendMessage(ws, { type: "attached", terminalId, canResize });
+				sendMessage(ws, {
+					type: "attached",
+					terminalId,
+					canResize,
+					cols: session.cols,
+					rows: session.rows,
+				});
 
 				db.update(terminalSessions)
 					.set({ lastAttachedAt: Date.now() })
@@ -1504,6 +1621,7 @@ export function registerWorkspaceTerminalRoute({
 						);
 						session.pty.resize(cols, rows);
 						session.modeTracker.resize(cols, rows);
+						resizeScreenTracker(session, cols, rows);
 						session.cols = cols;
 						session.rows = rows;
 					}

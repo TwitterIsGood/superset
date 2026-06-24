@@ -5,6 +5,14 @@ import { useEffect, useMemo, useRef } from "react";
 import { useWorkspace } from "renderer/routes/_authenticated/_dashboard/v2-workspace/providers/WorkspaceProvider";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import type { PaneViewerData } from "../../types";
+import {
+	createPaneLayoutSyncState,
+	markPaneLayoutHydrated,
+	markPaneLayoutPersisted,
+	resetPaneLayoutSyncState,
+	shouldHydratePaneLayout,
+	shouldPersistPaneLayout,
+} from "./paneLayoutSync";
 
 const EMPTY_STATE: WorkspaceState<PaneViewerData> = {
 	version: 1,
@@ -34,10 +42,10 @@ export function useV2WorkspacePaneLayout() {
 		[workspaceId],
 	);
 	const { store } = workspaceRuntime;
-	const syncStateRef = useRef({
-		workspaceId,
-		lastSyncedSnapshot: getSnapshot(EMPTY_STATE),
-	});
+	const emptySnapshot = getSnapshot(EMPTY_STATE);
+	const syncStateRef = useRef(
+		createPaneLayoutSyncState(workspaceId, emptySnapshot),
+	);
 
 	const { data: localWorkspaceRows = [], isReady: isPaneLayoutReady } =
 		useLiveQuery(
@@ -60,23 +68,29 @@ export function useV2WorkspacePaneLayout() {
 				: EMPTY_STATE,
 		[localWorkspaceState, workspaceId],
 	);
+	const hasPaneLayoutHydrationSource =
+		Boolean(localWorkspaceState) || isPaneLayoutReady;
 
 	useEffect(() => {
-		syncStateRef.current = {
-			workspaceId,
-			lastSyncedSnapshot: getSnapshot(EMPTY_STATE),
-		};
-	}, [workspaceId]);
+		resetPaneLayoutSyncState(syncStateRef.current, workspaceId, emptySnapshot);
+	}, [emptySnapshot, workspaceId]);
 
 	useEffect(() => {
 		const nextSnapshot = getSnapshot(persistedPaneLayout);
-		if (nextSnapshot === syncStateRef.current.lastSyncedSnapshot) {
+		if (
+			!shouldHydratePaneLayout({
+				state: syncStateRef.current,
+				workspaceId,
+				nextSnapshot,
+				hasHydrationSource: hasPaneLayoutHydrationSource,
+			})
+		) {
 			return;
 		}
 
-		syncStateRef.current.lastSyncedSnapshot = nextSnapshot;
+		markPaneLayoutHydrated(syncStateRef.current, workspaceId, nextSnapshot);
 		store.getState().replaceState(persistedPaneLayout);
-	}, [persistedPaneLayout, store]);
+	}, [hasPaneLayoutHydrationSource, persistedPaneLayout, store, workspaceId]);
 
 	useEffect(() => {
 		const unsubscribe = store.subscribe((nextStore) => {
@@ -86,7 +100,13 @@ export function useV2WorkspacePaneLayout() {
 				activeTabId: nextStore.activeTabId,
 			};
 			const nextSnapshot = getSnapshot(nextWorkspaceState);
-			if (nextSnapshot === syncStateRef.current.lastSyncedSnapshot) {
+			if (
+				!shouldPersistPaneLayout({
+					state: syncStateRef.current,
+					workspaceId,
+					nextSnapshot,
+				})
+			) {
 				return;
 			}
 
@@ -97,7 +117,7 @@ export function useV2WorkspacePaneLayout() {
 			collections.v2WorkspaceLocalState.update(workspaceId, (draft) => {
 				draft.paneLayout = nextWorkspaceState;
 			});
-			syncStateRef.current.lastSyncedSnapshot = nextSnapshot;
+			markPaneLayoutPersisted(syncStateRef.current, workspaceId, nextSnapshot);
 		});
 
 		return () => {

@@ -35,7 +35,7 @@
 		"install:deps": "electron-builder install-app-deps",
 		"release": "electron-builder --publish always",
 		"clean:dev": "rimraf ./node_modules/.dev",
-		"generate:routes": "tsr generate",
+		"generate:routes": "node node_modules/.bin/tsr generate",
 		"pretypecheck": "bun run generate:icons && bun run generate:routes",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"

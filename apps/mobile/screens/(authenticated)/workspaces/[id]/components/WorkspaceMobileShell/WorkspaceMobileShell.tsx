@@ -4,13 +4,7 @@ import {
 	Group as SwiftUIGroup,
 	Host as SwiftUIHost,
 } from "@expo/ui/swift-ui";
-import {
-	background,
-	environment,
-	interactiveDismissDisabled,
-	presentationDetents,
-	presentationDragIndicator,
-} from "@expo/ui/swift-ui/modifiers";
+import { background, environment } from "@expo/ui/swift-ui/modifiers";
 import { classifyAgentToolName } from "@superset/chat/shared";
 import type {
 	SelectChatSession,
@@ -75,8 +69,10 @@ import { Text } from "@/components/ui/text";
 import { apiClient } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import {
+	type TerminalDimensions,
 	TerminalEmulator,
 	type TerminalInputCommand,
+	type TerminalScreenSnapshot,
 } from "../TerminalEmulator";
 import { MobileMarkdown } from "./components/MobileMarkdown";
 import {
@@ -85,9 +81,9 @@ import {
 } from "./utils/assistantContentPartsForDisplay";
 import { mergeSnapshotMessagesWithPending } from "./utils/mergeSnapshotMessagesWithPending";
 import {
-	shouldReplayInitialTerminalSnapshot,
-	terminalTailDelta,
-} from "./utils/terminalTailDelta";
+	mergeTerminalSnapshotState,
+	terminalDimensionsFromRecord,
+} from "./utils/terminalSnapshotMerge";
 import {
 	embeddedFileLabelsFromText,
 	stripEmbeddedFilePayloads,
@@ -141,10 +137,13 @@ type TerminalAgentRun = {
 	label: string;
 	prompt: string;
 	createdAt: Date;
+	terminalDimensions: TerminalDimensions | null;
 	outputTail: string;
+	screenSnapshot: TerminalScreenSnapshot | null;
 	restoreRevision: number;
 	hasLoadedSnapshot: boolean;
 	suppressReplayUntilDelta: boolean;
+	usesScreenSnapshotBaseline: boolean;
 	exited: boolean;
 	exitCode: number | null;
 	errorMessage: string | null;
@@ -216,23 +215,26 @@ type TerminalLiveStatus = {
 	message: string | null;
 };
 type TerminalLiveControlMessage =
-	| { type: "attached"; terminalId: string; canResize?: boolean }
+	| {
+			type: "attached";
+			terminalId: string;
+			canResize?: boolean;
+			cols?: number;
+			rows?: number;
+	  }
 	| { type: "title"; title: string | null }
 	| { type: "exit"; exitCode?: number | null; signal?: number | null }
 	| { type: "error"; message: string };
 type TerminalLiveFrame =
 	| { type: "output"; text: string }
 	| { type: "control"; message: TerminalLiveControlMessage };
+type TerminalLiveClientMessage = { type: "input"; data: string };
 type TerminalLiveSocketRef = {
 	terminalId: string;
 	socket: WebSocket | null;
 	state: TerminalLiveConnectionState;
 	receivedBytes: boolean;
 };
-type TerminalSocketClientMessage =
-	| { type: "input"; data: string }
-	| { type: "resize"; cols: number; rows: number };
-
 interface WorkspaceMobileShellProps {
 	workspace: Pick<
 		SelectV2Workspace,
@@ -286,13 +288,8 @@ const terminalKeyButtons = [
 
 const terminalSnapshotPollIntervalMs = 1000;
 const terminalLiveSnapshotReconcileIntervalMs = 2500;
+const webSocketOpenReadyState = 1;
 const terminalActionsSheetBackground = "#111116";
-const terminalActionsSheetCompactDetent = { fraction: 0.56 };
-const terminalActionsSheetExpandedDetent = { fraction: 0.92 };
-const terminalActionsSheetDetents = [
-	terminalActionsSheetCompactDetent,
-	terminalActionsSheetExpandedDetent,
-];
 const safeShellTokenPattern = /^[A-Za-z0-9_@%+=:,./~-]+$/;
 const envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const fallbackTerminalPresetCommands: Record<string, string> = {
@@ -1355,11 +1352,17 @@ function parseTerminalLiveControlMessage(
 		if (!parsed || typeof parsed !== "object") return null;
 		const record = parsed as Record<string, unknown>;
 		if (record.type === "attached" && typeof record.terminalId === "string") {
+			const terminalDimensions = terminalDimensionsFromRecord({
+				cols: typeof record.cols === "number" ? record.cols : undefined,
+				rows: typeof record.rows === "number" ? record.rows : undefined,
+			});
 			return {
 				type: "attached",
 				terminalId: record.terminalId,
 				canResize:
 					typeof record.canResize === "boolean" ? record.canResize : undefined,
+				cols: terminalDimensions?.cols,
+				rows: terminalDimensions?.rows,
 			};
 		}
 		if (record.type === "title") {
@@ -1543,7 +1546,6 @@ export function WorkspaceMobileShell({
 	const shouldFollowChatOutputRef = useRef(false);
 	const appliedInitialTerminalIdRef = useRef<string | null>(null);
 	const terminalSizeRef = useRef<{ rows: number; cols: number } | null>(null);
-	const lastTerminalResizeKeyRef = useRef<string | null>(null);
 	const terminalRawTailByIdRef = useRef<Map<string, string>>(new Map());
 	const redrawnTerminalIdsRef = useRef<Set<string>>(new Set());
 	const terminalInputQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -1582,6 +1584,10 @@ export function WorkspaceMobileShell({
 		WorkspaceTerminalSession[]
 	>([]);
 	const [loadingTerminals, setLoadingTerminals] = useState(false);
+	const [
+		terminalDiscoveryReadyWorkspaceId,
+		setTerminalDiscoveryReadyWorkspaceId,
+	] = useState<string | null>(null);
 	const [terminalListError, setTerminalListError] = useState<string | null>(
 		null,
 	);
@@ -1885,6 +1891,8 @@ export function WorkspaceMobileShell({
 	const hostName = host?.name ?? `Host ${shortId(workspace.hostId)}`;
 	const hostUpdatedAtKey = hostUpdatedAtMs(host?.updatedAt);
 	const cloudCanUseHost = hostIsOnline === true && hasHostAccess === true;
+	const terminalDiscoveryReady =
+		terminalDiscoveryReadyWorkspaceId === workspace.id;
 	const agentOptions = agents.length > 0 ? agents : fallbackAgentOptions;
 	const chatAgentOptions = agentOptions.filter(
 		(agent) => agent.kind === "chat",
@@ -2091,71 +2099,15 @@ export function WorkspaceMobileShell({
 				replayInitialSnapshot: true,
 			},
 		): TerminalAgentRun => {
-			const terminalId = current.terminalId;
-			const previousRawTail = terminalRawTailByIdRef.current.get(terminalId);
-			const delta = terminalTailDelta(previousRawTail, snapshot.outputTail);
-			const restoreRevision = current.restoreRevision;
-
-			if (current.suppressReplayUntilDelta) {
-				if (previousRawTail === undefined) {
-					const shouldReplayInitialSnapshot =
-						options.replayInitialSnapshot &&
-						shouldReplayInitialTerminalSnapshot(snapshot.outputTail);
-					if (shouldReplayInitialSnapshot) {
-						terminalRawTailByIdRef.current.set(terminalId, snapshot.outputTail);
-					}
-					return {
-						...current,
-						outputTail: shouldReplayInitialSnapshot
-							? snapshot.outputTail
-							: current.outputTail,
-						restoreRevision,
-						hasLoadedSnapshot: true,
-						suppressReplayUntilDelta: !shouldReplayInitialSnapshot,
-						exited: snapshot.exited,
-						exitCode: snapshot.exitCode ?? null,
-						errorMessage: null,
-					};
-				}
-
-				if (delta.length > 0) {
-					terminalRawTailByIdRef.current.set(terminalId, snapshot.outputTail);
-					return {
-						...current,
-						outputTail: current.outputTail + delta,
-						restoreRevision,
-						hasLoadedSnapshot: true,
-						suppressReplayUntilDelta: false,
-						exited: snapshot.exited,
-						exitCode: snapshot.exitCode ?? null,
-						errorMessage: null,
-					};
-				}
-
-				terminalRawTailByIdRef.current.set(terminalId, snapshot.outputTail);
-				return {
-					...current,
-					restoreRevision,
-					hasLoadedSnapshot: true,
-					exited: snapshot.exited,
-					exitCode: snapshot.exitCode ?? null,
-					errorMessage: null,
-				};
-			}
-
-			terminalRawTailByIdRef.current.set(terminalId, snapshot.outputTail);
-			return {
-				...current,
-				outputTail:
-					previousRawTail === undefined
-						? snapshot.outputTail
-						: current.outputTail + delta,
-				restoreRevision,
-				hasLoadedSnapshot: true,
-				exited: snapshot.exited,
-				exitCode: snapshot.exitCode ?? null,
-				errorMessage: null,
-			};
+			const result = mergeTerminalSnapshotState(current, snapshot, {
+				previousRawTail: terminalRawTailByIdRef.current.get(current.terminalId),
+				replayInitialSnapshot: options.replayInitialSnapshot,
+			});
+			terminalRawTailByIdRef.current.set(
+				current.terminalId,
+				result.nextRawTail,
+			);
+			return result.run;
 		},
 		[],
 	);
@@ -2435,6 +2387,7 @@ export function WorkspaceMobileShell({
 		if (!cloudCanUseHost) {
 			setTerminalSessions([]);
 			setLoadingTerminals(false);
+			setTerminalDiscoveryReadyWorkspaceId(null);
 			setTerminalListError(null);
 			return;
 		}
@@ -2442,6 +2395,7 @@ export function WorkspaceMobileShell({
 		let cancelled = false;
 		let timer: ReturnType<typeof setTimeout> | null = null;
 		setLoadingTerminals(true);
+		setTerminalDiscoveryReadyWorkspaceId(null);
 		setTerminalListError(null);
 
 		const loadTerminals = async () => {
@@ -2453,6 +2407,7 @@ export function WorkspaceMobileShell({
 				if (cancelled) return;
 				clearRuntimeControlErrors();
 				setTerminalSessions(result.sessions);
+				setTerminalDiscoveryReadyWorkspaceId(workspace.id);
 				setTerminalListError(null);
 			} catch (error) {
 				if (!cancelled) {
@@ -2465,6 +2420,7 @@ export function WorkspaceMobileShell({
 					if (!relayUnavailable) {
 						setTerminalSessions([]);
 					}
+					setTerminalDiscoveryReadyWorkspaceId(null);
 					setTerminalListError(message);
 				}
 			} finally {
@@ -2661,7 +2617,7 @@ export function WorkspaceMobileShell({
 					await apiClient.v2Workspace.getTerminalAttachDescriptor.query({
 						workspaceId: workspace.id,
 						terminalId,
-						replay: !liveRef.receivedBytes,
+						replay: false,
 					});
 				if (cancelled || terminalLiveSocketRef.current !== liveRef) return;
 
@@ -2692,12 +2648,20 @@ export function WorkspaceMobileShell({
 								setActiveTerminalRun((current) => {
 									if (current?.terminalId !== terminalId) return current;
 									const outputTail = current.outputTail + frame.text;
-									terminalRawTailByIdRef.current.set(terminalId, outputTail);
+									const previousRawTail =
+										terminalRawTailByIdRef.current.get(terminalId) ?? "";
+									terminalRawTailByIdRef.current.set(
+										terminalId,
+										previousRawTail + frame.text,
+									);
 									return {
 										...current,
 										outputTail,
+										screenSnapshot: null,
 										hasLoadedSnapshot: true,
 										suppressReplayUntilDelta: false,
+										usesScreenSnapshotBaseline:
+											current.usesScreenSnapshotBaseline,
 										errorMessage: null,
 									};
 								});
@@ -2709,6 +2673,17 @@ export function WorkspaceMobileShell({
 								case "attached":
 									clearRuntimeControlErrors();
 									setLiveState("live");
+									setActiveTerminalRun((current) =>
+										current?.terminalId === terminalId
+											? {
+													...current,
+													terminalDimensions:
+														terminalDimensionsFromRecord(message) ??
+														current.terminalDimensions,
+													errorMessage: null,
+												}
+											: current,
+									);
 									break;
 								case "title":
 									setActiveTerminalRun((current) =>
@@ -2899,10 +2874,13 @@ export function WorkspaceMobileShell({
 					terminal.title?.trim() || `Terminal ${shortId(terminal.terminalId)}`,
 				prompt: terminal.title?.trim() || "Attached terminal",
 				createdAt: new Date(terminal.createdAt),
+				terminalDimensions: terminalDimensionsFromRecord(terminal),
 				outputTail: "",
+				screenSnapshot: null,
 				restoreRevision: 0,
 				hasLoadedSnapshot: false,
 				suppressReplayUntilDelta: true,
+				usesScreenSnapshotBaseline: false,
 				exited: terminal.exited,
 				exitCode: terminal.exitCode ?? null,
 				errorMessage: null,
@@ -2929,6 +2907,10 @@ export function WorkspaceMobileShell({
 			});
 			const createdAt = Date.now();
 			const label = `Terminal ${shortId(result.terminalId)}`;
+			const terminalDimensions =
+				terminalSize === null
+					? null
+					: terminalDimensionsFromRecord(terminalSize);
 			setActiveSurfaceKind("terminal");
 			setSelectedAgentId(selectedTerminalAgent.id);
 			setActiveTerminalRun({
@@ -2936,10 +2918,13 @@ export function WorkspaceMobileShell({
 				label,
 				prompt: "Host terminal",
 				createdAt: new Date(createdAt),
+				terminalDimensions,
 				outputTail: "",
+				screenSnapshot: null,
 				restoreRevision: 0,
 				hasLoadedSnapshot: false,
 				suppressReplayUntilDelta: true,
+				usesScreenSnapshotBaseline: false,
 				exited: false,
 				exitCode: null,
 				errorMessage: null,
@@ -2956,6 +2941,8 @@ export function WorkspaceMobileShell({
 								exitCode: 0,
 								attached: false,
 								title: label,
+								cols: terminalDimensions?.cols,
+								rows: terminalDimensions?.rows,
 							},
 							...current,
 						],
@@ -3283,7 +3270,16 @@ export function WorkspaceMobileShell({
 
 	useEffect(() => {
 		if (activeSurfaceKind !== "terminal" || activeTerminalRun) return;
-		if (!canUseHost || terminalCreateError || creatingTerminal) return;
+		if (
+			!canUseHost ||
+			!terminalDiscoveryReady ||
+			loadingTerminals ||
+			terminalListError ||
+			terminalCreateError ||
+			creatingTerminal
+		) {
+			return;
+		}
 
 		const latestTerminal = [...terminalSessions]
 			.filter((terminal) => !terminal.exited)
@@ -3301,8 +3297,11 @@ export function WorkspaceMobileShell({
 		canUseHost,
 		creatingTerminal,
 		handleCreateTerminalSession,
+		loadingTerminals,
 		selectTerminalSession,
+		terminalDiscoveryReady,
 		terminalCreateError,
+		terminalListError,
 		terminalSessions,
 	]);
 
@@ -3956,22 +3955,6 @@ export function WorkspaceMobileShell({
 		}
 	};
 
-	const sendTerminalLiveMessage = (
-		terminalId: string,
-		message: TerminalSocketClientMessage,
-	): boolean => {
-		const liveSocket = terminalLiveSocketRef.current;
-		if (
-			liveSocket?.terminalId !== terminalId ||
-			!liveSocket.socket ||
-			liveSocket.socket.readyState !== WebSocket.OPEN
-		) {
-			return false;
-		}
-		liveSocket.socket.send(JSON.stringify(message));
-		return true;
-	};
-
 	const requestTerminalRedraw = useCallback(
 		(terminalId: string): Promise<void> => {
 			if (redrawnTerminalIdsRef.current.has(terminalId)) {
@@ -3992,6 +3975,29 @@ export function WorkspaceMobileShell({
 		[workspace.id],
 	);
 
+	const sendTerminalLiveMessage = (
+		terminalId: string,
+		message: TerminalLiveClientMessage,
+	) => {
+		const liveSocket = terminalLiveSocketRef.current;
+		if (
+			liveSocket?.terminalId !== terminalId ||
+			liveSocket.socket?.readyState !== webSocketOpenReadyState ||
+			liveSocket.state === "error" ||
+			liveSocket.state === "exited"
+		) {
+			return false;
+		}
+
+		try {
+			liveSocket.socket.send(JSON.stringify(message));
+			shouldFollowChatOutputRef.current = true;
+			return true;
+		} catch {
+			return false;
+		}
+	};
+
 	const handleSendTerminalData = (data: string) => {
 		if (
 			data.length === 0 ||
@@ -4004,6 +4010,10 @@ export function WorkspaceMobileShell({
 
 		const terminalId = activeTerminalRun.terminalId;
 		const workspaceId = workspace.id;
+
+		if (sendTerminalLiveMessage(terminalId, { type: "input", data })) {
+			return;
+		}
 
 		const writeInput = async () => {
 			await apiClient.v2Workspace.writeTerminalInput.mutate({
@@ -4073,50 +4083,21 @@ export function WorkspaceMobileShell({
 		Keyboard.dismiss();
 	};
 
-	const handleTerminalResize = (size: { rows: number; cols: number }) => {
+	const handleTerminalLocalResize = (size: TerminalDimensions) => {
 		terminalSizeRef.current = size;
+	};
+
+	const handleTerminalResize = (size: TerminalDimensions) => {
+		handleTerminalLocalResize(size);
 		if (!canUseHost || !activeTerminalRun || activeTerminalRun.exited) return;
 
-		const resizeKey = `${activeTerminalRun.terminalId}:${size.cols}:${size.rows}`;
-		const shouldResize = lastTerminalResizeKeyRef.current !== resizeKey;
 		const shouldRequestRedraw =
 			activeTerminalRun.hasLoadedSnapshot &&
 			activeTerminalRun.suppressReplayUntilDelta &&
 			!redrawnTerminalIdsRef.current.has(activeTerminalRun.terminalId);
-		if (!shouldResize && !shouldRequestRedraw) return;
-		if (shouldResize) {
-			lastTerminalResizeKeyRef.current = resizeKey;
-		}
+		if (!shouldRequestRedraw) return;
 
-		const requestRedraw = () => {
-			if (!shouldRequestRedraw) return;
-			return requestTerminalRedraw(activeTerminalRun.terminalId);
-		};
-
-		const resizedViaLiveSocket =
-			shouldResize &&
-			sendTerminalLiveMessage(activeTerminalRun.terminalId, {
-				type: "resize",
-				cols: size.cols,
-				rows: size.rows,
-			});
-		const resizePromise =
-			shouldResize && !resizedViaLiveSocket
-				? apiClient.v2Workspace.resizeTerminal
-						.mutate({
-							workspaceId: workspace.id,
-							terminalId: activeTerminalRun.terminalId,
-							cols: size.cols,
-							rows: size.rows,
-						})
-						.catch(() => {
-							// Older host-service builds do not expose terminal.resize yet. The
-							// terminal remains interactive; the redraw request below still helps
-							// TUIs repaint into the mobile xterm.
-						})
-				: Promise.resolve();
-
-		resizePromise.then(requestRedraw).catch(() => {
+		requestTerminalRedraw(activeTerminalRun.terminalId).catch(() => {
 			// Best-effort redraw. Input failures are surfaced by explicit user input.
 		});
 	};
@@ -4794,12 +4775,15 @@ export function WorkspaceMobileShell({
 						output={activeTerminalRun.outputTail}
 						restoreRevision={activeTerminalRun.restoreRevision}
 						inputCommand={terminalInputCommand}
+						terminalDimensions={activeTerminalRun.terminalDimensions}
+						screenSnapshot={activeTerminalRun.screenSnapshot}
 						pendingModifiers={terminalModifiers}
 						keyboardDismissSignal={terminalKeyboardDismissToken}
 						onInput={(data) => {
 							void handleSendTerminalData(data);
 						}}
 						onInteraction={handleTerminalWebViewInteraction}
+						onLocalResize={handleTerminalLocalResize}
 						onPendingModifiersConsumed={() => {
 							setTerminalModifiers(emptyTerminalModifiers);
 						}}
@@ -5760,12 +5744,6 @@ export function WorkspaceMobileShell({
 				: terminalActionsSheetMode === "model"
 					? `${selectedAgentLabel} · ${hostName}`
 					: workspacePath;
-		const selectedTerminalActionsSheetDetent =
-			terminalActionsSheetMode === "switcher"
-				? terminalActionsSheetExpandedDetent
-				: terminalActionsSheetMode === "model"
-					? terminalActionsSheetCompactDetent
-					: terminalActionsSheetCompactDetent;
 
 		return (
 			<SwiftUIHost style={{ position: "absolute", width }}>
@@ -5778,11 +5756,6 @@ export function WorkspaceMobileShell({
 					<SwiftUIGroup
 						modifiers={[
 							environment("colorScheme", "dark"),
-							presentationDetents(terminalActionsSheetDetents, {
-								selection: selectedTerminalActionsSheetDetent,
-							}),
-							presentationDragIndicator("hidden"),
-							interactiveDismissDisabled(false),
 							background(terminalActionsSheetBackground),
 						]}
 					>

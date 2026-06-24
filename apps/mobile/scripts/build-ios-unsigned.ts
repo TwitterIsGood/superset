@@ -2,8 +2,8 @@
 /// <reference types="bun-types" />
 
 import { existsSync } from "node:fs";
-import { mkdir, rm } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { cp, mkdir, rm } from "node:fs/promises";
+import { basename, join, resolve } from "node:path";
 import {
 	getIosAtsExceptionDomains,
 	type MobileProfileName,
@@ -62,13 +62,23 @@ async function run(
 
 async function zipIpa(appPath: string, outputPath: string, cwd: string) {
 	await rm(outputPath, { force: true });
-	await run(
-		"ditto",
-		["-c", "-k", "--sequesterRsrc", "--keepParent", appPath, outputPath],
-		{
-			cwd,
-		},
-	);
+	const stagingDir = join(cwd, ".ipa-staging");
+	const payloadDir = join(stagingDir, "Payload");
+	await rm(stagingDir, { force: true, recursive: true });
+	await mkdir(payloadDir, { recursive: true });
+
+	try {
+		await cp(appPath, join(payloadDir, basename(appPath)), { recursive: true });
+		await run(
+			"ditto",
+			["-c", "-k", "--sequesterRsrc", "--keepParent", "Payload", outputPath],
+			{
+				cwd: stagingDir,
+			},
+		);
+	} finally {
+		await rm(stagingDir, { force: true, recursive: true });
+	}
 }
 
 async function verifyPlist(appPath: string, expectedDomains: string[]) {

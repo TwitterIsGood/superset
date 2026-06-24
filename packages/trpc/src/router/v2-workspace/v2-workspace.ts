@@ -133,6 +133,17 @@ type WorkspaceTerminalCreateResult = {
 	status: "active";
 };
 
+type WorkspaceTerminalScreenSnapshot = {
+	format: "xterm-serialize-ansi";
+	version: 1;
+	cols: number;
+	rows: number;
+	content: string;
+	contentBytes: number;
+	scrollback: number;
+	truncated: boolean;
+};
+
 type WorkspaceTerminalSnapshot = {
 	terminalId: string;
 	workspaceId: string;
@@ -141,8 +152,11 @@ type WorkspaceTerminalSnapshot = {
 	exitCode: number;
 	attached: boolean;
 	title: string | null;
+	cols?: number;
+	rows?: number;
 	outputTail: string;
 	bufferBytes: number;
+	screenSnapshot?: WorkspaceTerminalScreenSnapshot;
 };
 
 type WorkspaceTerminalSessionSummary = Omit<

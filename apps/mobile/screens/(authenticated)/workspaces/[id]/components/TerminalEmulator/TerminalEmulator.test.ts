@@ -61,13 +61,15 @@ describe("TerminalEmulator", () => {
 		expect(mountTerminalBlock).not.toContain("\n\t\ttheme,");
 	});
 
-	test("does not override xterm's helper textarea ownership from React Native", () => {
+	test("keeps xterm's helper textarea from becoming the iOS first responder", () => {
 		expect(SOURCE).toContain("keyboardDisplayRequiresUserAction={false}");
 		expect(SOURCE).not.toContain("webViewRef.current?.requestFocus?.();");
 		expect(SOURCE).toContain("createInputRelayScript");
 		expect(SOURCE).toContain("TextInput");
 		expect(SOURCE).toContain("nativeInputRef");
 		expect(SOURCE).toContain("styles.nativeInput");
+		expect(SOURCE).toContain('pointerEvents="none"');
+		expect(SOURCE).toContain('selectionColor="transparent"');
 		expect(SOURCE).toContain('keyboardType="ascii-capable"');
 		expect(SOURCE).toContain('autoCapitalize="none"');
 		expect(SOURCE).toContain("autoCorrect={false}");
@@ -80,10 +82,21 @@ describe("TerminalEmulator", () => {
 		expect(SOURCE).not.toContain("injectedJavaScript=");
 		expect(SOURCE).not.toContain("injectTerminalInputStabilizer");
 		expect(SOURCE).not.toContain("__SUPERSET_TERMINAL_INPUT_STABILIZER");
+		expect(SOURCE).not.toContain(
+			'pointerEvents="none"\n\t\t\t\toriginWhitelist',
+		);
 		expect(SOURCE).not.toContain('input.style.left = "0px"');
 		expect(SOURCE).not.toContain('input.style.fontSize = "16px"');
-		expect(SOURCE).not.toContain("MutationObserver");
+		expect(SOURCE).toContain("__SUP_TERM_NATIVE_INPUT_GUARD__");
+		expect(SOURCE).toContain("function suppressHelperInput(input)");
+		expect(SOURCE).toContain("input.readOnly = true");
+		expect(SOURCE).toContain('input.setAttribute("readonly", "readonly")');
+		expect(SOURCE).toContain('input.style.pointerEvents = "none"');
+		expect(SOURCE).toContain("new MutationObserver(suppressAllHelperInputs)");
+		expect(SOURCE).toContain('document.addEventListener("focusin"');
 		expect(WEBVIEW_HTML_SOURCE).toContain(".xterm-helper-textarea");
+		expect(WEBVIEW_HTML_SOURCE).toContain(".composition-view.active");
+		expect(WEBVIEW_HTML_SOURCE).toContain("display: none !important");
 		expect(WEBVIEW_HTML_SOURCE).toContain('setAttribute("autocorrect", "off")');
 		expect(WEBVIEW_HTML_SOURCE).toContain(
 			'setAttribute("autocapitalize", "off")',
@@ -93,7 +106,24 @@ describe("TerminalEmulator", () => {
 		);
 	});
 
-	test("lets xterm own typed input and keeps accessory keys byte-only", () => {
+	test("keeps the native TextInput from visually covering terminal output", () => {
+		const nativeInputStyleIndex = SOURCE.indexOf("nativeInput: {");
+		expect(nativeInputStyleIndex).toBeGreaterThan(0);
+		const nativeInputStyle = SOURCE.slice(
+			nativeInputStyleIndex,
+			nativeInputStyleIndex + 420,
+		);
+
+		expect(nativeInputStyle).toContain("width: 1");
+		expect(nativeInputStyle).toContain("height: 1");
+		expect(nativeInputStyle).toContain("opacity: 0");
+		expect(nativeInputStyle).toContain("zIndex: -1");
+		expect(nativeInputStyle).not.toContain("right: 0");
+		expect(nativeInputStyle).not.toContain("bottom: 0");
+		expect(nativeInputStyle).not.toContain("opacity: 1");
+	});
+
+	test("relays terminal input through the native TextInput and keeps accessory keys byte-only", () => {
 		expect(SOURCE).toContain("function createInputRelayScript");
 		expect(SOURCE).toContain('var relayKey = "__SUP_TERM_INPUT_RELAY__"');
 		expect(SOURCE).toContain(
@@ -160,7 +190,9 @@ describe("TerminalEmulator", () => {
 		expect(SOURCE).toContain("const pendingTapRef");
 		expect(SOURCE).toContain("terminalTapMoveTolerancePx");
 		expect(SOURCE).toContain("const focusTerminal = useCallback");
+		expect(SOURCE).toContain("const focusNativeTerminalInput = useCallback");
 		expect(SOURCE).toContain("nativeInputRef.current?.focus();");
+		expect(SOURCE).toContain("injectJavaScript(terminalKeyboardBlurScript)");
 		expect(SOURCE).toContain("setTimeout(() =>");
 		expect(SOURCE).toContain("const requestFocusRetention = useCallback");
 		expect(SOURCE).toContain("const handleWebViewTouchStart = useCallback");
@@ -176,6 +208,13 @@ describe("TerminalEmulator", () => {
 		expect(SOURCE).toContain("onTouchCancel={handleWebViewTouchCancel}");
 		expect(SOURCE).not.toContain("createKeyboardFocusScript");
 		expect(SOURCE).not.toContain("forceRefocus: true");
+		expect(SOURCE).toContain('type: "nativeFocusRequested"');
+		expect(WEBVIEW_HTML_SOURCE).toContain(
+			'type: "nativeFocusRequested", streamKey: this.streamKey',
+		);
+		expect(WEBVIEW_HTML_SOURCE).not.toContain(
+			"this.runtime?.focus({ forceRefocus: true })",
+		);
 
 		const focusTerminalStart = SOURCE.indexOf(
 			"const focusTerminal = useCallback",
@@ -204,8 +243,8 @@ describe("TerminalEmulator", () => {
 
 		const outputEffect = SOURCE.slice(outputEffectStart, outputEffectEnd);
 		expect(outputEffect).toContain('type: "writeOutput"');
-		expect(outputEffect).toContain('type: "restoreOutput"');
-		expect(outputEffect).toContain('type: "resize"');
+		expect(outputEffect).toContain("createTerminalRestoreMessage");
+		expect(outputEffect).toContain("sendTerminalResize()");
 		expect(outputEffect).not.toContain('type: "focus"');
 		expect(outputEffect).not.toContain("forceRefocus: false");
 		expect(outputEffect).not.toContain("focusTerminal(true)");
@@ -216,9 +255,31 @@ describe("TerminalEmulator", () => {
 		expect(inputCase).toContain("shouldRetainFocusRef.current = true");
 		expect(inputCase).not.toContain("normalizeTerminalInputForHost");
 		expect(inputCase).not.toContain("onInput(");
+
+		const nativeFocusCaseIndex = SOURCE.indexOf('case "nativeFocusRequested":');
+		expect(nativeFocusCaseIndex).toBeGreaterThan(0);
+		const nativeFocusCase = SOURCE.slice(
+			nativeFocusCaseIndex,
+			nativeFocusCaseIndex + 220,
+		);
+		expect(nativeFocusCase).toContain("shouldRetainFocusRef.current = true");
+		expect(nativeFocusCase).toContain("focusNativeTerminalInput();");
 	});
 
-	test("keeps xterm as the input owner and lets the keyboard accessory dismiss it", () => {
+	test("does not forward WebView input messages into a second host write path", () => {
+		const inputCaseIndex = SOURCE.indexOf('case "input":');
+		expect(inputCaseIndex).toBeGreaterThan(0);
+		const inputCase = SOURCE.slice(inputCaseIndex, inputCaseIndex + 420);
+		expect(inputCase).toContain("shouldRetainFocusRef.current = true");
+		expect(inputCase).not.toContain("message.data.length > 0");
+		expect(inputCase).not.toContain(
+			"normalizeTerminalInputForHost(message.data)",
+		);
+		expect(inputCase).not.toContain("onInput(");
+		expect(SOURCE).toContain("const terminalNativeInputFlushDelayMs = 0;");
+	});
+
+	test("keeps the native terminal input guard active and lets the keyboard accessory dismiss it", () => {
 		expect(SOURCE).toContain("keyboardDismissSignal?: number");
 		expect(SOURCE).toContain("keyboardDismissSignal = 0");
 		expect(SOURCE).toContain("terminalKeyboardBlurScript");
@@ -240,7 +301,8 @@ describe("TerminalEmulator", () => {
 		expect(blurScriptStart).toBeGreaterThan(0);
 		expect(blurScriptEnd).toBeGreaterThan(blurScriptStart);
 		const blurScript = SOURCE.slice(blurScriptStart, blurScriptEnd);
-		expect(blurScript).not.toContain('input.value = "";');
+		expect(blurScript).toContain('input.value = "";');
+		expect(blurScript).toContain("suppressAllHelperInputs();");
 	});
 
 	test("does not suppress user input while restoring terminal snapshots", () => {
@@ -259,6 +321,110 @@ describe("TerminalEmulator", () => {
 		expect(SOURCE).toContain(
 			"if (restoreRevision <= 0 || !rendererReadyRef.current) return;",
 		);
-		expect(SOURCE).toContain('type: "restoreOutput", streamKey, text: output');
+		expect(SOURCE).toContain("function createTerminalRestoreMessage");
+		expect(SOURCE).toContain('type: "restoreOutput"');
+		expect(SOURCE).toContain("cols: restoreDimensions.cols");
+		expect(SOURCE).toContain("rows: restoreDimensions.rows");
+		expect(WEBVIEW_HTML_SOURCE).toContain(
+			"restoreOutput({ data: encodeTerminalOutput(message.text), cols: message.cols, rows: message.rows })",
+		);
+	});
+
+	test("restores host screen snapshots with their original terminal dimensions", () => {
+		expect(SOURCE).toContain("export type TerminalScreenSnapshot");
+		expect(SOURCE).toContain('format: "xterm-serialize-ansi"');
+		expect(SOURCE).toContain("screenSnapshot?: TerminalScreenSnapshot | null");
+		expect(SOURCE).toContain("function restoreDimensionsFromSnapshot");
+		expect(SOURCE).toContain("cols: screenSnapshot.cols");
+		expect(SOURCE).toContain("rows: screenSnapshot.rows");
+		expect(SOURCE).toContain("screenSnapshot = null");
+		expect(SOURCE).toContain("createTerminalRestoreMessage({");
+		expect(WEBVIEW_HTML_SOURCE).toContain('operation.type === "snapshot"');
+		expect(WEBVIEW_HTML_SOURCE).toContain(
+			"terminal.resize(operation.cols, operation.rows)",
+		);
+		expect(WEBVIEW_HTML_SOURCE).toContain(
+			'if (expectedOperation.type === "snapshot")',
+		);
+		expect(WEBVIEW_HTML_SOURCE).toContain("terminal.scrollToBottom()");
+		expect(WEBVIEW_HTML_SOURCE).toContain("this.refreshVisibleRows()");
+	});
+
+	test("does not append screen snapshot changes as output deltas", () => {
+		expect(SOURCE).toContain("function shouldAppendTerminalOutput");
+		expect(SOURCE).toContain("!screenSnapshot");
+		expect(SOURCE).toContain("nextOutput.startsWith(previousOutput)");
+
+		const outputEffectStart = SOURCE.indexOf(
+			"if (!rendererReadyRef.current) return;",
+		);
+		const outputEffectEnd = SOURCE.indexOf(
+			"useEffect(() => {\n\t\tif (restoreRevision",
+			outputEffectStart,
+		);
+		expect(outputEffectStart).toBeGreaterThan(0);
+		expect(outputEffectEnd).toBeGreaterThan(outputEffectStart);
+
+		const outputEffect = SOURCE.slice(outputEffectStart, outputEffectEnd);
+		expect(outputEffect).toContain("shouldAppendTerminalOutput({");
+		expect(outputEffect).toContain("screenSnapshot,");
+		expect(outputEffect).toContain('type: "writeOutput"');
+		expect(outputEffect).toContain("createTerminalRestoreMessage({");
+	});
+
+	test("keeps mobile xterm resize local unless ownership is explicitly claimed", () => {
+		expect(SOURCE).toContain("export type TerminalDimensions");
+		expect(SOURCE).toContain("terminalDimensions?: TerminalDimensions | null");
+		expect(SOURCE).toContain("function createTerminalResizeMessage");
+		expect(SOURCE).toContain("cols: terminalDimensions.cols");
+		expect(SOURCE).toContain("rows: terminalDimensions.rows");
+		expect(SOURCE).toContain("sendTerminalResize()");
+		expect(SOURCE).toContain("onLocalResize?: (size: TerminalDimensions)");
+		expect(SOURCE).not.toContain("shouldClaim: true");
+
+		const resizeCaseIndex = SOURCE.indexOf('case "resize":');
+		expect(resizeCaseIndex).toBeGreaterThan(0);
+		const resizeCase = SOURCE.slice(resizeCaseIndex, resizeCaseIndex + 360);
+		expect(resizeCase).toContain(
+			"onLocalResize?.({ rows: message.rows, cols: message.cols })",
+		);
+		expect(resizeCase).toContain("message.shouldClaim === true");
+		expect(resizeCase).toContain(
+			"onResize?.({ rows: message.rows, cols: message.cols })",
+		);
+		expect(WEBVIEW_HTML_SOURCE).toContain("fixedSize = null");
+		expect(WEBVIEW_HTML_SOURCE).toContain(
+			"this.fixedSize = { cols: requestedCols, rows: requestedRows }",
+		);
+		expect(WEBVIEW_HTML_SOURCE).toContain(
+			"const shouldClaim = fixedSize ? false : resizeInput?.shouldClaim ?? true",
+		);
+		expect(WEBVIEW_HTML_SOURCE).toContain(
+			"currentTerminal.resize(fixedSize.cols, fixedSize.rows)",
+		);
+		expect(WEBVIEW_HTML_SOURCE).toContain(
+			"cols: message.cols, rows: message.rows",
+		);
+	});
+
+	test("does not hold the first native input chunk behind a long timer", () => {
+		expect(SOURCE).toContain("const terminalNativeInputFlushDelayMs = 0;");
+		expect(SOURCE).not.toContain("terminalNativeInitialInputFlushDelayMs");
+
+		const nativeInputStart = SOURCE.indexOf(
+			"const handleNativeInputChangeText = useCallback",
+		);
+		const nativeInputEnd = SOURCE.indexOf(
+			"const handleNativeInputKeyPress = useCallback",
+			nativeInputStart,
+		);
+		expect(nativeInputStart).toBeGreaterThan(0);
+		expect(nativeInputEnd).toBeGreaterThan(nativeInputStart);
+		const nativeInput = SOURCE.slice(nativeInputStart, nativeInputEnd);
+		expect(nativeInput).toContain(
+			"scheduleNativeInputFlush(terminalNativeInputFlushDelayMs)",
+		);
+		expect(nativeInput).not.toContain("isInitialInsertion");
+		expect(nativeInput).not.toContain("previousValue");
 	});
 });

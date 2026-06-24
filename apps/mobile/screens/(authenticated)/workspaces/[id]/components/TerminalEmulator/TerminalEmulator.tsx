@@ -43,6 +43,19 @@ export type TerminalModifierState = {
 	alt: boolean;
 };
 
+export type TerminalDimensions = {
+	cols: number;
+	rows: number;
+};
+
+export type TerminalScreenSnapshot = {
+	format: "xterm-serialize-ansi";
+	version: 1;
+	cols: number;
+	rows: number;
+	content: string;
+};
+
 type BridgeInboundMessage =
 	| {
 			type: "mount";
@@ -57,10 +70,22 @@ type BridgeInboundMessage =
 	  }
 	| { type: "unmount"; streamKey: string }
 	| { type: "writeOutput"; streamKey: string; text: string }
-	| { type: "restoreOutput"; streamKey: string; text: string }
+	| {
+			type: "restoreOutput";
+			streamKey: string;
+			text: string;
+			cols?: number;
+			rows?: number;
+	  }
 	| { type: "clear"; streamKey: string }
 	| { type: "focus"; streamKey: string; forceRefocus?: boolean }
-	| { type: "resize"; streamKey: string; shouldClaim?: boolean }
+	| {
+			type: "resize";
+			streamKey: string;
+			shouldClaim?: boolean;
+			cols?: number;
+			rows?: number;
+	  }
 	| {
 			type: "setPendingModifiers";
 			streamKey: string;
@@ -78,6 +103,7 @@ type BridgeOutboundMessage =
 			cols: number;
 			shouldClaim?: boolean;
 	  }
+	| { type: "nativeFocusRequested"; streamKey: string | null }
 	| { type: "pendingModifiersConsumed"; streamKey: string }
 	| { type: "debug"; message: string; details?: unknown };
 
@@ -95,11 +121,14 @@ interface TerminalEmulatorProps {
 	scrollbackLines?: number;
 	fontFamily?: string;
 	fontSize?: number;
+	terminalDimensions?: TerminalDimensions | null;
+	screenSnapshot?: TerminalScreenSnapshot | null;
 	theme?: TerminalTheme;
 	pendingModifiers: TerminalModifierState;
 	keyboardDismissSignal?: number;
 	onInput: (data: string) => void;
 	onInteraction?: () => void;
+	onLocalResize?: (size: TerminalDimensions) => void;
 	onResize?: (size: { rows: number; cols: number }) => void;
 	onPendingModifiersConsumed?: () => void;
 	onRendererReadyChange?: (isReady: boolean) => void;
@@ -108,15 +137,52 @@ interface TerminalEmulatorProps {
 const terminalWebViewSource = { html: terminalEmulatorWebViewHtml };
 const terminalWebViewOriginWhitelist = ["*"];
 const terminalTapMoveTolerancePx = 8;
-const terminalNativeInputFlushDelayMs = 40;
-const terminalNativeInitialInputFlushDelayMs = 180;
+const terminalNativeInputFlushDelayMs = 0;
 const terminalNativeBackspaceNoiseWindowMs = 220;
 const terminalKeyboardBlurScript = `
 (function () {
-  var inputs = document.querySelectorAll("textarea.xterm-helper-textarea");
-  inputs.forEach(function (input) {
+  var guardKey = "__SUP_TERM_NATIVE_INPUT_GUARD__";
+  var state = window[guardKey] || (window[guardKey] = {});
+  function clearCompositionText() {
+    var compositions = document.querySelectorAll(".composition-view");
+    compositions.forEach(function (composition) {
+      composition.textContent = "";
+      composition.classList.remove("active");
+    });
+  }
+  function suppressHelperInput(input) {
+    if (!input) return;
     input.blur();
-  });
+    input.readOnly = true;
+    input.tabIndex = -1;
+    input.setAttribute("readonly", "readonly");
+    input.setAttribute("aria-hidden", "true");
+    input.setAttribute("autocorrect", "off");
+    input.setAttribute("autocapitalize", "off");
+    input.setAttribute("spellcheck", "false");
+    input.value = "";
+    input.style.pointerEvents = "none";
+    input.style.opacity = "0";
+    input.style.caretColor = "transparent";
+  }
+  function suppressAllHelperInputs() {
+    var inputs = document.querySelectorAll("textarea.xterm-helper-textarea");
+    inputs.forEach(suppressHelperInput);
+    clearCompositionText();
+  }
+  if (!state.installed) {
+    state.installed = true;
+    document.addEventListener("focusin", function (event) {
+      if (event.target && event.target.matches && event.target.matches("textarea.xterm-helper-textarea")) {
+        event.stopImmediatePropagation();
+        suppressHelperInput(event.target);
+        setTimeout(suppressAllHelperInputs, 0);
+      }
+    }, true);
+    state.observer = new MutationObserver(suppressAllHelperInputs);
+    state.observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+  suppressAllHelperInputs();
   if (window.__PASEO_TERMINAL_WEBVIEW_BLUR__) {
     window.__PASEO_TERMINAL_WEBVIEW_BLUR__();
   }
@@ -180,6 +246,67 @@ function createMountMessage(input: {
 		fontSize: input.fontSize,
 		pendingModifiers: input.pendingModifiers,
 		swipeGesturesEnabled: false,
+	};
+}
+
+function createTerminalResizeMessage({
+	streamKey,
+	terminalDimensions,
+}: {
+	streamKey: string;
+	terminalDimensions?: TerminalDimensions | null;
+}): BridgeInboundMessage {
+	return {
+		type: "resize",
+		streamKey,
+		shouldClaim: false,
+		...(terminalDimensions
+			? {
+					cols: terminalDimensions.cols,
+					rows: terminalDimensions.rows,
+				}
+			: {}),
+	};
+}
+
+function restoreDimensionsFromSnapshot(
+	screenSnapshot: TerminalScreenSnapshot | null | undefined,
+	terminalDimensions: TerminalDimensions | null | undefined,
+): TerminalDimensions | null {
+	if (screenSnapshot) {
+		return {
+			cols: screenSnapshot.cols,
+			rows: screenSnapshot.rows,
+		};
+	}
+	return terminalDimensions ?? null;
+}
+
+function createTerminalRestoreMessage({
+	streamKey,
+	text,
+	screenSnapshot,
+	terminalDimensions,
+}: {
+	streamKey: string;
+	text: string;
+	screenSnapshot?: TerminalScreenSnapshot | null;
+	terminalDimensions?: TerminalDimensions | null;
+}): BridgeInboundMessage {
+	const restoreDimensions = restoreDimensionsFromSnapshot(
+		screenSnapshot,
+		terminalDimensions,
+	);
+	return {
+		type: "restoreOutput",
+		streamKey,
+		text,
+		...(restoreDimensions
+			? {
+					cols: restoreDimensions.cols,
+					rows: restoreDimensions.rows,
+				}
+			: {}),
 	};
 }
 
@@ -348,6 +475,23 @@ true;
 `;
 }
 
+function shouldAppendTerminalOutput({
+	previousOutput,
+	nextOutput,
+	screenSnapshot,
+}: {
+	previousOutput: string | null;
+	nextOutput: string;
+	screenSnapshot?: TerminalScreenSnapshot | null;
+}): boolean {
+	return (
+		!screenSnapshot &&
+		previousOutput !== null &&
+		nextOutput.startsWith(previousOutput) &&
+		nextOutput.length > previousOutput.length
+	);
+}
+
 function createBridgeReceiveScript(message: BridgeInboundMessage): string {
 	const payload = serializeForInjectedJavaScript(message);
 	return `
@@ -380,11 +524,14 @@ export function TerminalEmulator({
 	scrollbackLines = 4000,
 	fontFamily = "Menlo, ui-monospace, SFMono-Regular, monospace",
 	fontSize = 12,
+	terminalDimensions = null,
+	screenSnapshot = null,
 	theme = defaultTerminalTheme,
 	pendingModifiers,
 	keyboardDismissSignal = 0,
 	onInput,
 	onInteraction,
+	onLocalResize,
 	onResize,
 	onPendingModifiersConsumed,
 	onRendererReadyChange,
@@ -439,6 +586,19 @@ export function TerminalEmulator({
 		setNativeInputValue("");
 	}, [clearNativeInputFlushTimer]);
 
+	const focusNativeTerminalInput = useCallback(() => {
+		nativeInputRef.current?.focus();
+		webViewRef.current?.injectJavaScript(terminalKeyboardBlurScript);
+		setTimeout(() => {
+			nativeInputRef.current?.focus();
+			webViewRef.current?.injectJavaScript(terminalKeyboardBlurScript);
+		}, 0);
+		setTimeout(() => {
+			nativeInputRef.current?.focus();
+			webViewRef.current?.injectJavaScript(terminalKeyboardBlurScript);
+		}, 250);
+	}, []);
+
 	const flushNativeInputChange = useCallback(
 		(nextValue = nativeInputPendingValueRef.current) => {
 			clearNativeInputFlushTimer();
@@ -479,6 +639,21 @@ export function TerminalEmulator({
 		webViewRef.current.injectJavaScript(createBridgeReceiveScript(message));
 	}, []);
 
+	const sendTerminalResize = useCallback(() => {
+		sendToWebView(
+			createTerminalResizeMessage({
+				streamKey,
+				terminalDimensions,
+			}),
+		);
+	}, [
+		sendToWebView,
+		streamKey,
+		terminalDimensions?.cols,
+		terminalDimensions?.rows,
+		terminalDimensions,
+	]);
+
 	const blurTerminalKeyboard = useCallback(() => {
 		shouldRetainFocusRef.current = false;
 		nativeInputRef.current?.blur();
@@ -488,14 +663,14 @@ export function TerminalEmulator({
 	const focusTerminal = useCallback(() => {
 		if (!mountedStreamKeyRef.current) return;
 		webViewRef.current?.injectJavaScript(createInputRelayScript(streamKey));
-		nativeInputRef.current?.focus();
+		focusNativeTerminalInput();
 		setTimeout(() => {
 			nativeInputRef.current?.focus();
 		}, 50);
 		setTimeout(() => {
 			nativeInputRef.current?.focus();
 		}, 150);
-	}, [streamKey]);
+	}, [focusNativeTerminalInput, streamKey]);
 
 	const requestFocusRetention = useCallback(() => {
 		onInteraction?.();
@@ -507,17 +682,14 @@ export function TerminalEmulator({
 		(event: GestureResponderEvent) => {
 			onInteraction?.();
 			shouldRetainFocusRef.current = true;
-			nativeInputRef.current?.focus();
-			setTimeout(() => {
-				nativeInputRef.current?.focus();
-			}, 0);
+			focusNativeTerminalInput();
 			pendingTapRef.current = {
 				startX: event.nativeEvent.pageX,
 				startY: event.nativeEvent.pageY,
 				moved: false,
 			};
 		},
-		[onInteraction],
+		[focusNativeTerminalInput, onInteraction],
 	);
 
 	const handleWebViewTouchMove = useCallback((event: GestureResponderEvent) => {
@@ -558,14 +730,16 @@ export function TerminalEmulator({
 		mountedStreamKeyRef.current = streamKey;
 		rendererReadyRef.current = false;
 		sendToWebView(mountMessage);
-		sendToWebView({ type: "resize", streamKey, shouldClaim: true });
+		sendTerminalResize();
 		webViewRef.current?.injectJavaScript(createInputRelayScript(streamKey));
+		webViewRef.current?.injectJavaScript(terminalKeyboardBlurScript);
 		flushPendingMessages();
 	}, [
 		flushPendingMessages,
 		fontFamily,
 		fontSize,
 		scrollbackLines,
+		sendTerminalResize,
 		sendToWebView,
 		stableTheme,
 		streamKey,
@@ -588,30 +762,70 @@ export function TerminalEmulator({
 		if (lastRenderedOutputRef.current === output) return;
 		const previousOutput = lastRenderedOutputRef.current;
 		lastRenderedOutputRef.current = output;
+		let restoredOutput = false;
 		if (output.length === 0) {
 			sendToWebView({ type: "clear", streamKey });
 		} else if (
-			previousOutput !== null &&
-			output.startsWith(previousOutput) &&
-			output.length > previousOutput.length
+			shouldAppendTerminalOutput({
+				previousOutput,
+				nextOutput: output,
+				screenSnapshot,
+			})
 		) {
+			const appendText =
+				previousOutput === null ? output : output.slice(previousOutput.length);
 			sendToWebView({
 				type: "writeOutput",
 				streamKey,
-				text: output.slice(previousOutput.length),
+				text: appendText,
 			});
 		} else {
-			sendToWebView({ type: "restoreOutput", streamKey, text: output });
+			restoredOutput = true;
+			sendToWebView(
+				createTerminalRestoreMessage({
+					streamKey,
+					text: output,
+					screenSnapshot,
+					terminalDimensions,
+				}),
+			);
 		}
-		sendToWebView({ type: "resize", streamKey, shouldClaim: true });
-	}, [output, sendToWebView, streamKey]);
+		if (!restoredOutput) {
+			sendTerminalResize();
+		}
+	}, [
+		output,
+		screenSnapshot,
+		sendTerminalResize,
+		sendToWebView,
+		streamKey,
+		terminalDimensions,
+	]);
 
 	useEffect(() => {
 		if (restoreRevision <= 0 || !rendererReadyRef.current) return;
 		lastRenderedOutputRef.current = output;
-		sendToWebView({ type: "restoreOutput", streamKey, text: output });
-		sendToWebView({ type: "resize", streamKey, shouldClaim: true });
-	}, [output, restoreRevision, sendToWebView, streamKey]);
+		sendToWebView(
+			createTerminalRestoreMessage({
+				streamKey,
+				text: output,
+				screenSnapshot,
+				terminalDimensions,
+			}),
+		);
+	}, [
+		output,
+		restoreRevision,
+		screenSnapshot,
+		sendToWebView,
+		streamKey,
+		terminalDimensions,
+	]);
+
+	useEffect(() => {
+		if (!mountedStreamKeyRef.current || !rendererReadyRef.current) return;
+		sendTerminalResize();
+	}, [sendTerminalResize]);
 
 	useEffect(() => {
 		if (!inputCommand) return;
@@ -691,7 +905,15 @@ export function TerminalEmulator({
 						webViewRef.current?.injectJavaScript(
 							createInputRelayScript(streamKey),
 						);
-						sendToWebView({ type: "restoreOutput", streamKey, text: output });
+						webViewRef.current?.injectJavaScript(terminalKeyboardBlurScript);
+						sendToWebView(
+							createTerminalRestoreMessage({
+								streamKey,
+								text: output,
+								screenSnapshot,
+								terminalDimensions,
+							}),
+						);
 						if (shouldRetainFocusRef.current) {
 							nativeInputRef.current?.focus();
 						}
@@ -702,7 +924,14 @@ export function TerminalEmulator({
 					shouldRetainFocusRef.current = true;
 					break;
 				case "resize":
-					onResize?.({ rows: message.rows, cols: message.cols });
+					onLocalResize?.({ rows: message.rows, cols: message.cols });
+					if (message.shouldClaim === true) {
+						onResize?.({ rows: message.rows, cols: message.cols });
+					}
+					break;
+				case "nativeFocusRequested":
+					shouldRetainFocusRef.current = true;
+					focusNativeTerminalInput();
 					break;
 				case "pendingModifiersConsumed":
 					onPendingModifiersConsumed?.();
@@ -710,31 +939,26 @@ export function TerminalEmulator({
 			}
 		},
 		[
+			focusNativeTerminalInput,
 			onPendingModifiersConsumed,
 			onRendererReadyChange,
+			onLocalResize,
 			onResize,
 			output,
+			screenSnapshot,
 			sendToWebView,
 			streamKey,
+			terminalDimensions,
 		],
 	);
 
 	const handleNativeInputChangeText = useCallback(
 		(nextValue: string) => {
-			const previousValue = nativeInputValueRef.current;
-			const isInitialInsertion =
-				previousValue.length === 0 &&
-				nativeInputPendingValueRef.current.length === 0 &&
-				nextValue.length === 1;
 			ignoreEmptyBackspaceUntilRef.current =
 				Date.now() + terminalNativeBackspaceNoiseWindowMs;
 			nativeInputPendingValueRef.current = nextValue;
 			setNativeInputValue(nextValue);
-			scheduleNativeInputFlush(
-				isInitialInsertion
-					? terminalNativeInitialInputFlushDelayMs
-					: terminalNativeInputFlushDelayMs,
-			);
+			scheduleNativeInputFlush(terminalNativeInputFlushDelayMs);
 		},
 		[scheduleNativeInputFlush],
 	);
@@ -792,7 +1016,6 @@ export function TerminalEmulator({
 				source={terminalWebViewSource}
 				style={webViewStyle}
 				containerStyle={webViewContainerStyle}
-				pointerEvents="none"
 				originWhitelist={terminalWebViewOriginWhitelist}
 				scrollEnabled
 				nestedScrollEnabled
@@ -821,10 +1044,12 @@ export function TerminalEmulator({
 				testID="terminal-native-input-capture"
 				accessibilityLabel="Terminal input"
 				value={nativeInputValue}
+				pointerEvents="none"
 				style={styles.nativeInput}
 				autoCapitalize="none"
 				autoCorrect={false}
 				spellCheck={false}
+				selectionColor="transparent"
 				keyboardType="ascii-capable"
 				textContentType="none"
 				importantForAutofill="no"
@@ -860,12 +1085,12 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		left: 0,
 		top: 0,
-		right: 0,
-		bottom: 0,
-		opacity: 1,
+		width: 1,
+		height: 1,
+		opacity: 0,
 		color: "transparent",
 		backgroundColor: "transparent",
 		fontSize: 1,
-		zIndex: 1,
+		zIndex: -1,
 	},
 });

@@ -9,6 +9,8 @@ export interface TerminalResourceSession {
 	createdAt: number;
 	pid: number;
 	title: string | null;
+	cols: number;
+	rows: number;
 }
 
 function isLiveDaemonSession(
@@ -68,6 +70,8 @@ export function listTerminalResourceSessions(
 				createdAt: row.createdAt,
 				pid: session.pid,
 				title: titlesByTerminalId.get(session.id) ?? null,
+				cols: session.cols,
+				rows: session.rows,
 			},
 		];
 	});

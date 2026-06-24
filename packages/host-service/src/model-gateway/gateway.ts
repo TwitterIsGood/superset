@@ -197,13 +197,12 @@ async function forwardAnthropic(args: {
 			},
 		});
 	}
+	const contentType =
+		upstream.headers.get("content-type") ??
+		(args.body.stream === true ? "text/event-stream" : "application/json");
 	return new Response(upstream.body, {
 		status: upstream.status,
-		headers: {
-			"content-type":
-				upstream.headers.get("content-type") ??
-				responseHeadersForJson(args.body.stream === true)["content-type"],
-		},
+		headers: { "content-type": contentType },
 	});
 }
 
