@@ -626,6 +626,16 @@ cd packages/host-service && bun test
     - After moving built-in ringtone playback out of renderer static assets, renderer total dropped again to `34.67 MiB`; `mp3 outputs=0`, and the previous `1.19 MiB` `codecompleteedm.mp3` plus the other built-in ringtone assets no longer appear in renderer output.
     - Main remains `9.31 MiB` and preload remains `0.00 MiB`, as expected for a renderer-asset-only change.
   - Validation passed: `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run lint:fix`, `bun run lint`, `bun run --cwd apps/desktop typecheck`, and the compile-stats build above.
+- 2026-06-27 terminal WebGL lazy-load follow-up:
+  - Root cause: terminal pane code was lazy at the pane boundary, but `@xterm/addon-webgl` was still statically imported by both terminal addon entry points. This kept the WebGL renderer payload coupled to terminal chunk load rather than the exact post-open WebGL activation point.
+  - Changed `renderer/lib/terminal/terminal-addons.ts` and the v1 terminal `helpers.ts` to use type-only `WebglAddon` imports plus `await import("@xterm/addon-webgl")` inside the existing `requestAnimationFrame` activation path.
+  - Preserved the existing VS Code-style fallback: once WebGL fails or context is lost, future terminals use the DOM renderer. The async path checks `disposed` before and after the dynamic import so closing a terminal while the chunk is loading does not attach a stale addon.
+  - Added a source-level regression test that forbids static `import { WebglAddon } from "@xterm/addon-webgl"` in both terminal entry points and requires the dynamic import form.
+  - Compile evidence with `DESKTOP_BUILD_STATS=true DESKTOP_BUILD_STATS_DIR=performance-reports/build-stats DESKTOP_BUNDLE_CLI=false bun run --cwd apps/desktop compile:app`:
+    - Renderer total remains `34.67 MiB` because the WebGL code is still shipped as a lazy chunk, not removed.
+    - The previous `1.05 MiB` `addon-webgl` top-list output is gone from the static terminal path. WebGL is now a separate lazy output: `assets/addon-webgl-*.js` at `0.27 MiB`.
+    - This is primarily a first-load/runtime-memory win for non-terminal and terminal-before-WebGL paths, not a base installer-size win.
+  - Validation passed: `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run lint:fix`, `bun run --cwd apps/desktop typecheck`, `bun run lint`, and the compile-stats build above.
 
 ---
 

@@ -107,6 +107,42 @@ describe("Trellis runtime pack packaging", () => {
 		expect(ringtonePlaySource).toContain("ringtone.playNotification");
 	});
 
+	test("keeps the xterm WebGL addon dynamically loaded", () => {
+		const terminalAddonSources = [
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"lib",
+				"terminal",
+				"terminal-addons.ts",
+			),
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"screens",
+				"main",
+				"components",
+				"WorkspaceView",
+				"ContentView",
+				"TabsContent",
+				"Terminal",
+				"helpers.ts",
+			),
+		].map((path) => readFileSync(path, "utf8"));
+
+		for (const source of terminalAddonSources) {
+			expect(source).not.toContain(
+				'import { WebglAddon } from "@xterm/addon-webgl"',
+			);
+			expect(source).toContain(
+				'import type { WebglAddon } from "@xterm/addon-webgl"',
+			);
+			expect(source).toContain('await import("@xterm/addon-webgl")');
+		}
+	});
+
 	test("keeps CJS-only Trellis compatibility dependencies nested", () => {
 		expect(requiredMaterializedNodeModules).not.toContain("mimic-fn");
 		expect(trellisRuntimePackResourceCopies).toContainEqual(

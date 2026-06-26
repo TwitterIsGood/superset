@@ -5,7 +5,7 @@ import { ImageAddon } from "@xterm/addon-image";
 import { LigaturesAddon } from "@xterm/addon-ligatures";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
-import { WebglAddon } from "@xterm/addon-webgl";
+import type { WebglAddon } from "@xterm/addon-webgl";
 import type { ITheme } from "@xterm/xterm";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { applyTerminalFontFamilyCssVariable } from "renderer/lib/terminal/appearance";
@@ -60,6 +60,10 @@ export function getDefaultTerminalBg(): string {
 
 // Once WebGL fails, skip it for all subsequent terminals (VS Code pattern).
 let suggestedRendererType: "webgl" | "dom" | undefined;
+
+function canUseWebglRenderer(): boolean {
+	return suggestedRendererType !== "dom";
+}
 
 export interface CreateTerminalOptions {
 	/**
@@ -133,21 +137,31 @@ export function createTerminalInWrapper(options: CreateTerminalOptions = {}): {
 
 	// Defer WebGL to rAF to avoid racing xterm's post-open viewport sync.
 	const rafId = requestAnimationFrame(() => {
-		if (disposed || suggestedRendererType === "dom") return;
+		void (async () => {
+			if (disposed || !canUseWebglRenderer()) return;
 
-		try {
-			webglAddon = new WebglAddon();
-			webglAddon.onContextLoss(() => {
-				webglAddon?.dispose();
+			try {
+				const { WebglAddon } = await import("@xterm/addon-webgl");
+				if (disposed || !canUseWebglRenderer()) return;
+
+				const addon = new WebglAddon();
+				webglAddon = addon;
+				addon.onContextLoss(() => {
+					addon.dispose();
+					if (webglAddon === addon) {
+						webglAddon = null;
+					}
+					suggestedRendererType = "dom";
+					xterm.refresh(0, xterm.rows - 1);
+				});
+				xterm.loadAddon(addon);
+			} catch {
+				if (!disposed) {
+					suggestedRendererType = "dom";
+				}
 				webglAddon = null;
-				suggestedRendererType = "dom";
-				xterm.refresh(0, xterm.rows - 1);
-			});
-			xterm.loadAddon(webglAddon);
-		} catch {
-			suggestedRendererType = "dom";
-			webglAddon = null;
-		}
+			}
+		})();
 	});
 
 	const cleanupQuerySuppression = suppressQueryResponses(xterm);

@@ -4,7 +4,7 @@ import { LigaturesAddon } from "@xterm/addon-ligatures";
 import { ProgressAddon } from "@xterm/addon-progress";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
-import { WebglAddon } from "@xterm/addon-webgl";
+import type { WebglAddon } from "@xterm/addon-webgl";
 import type { Terminal as XTerm } from "@xterm/xterm";
 import { Utf8Base64 } from "./clipboard-base64";
 
@@ -16,6 +16,10 @@ export interface LoadAddonsResult {
 
 // Once WebGL fails, skip it for all subsequent runtimes (VS Code pattern).
 let suggestedRendererType: "webgl" | "dom" | undefined;
+
+function canUseWebglRenderer(): boolean {
+	return suggestedRendererType !== "dom";
+}
 
 /**
  * Load optional addons onto an already-opened terminal. Returns a cleanup
@@ -46,21 +50,31 @@ export function loadAddons(terminal: XTerm): LoadAddonsResult {
 	} catch {}
 
 	const rafId = requestAnimationFrame(() => {
-		if (disposed || suggestedRendererType === "dom") return;
+		void (async () => {
+			if (disposed || !canUseWebglRenderer()) return;
 
-		try {
-			webglAddon = new WebglAddon();
-			webglAddon.onContextLoss(() => {
-				webglAddon?.dispose();
+			try {
+				const { WebglAddon } = await import("@xterm/addon-webgl");
+				if (disposed || !canUseWebglRenderer()) return;
+
+				const addon = new WebglAddon();
+				webglAddon = addon;
+				addon.onContextLoss(() => {
+					addon.dispose();
+					if (webglAddon === addon) {
+						webglAddon = null;
+					}
+					suggestedRendererType = "dom";
+					terminal.refresh(0, terminal.rows - 1);
+				});
+				terminal.loadAddon(addon);
+			} catch {
+				if (!disposed) {
+					suggestedRendererType = "dom";
+				}
 				webglAddon = null;
-				suggestedRendererType = "dom";
-				terminal.refresh(0, terminal.rows - 1);
-			});
-			terminal.loadAddon(webglAddon);
-		} catch {
-			suggestedRendererType = "dom";
-			webglAddon = null;
-		}
+			}
+		})();
 	});
 
 	return {
