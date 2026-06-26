@@ -179,6 +179,7 @@ jobs:
         run: bun run report:size --top=15
 
       - name: Install target platform optional dependencies
+        if: inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64'
         run: bun install --frozen --ignore-scripts --minimum-release-age=0 --cpu=${{ matrix.arch }} --os=darwin
 
       - name: Build desktop resource packs

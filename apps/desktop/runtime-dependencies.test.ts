@@ -145,6 +145,9 @@ describe("Trellis runtime pack packaging", () => {
 		expect(buildWorkflow).toContain("macos_artifact_mode");
 		expect(buildWorkflow).toContain("zip_only");
 		expect(buildWorkflow).toContain('PACKAGE_TARGET_ARGS=("--mac" "zip"');
+		expect(buildWorkflow).toContain(
+			"if: inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64'",
+		);
 		expect(buildWorkflow).toContain("if: inputs.macos_artifact_mode == 'full'");
 		expect(buildWorkflow).toContain(
 			"Verify macOS auto-update metadata and CLI delivery",
