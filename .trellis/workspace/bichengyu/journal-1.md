@@ -963,3 +963,37 @@ Root-fixed mobile remote terminal rendering by using host-owned screen snapshots
 ### Next Steps
 
 - None - task complete
+
+
+## Session 29: Containerize online services
+
+**Date**: 2026-06-26
+**Task**: Containerize online services
+**Package**: desktop
+**Branch**: `main`
+
+### Summary
+
+Moved online API, Web, Relay, and Electric Proxy into Docker Compose with host-built runtime artifacts, internal service networking, generated online env, legacy tmux/launchd cleanup, and verified local/public probes.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `074628701` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

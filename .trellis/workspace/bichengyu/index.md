@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 28
-- **Last Active**: 2026-06-24
+- **Total Sessions**: 29
+- **Last Active**: 2026-06-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~965 | Active |
+| `journal-1.md` | ~999 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 29 | 2026-06-26 | Containerize online services | `074628701` | `main` |
 | 28 | 2026-06-24 | Mobile terminal snapshot stabilization | `d9abfe785` | `main` |
 | 27 | 2026-06-22 | Address Chat stop retention review | `4d80cc25e` | `codex/chat-abort-retention` |
 | 26 | 2026-06-22 | Fix Chat stop and resend handling | `8096f61d8` | `codex/chat-abort-retention` |
