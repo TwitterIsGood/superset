@@ -156,6 +156,12 @@ describe("Trellis runtime pack packaging", () => {
 		expect(buildWorkflow).toContain("require_resource_pack_object_storage");
 		expect(buildWorkflow).toContain("bundle_cli");
 		expect(buildWorkflow).toContain("upload_sourcemaps");
+		expect(buildWorkflow).toContain(
+			"Skipping runtime pack build for artifact-only validation.",
+		);
+		expect(buildWorkflow).toContain(
+			"cp src/resources/pack-system/pack-manifest-index.json dist/resources/pack-system/pack-manifest-index.json",
+		);
 		expect(buildWorkflow).toContain("DESKTOP_BUNDLE_CLI");
 		expect(buildWorkflow).toContain(
 			"Published desktop builds require SUPERSET_OBJECT_STORAGE_* secrets",

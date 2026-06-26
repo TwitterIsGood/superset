@@ -190,6 +190,12 @@ jobs:
           TARGET_PLATFORM: darwin
           UPLOAD_RESOURCE_PACK_ARTIFACTS: ${{ inputs.upload_resource_pack_artifacts }}
         run: |
+          if [[ "$UPLOAD_RESOURCE_PACK_ARTIFACTS" != "true" ]]; then
+            echo "::notice::Skipping runtime pack build for artifact-only validation."
+            mkdir -p dist/resources/pack-system
+            cp src/resources/pack-system/pack-manifest-index.json dist/resources/pack-system/pack-manifest-index.json
+            exit 0
+          fi
           bun run build:trellis-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
           bun run build:claude-agent-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
           bun run build:mastracode-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
@@ -595,6 +601,12 @@ jobs:
           TARGET_PLATFORM: linux
           UPLOAD_RESOURCE_PACK_ARTIFACTS: ${{ inputs.upload_resource_pack_artifacts }}
         run: |
+          if [[ "$UPLOAD_RESOURCE_PACK_ARTIFACTS" != "true" ]]; then
+            echo "::notice::Skipping runtime pack build for artifact-only validation."
+            mkdir -p dist/resources/pack-system
+            cp src/resources/pack-system/pack-manifest-index.json dist/resources/pack-system/pack-manifest-index.json
+            exit 0
+          fi
           bun run build:trellis-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
           bun run build:claude-agent-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
           bun run build:mastracode-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
