@@ -70,7 +70,6 @@ describe("port planning", () => {
 			CADDY_ELECTRIC_PORT: 3110,
 			RELAY_PORT: 3113,
 			LOCAL_PG_PORT: 3114,
-			LOCAL_NEON_PROXY_PORT: 3115,
 			LOCAL_REDIS_PORT: 3116,
 			LOCAL_KV_REST_PORT: 3117,
 			LOCAL_S3_PORT: 3119,
@@ -114,7 +113,7 @@ describe("port planning", () => {
 		expect(plan.env.EXPO_PUBLIC_ELECTRIC_URL).toBe("http://localhost:3212");
 		expect(plan.env.DESKTOP_AUTOMATION_PORT).toBe("3218");
 		expect(plan.env.DATABASE_URL).toBe(
-			"postgres://postgres:postgres@db.localtest.me:3015/main",
+			"postgres://postgres:postgres@localhost:3014/main",
 		);
 		expect(plan.env.ELECTRIC_URL).toBe("http://localhost:3009/v1/shape");
 		expect(plan.env.KV_REST_API_URL).toBe("http://localhost:3017");
@@ -126,7 +125,6 @@ describe("port planning", () => {
 		const dataPortOverrides = readDataPortOverridesFromEnv(`
 # >>> superset primary dev managed
 LOCAL_PG_PORT="43014"
-LOCAL_NEON_PROXY_PORT="43015"
 LOCAL_ELECTRIC_PORT="43009"
 LOCAL_REDIS_PORT="43016"
 LOCAL_KV_REST_PORT="43017"
@@ -147,7 +145,7 @@ LOCAL_KV_REST_PORT="43017"
 		});
 
 		expect(plan.env.DATABASE_URL).toBe(
-			"postgres://postgres:postgres@db.localtest.me:43015/main",
+			"postgres://postgres:postgres@localhost:43014/main",
 		);
 		expect(plan.env.ELECTRIC_URL).toBe("http://localhost:43009/v1/shape");
 		expect(plan.env.KV_REST_API_URL).toBe("http://localhost:43017");
@@ -173,7 +171,7 @@ LOCAL_KV_REST_PORT="43017"
 		expect(plan.env.EXPO_PUBLIC_ELECTRIC_URL).toBe("http://localhost:3232");
 		expect(plan.env.DESKTOP_AUTOMATION_PORT).toBe("3238");
 		expect(plan.env.DATABASE_URL).toBe(
-			"postgres://postgres:postgres@db.localtest.me:3235/main",
+			"postgres://postgres:postgres@localhost:3234/main",
 		);
 		expect(plan.env.ELECTRIC_URL).toBe("http://localhost:3229/v1/shape");
 		expect(plan.env.KV_REST_API_URL).toBe("http://localhost:3237");

@@ -21,7 +21,6 @@ ONLINE_ELECTRIC_PROXY_PORT="43012"
 ONLINE_RELAY_PORT="43013"
 ONLINE_ELECTRIC_PORT="43009"
 ONLINE_PG_PORT="43014"
-ONLINE_NEON_PROXY_PORT="43015"
 ONLINE_REDIS_PORT="43016"
 ONLINE_KV_REST_PORT="43017"
 ONLINE_S3_PORT="43018"
@@ -36,9 +35,9 @@ PUBLIC_ELECTRIC_URL="${SUPERSET_PUBLIC_ELECTRIC_URL:-${PUBLIC_SCHEME}://${PUBLIC
 PUBLIC_RELAY_URL="${SUPERSET_PUBLIC_RELAY_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63013}"
 MOBILE_PROFILE="${SUPERSET_MOBILE_PROFILE:-online-canary}"
 
-HOST_DATABASE_URL="postgres://postgres:postgres@localhost:${ONLINE_NEON_PROXY_PORT}/main"
+HOST_DATABASE_URL="postgres://postgres:postgres@localhost:${ONLINE_PG_PORT}/main"
 HOST_DATABASE_URL_UNPOOLED="postgres://postgres:postgres@localhost:${ONLINE_PG_PORT}/main"
-CONTAINER_DATABASE_URL="postgres://postgres:postgres@neon-proxy:4444/main"
+CONTAINER_DATABASE_URL="postgres://postgres:postgres@postgres:5432/main"
 CONTAINER_DATABASE_URL_UNPOOLED="postgres://postgres:postgres@postgres:5432/main"
 
 export PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/OrbStack.app/Contents/MacOS/xbin:$PATH"
@@ -87,7 +86,7 @@ apply_host_env() {
 	export SUPERSET_NEXT_DIST_DIR=".next-online"
 
 	export LOCAL_PG_PORT="$ONLINE_PG_PORT"
-	export LOCAL_NEON_PROXY_PORT="$ONLINE_NEON_PROXY_PORT"
+	unset LOCAL_NEON_PROXY_PORT
 	export LOCAL_ELECTRIC_PORT="$ONLINE_ELECTRIC_PORT"
 	export LOCAL_REDIS_PORT="$ONLINE_REDIS_PORT"
 	export LOCAL_KV_REST_PORT="$ONLINE_KV_REST_PORT"
@@ -163,7 +162,6 @@ write_online_env_file() {
 		write_env_var "SUPERSET_HOME_DIR" "/var/lib/superset"
 		write_env_var "SUPERSET_NEXT_DIST_DIR" ".next-online"
 		write_env_var "LOCAL_PG_PORT" "$ONLINE_PG_PORT"
-		write_env_var "LOCAL_NEON_PROXY_PORT" "$ONLINE_NEON_PROXY_PORT"
 		write_env_var "LOCAL_ELECTRIC_PORT" "$ONLINE_ELECTRIC_PORT"
 		write_env_var "LOCAL_REDIS_PORT" "$ONLINE_REDIS_PORT"
 		write_env_var "LOCAL_KV_REST_PORT" "$ONLINE_KV_REST_PORT"
@@ -216,8 +214,8 @@ write_online_env_file() {
 		write_env_var "FLY_REGION" "local"
 		write_env_var "FLY_MACHINE_ID" "superset-online"
 		write_env_var "RELAY_PUBLIC_URL" "$PUBLIC_RELAY_URL"
-		write_env_var "NO_PROXY" "localhost,127.0.0.1,api,web,relay,electric-proxy,electric,postgres,neon-proxy,redis,kv-rest,minio"
-		write_env_var "no_proxy" "localhost,127.0.0.1,api,web,relay,electric-proxy,electric,postgres,neon-proxy,redis,kv-rest,minio"
+		write_env_var "NO_PROXY" "localhost,127.0.0.1,api,web,relay,electric-proxy,electric,postgres,redis,kv-rest,minio"
+		write_env_var "no_proxy" "localhost,127.0.0.1,api,web,relay,electric-proxy,electric,postgres,redis,kv-rest,minio"
 	} > "$ONLINE_ENV_PATH"
 	chmod 600 "$ONLINE_ENV_PATH"
 }
@@ -350,29 +348,25 @@ build_app_artifacts() {
 		--entry-naming=server.js
 }
 
-db_proxy_query_ok() {
-	curl -sS --max-time 5 \
-		-X POST "http://localhost:${ONLINE_NEON_PROXY_PORT}/sql" \
-		-H "Neon-Connection-String: ${HOST_DATABASE_URL}" \
-		-H "Content-Type: application/json" \
-		-d '{"query":"select 1","params":[]}' 2>/dev/null |
-		grep -q '"command":"SELECT"'
+db_query_ok() {
+	compose exec -T postgres psql -U postgres -d main -At -v ON_ERROR_STOP=1 -c "select 1" 2>/dev/null |
+		grep -qx "1"
 }
 
-wait_for_db_proxy_query() {
+wait_for_db_query() {
 	local max_attempts="${1:-60}"
 	local attempt=1
-	while ! db_proxy_query_ok; do
+	while ! db_query_ok; do
 		if (( attempt >= max_attempts )); then
-			fail "neon proxy did not serve SQL queries after ${max_attempts} attempts"
+			fail "postgres did not serve SQL queries after ${max_attempts} attempts"
 		fi
 		if (( attempt == 1 )); then
-			log "waiting for neon proxy SQL queries..."
+			log "waiting for postgres SQL queries..."
 		fi
 		sleep 2
 		attempt=$((attempt + 1))
 	done
-	log "neon proxy query ready"
+	log "postgres query ready"
 }
 
 wait_for_probe() {
@@ -442,7 +436,11 @@ run_migrations_and_seed() {
 
 start_data_services() {
 	log "starting Docker data services on 430xx ports"
-	compose up -d --build postgres neon-proxy electric redis kv-rest minio
+	compose up -d --no-build postgres electric redis minio
+	if ! compose up -d --no-build kv-rest; then
+		log "kv-rest image missing; building it once"
+		compose up -d --build kv-rest
+	fi
 	compose run --rm minio-init
 }
 
@@ -450,7 +448,7 @@ start_app_services() {
 	log "building app images from prepared artifacts"
 	compose build api web relay electric-proxy
 	log "starting Docker app services"
-	compose up -d api web relay electric-proxy
+	compose up -d --remove-orphans api web relay electric-proxy
 }
 
 wait_for_local_services() {
@@ -482,7 +480,6 @@ print_status() {
 	echo "  electric-proxy   http://localhost:${ONLINE_ELECTRIC_PROXY_PORT}"
 	echo "  relay            http://localhost:${ONLINE_RELAY_PORT}"
 	echo "  postgres         localhost:${ONLINE_PG_PORT}"
-	echo "  neon-proxy       localhost:${ONLINE_NEON_PROXY_PORT}"
 	echo "  electric         localhost:${ONLINE_ELECTRIC_PORT}"
 	echo "  redis            localhost:${ONLINE_REDIS_PORT}"
 	echo "  kv-rest          localhost:${ONLINE_KV_REST_PORT}"
@@ -503,10 +500,10 @@ print_status() {
 	fi
 	echo
 	echo "local probes:"
-	if db_proxy_query_ok; then
-		printf '  OK   %-24s %s\n' "neon proxy SQL" "SELECT"
+	if db_query_ok; then
+		printf '  OK   %-24s %s\n' "postgres SQL" "SELECT"
 	else
-		printf '  FAIL %-24s %s\n' "neon proxy SQL" "http://localhost:${ONLINE_NEON_PROXY_PORT}/sql"
+		printf '  FAIL %-24s %s\n' "postgres SQL" "localhost:${ONLINE_PG_PORT}"
 	fi
 	probe_url "object storage" "http://localhost:${ONLINE_S3_PORT}/minio/health/live" "200"
 	probe_url "api session" "http://localhost:${ONLINE_API_PORT}/api/auth/get-session" "200"
@@ -528,7 +525,7 @@ start_all() {
 	stop_legacy_host_services
 	build_app_artifacts
 	start_data_services
-	wait_for_db_proxy_query
+	wait_for_db_query
 	wait_for_object_storage
 	run_migrations_and_seed
 	start_app_services

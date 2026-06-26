@@ -17,8 +17,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      neon-proxy:
-        condition: service_started
       kv-rest:
         condition: service_started
       electric:

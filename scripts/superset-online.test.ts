@@ -29,4 +29,15 @@ describe("superset online public URL defaults", () => {
 		expect(SOURCE).toContain("EXPO_PUBLIC_RELAY_URL");
 		expect(SOURCE).not.toContain("EXPO_PUBLIC_POSTHOG_KEY=");
 	});
+
+	test("connects app services directly to Postgres instead of Neon proxy", () => {
+		expect(SOURCE).toContain(
+			'CONTAINER_DATABASE_URL="postgres://postgres:postgres@postgres:5432/main"',
+		);
+		expect(SOURCE).toMatch(
+			/HOST_DATABASE_URL="postgres:\/\/postgres:postgres@localhost:\$\{ONLINE_PG_PORT\}\/main"/,
+		);
+		expect(SOURCE).not.toContain("neon-proxy:4444");
+		expect(SOURCE).not.toContain("wait_for_db_proxy_query");
+	});
 });

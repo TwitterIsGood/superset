@@ -142,7 +142,6 @@ export type PortSet = {
 	WRANGLER_PORT: number;
 	RELAY_PORT: number;
 	LOCAL_PG_PORT: number;
-	LOCAL_NEON_PROXY_PORT: number;
 	LOCAL_REDIS_PORT: number;
 	LOCAL_KV_REST_PORT: number;
 	LOCAL_S3_PORT: number;
@@ -154,7 +153,6 @@ type DataPortOverrides = Partial<
 		PortSet,
 		| "ELECTRIC_PORT"
 		| "LOCAL_PG_PORT"
-		| "LOCAL_NEON_PROXY_PORT"
 		| "LOCAL_REDIS_PORT"
 		| "LOCAL_KV_REST_PORT"
 		| "LOCAL_S3_PORT"
@@ -503,7 +501,6 @@ export function buildPortSet(base: number): PortSet {
 		WRANGLER_PORT: base + 12,
 		RELAY_PORT: base + 13,
 		LOCAL_PG_PORT: base + 14,
-		LOCAL_NEON_PROXY_PORT: base + 15,
 		LOCAL_REDIS_PORT: base + 16,
 		LOCAL_KV_REST_PORT: base + 17,
 		DESKTOP_AUTOMATION_PORT: base + 18,
@@ -566,7 +563,6 @@ export function buildWorktreeDevPlan(input: {
 		electricProxy: `http://localhost:${ports.WRANGLER_PORT}`,
 		kvRest: `http://localhost:${dataPorts.LOCAL_KV_REST_PORT}`,
 		marketing: `http://localhost:${ports.MARKETING_PORT}`,
-		neonProxy: `http://localhost:${dataPorts.LOCAL_NEON_PROXY_PORT}`,
 		postgres: `postgres://postgres:postgres@localhost:${dataPorts.LOCAL_PG_PORT}/main`,
 		relay: `http://localhost:${ports.RELAY_PORT}`,
 		s3: `http://localhost:${dataPorts.LOCAL_S3_PORT}`,
@@ -585,13 +581,12 @@ export function buildWorktreeDevPlan(input: {
 		SUPERSET_DEV_DATA_MODE: input.dataMode,
 
 		LOCAL_PG_PORT: String(dataPorts.LOCAL_PG_PORT),
-		LOCAL_NEON_PROXY_PORT: String(dataPorts.LOCAL_NEON_PROXY_PORT),
 		LOCAL_ELECTRIC_PORT: String(dataPorts.ELECTRIC_PORT),
 		LOCAL_REDIS_PORT: String(dataPorts.LOCAL_REDIS_PORT),
 		LOCAL_KV_REST_PORT: String(dataPorts.LOCAL_KV_REST_PORT),
 		LOCAL_S3_PORT: String(dataPorts.LOCAL_S3_PORT),
 		LOCAL_S3_CONSOLE_PORT: String(dataPorts.LOCAL_S3_CONSOLE_PORT),
-		DATABASE_URL: `postgres://postgres:postgres@db.localtest.me:${dataPorts.LOCAL_NEON_PROXY_PORT}/main`,
+		DATABASE_URL: urls.postgres,
 		DATABASE_URL_UNPOOLED: `postgres://postgres:postgres@localhost:${dataPorts.LOCAL_PG_PORT}/main`,
 		KV_REST_API_URL: urls.kvRest,
 		KV_REST_API_TOKEN: LOCAL_KV_TOKEN,
@@ -830,11 +825,6 @@ export function readDataPortOverridesFromEnv(input: string): DataPortOverrides {
 	const localPgPort = readEnvPort(values, "LOCAL_PG_PORT");
 	if (localPgPort !== undefined) overrides.LOCAL_PG_PORT = localPgPort;
 
-	const localNeonProxyPort = readEnvPort(values, "LOCAL_NEON_PROXY_PORT");
-	if (localNeonProxyPort !== undefined) {
-		overrides.LOCAL_NEON_PROXY_PORT = localNeonProxyPort;
-	}
-
 	const localElectricPort =
 		readEnvPort(values, "LOCAL_ELECTRIC_PORT") ??
 		readEnvPort(values, "ELECTRIC_PORT");
@@ -945,10 +935,6 @@ function buildPortsJson(plan: WorktreeDevPlan) {
 			{ port: plan.ports.RELAY_PORT, label: "Relay" },
 			{ port: plan.dataPorts.ELECTRIC_PORT, label: `${backingPrefix}Electric` },
 			{ port: plan.dataPorts.LOCAL_PG_PORT, label: `${backingPrefix}Postgres` },
-			{
-				port: plan.dataPorts.LOCAL_NEON_PROXY_PORT,
-				label: `${backingPrefix}Neon Proxy`,
-			},
 			{ port: plan.dataPorts.LOCAL_REDIS_PORT, label: `${backingPrefix}Redis` },
 			{
 				port: plan.dataPorts.LOCAL_KV_REST_PORT,
@@ -991,28 +977,21 @@ async function checkHttpHealth(url: string, timeoutMs = 1000) {
 }
 
 async function getDataServiceStatus(plan: WorktreeDevPlan) {
-	const [postgres, neonProxy, electric, redis, kvRest] = await Promise.all([
+	const [postgres, electric, redis, kvRest] = await Promise.all([
 		checkTcpPort(plan.dataPorts.LOCAL_PG_PORT),
-		checkTcpPort(plan.dataPorts.LOCAL_NEON_PROXY_PORT),
 		checkHttpHealth(
 			`http://localhost:${plan.dataPorts.ELECTRIC_PORT}/v1/health`,
 		),
 		checkTcpPort(plan.dataPorts.LOCAL_REDIS_PORT),
 		checkHttpHealth(`${plan.urls.kvRest}/health`),
 	]);
-	return { postgres, neonProxy, electric, redis, kvRest };
+	return { postgres, electric, redis, kvRest };
 }
 
 function allDataServicesReady(
 	status: Awaited<ReturnType<typeof getDataServiceStatus>>,
 ) {
-	return (
-		status.postgres &&
-		status.neonProxy &&
-		status.electric &&
-		status.redis &&
-		status.kvRest
-	);
+	return status.postgres && status.electric && status.redis && status.kvRest;
 }
 
 async function ensureDockerAvailable() {
@@ -1046,7 +1025,6 @@ async function startDockerDataStack(plan: WorktreeDevPlan) {
 			cwd: stackRoot,
 			env: {
 				LOCAL_PG_PORT: String(plan.dataPorts.LOCAL_PG_PORT),
-				LOCAL_NEON_PROXY_PORT: String(plan.dataPorts.LOCAL_NEON_PROXY_PORT),
 				LOCAL_ELECTRIC_PORT: String(plan.dataPorts.ELECTRIC_PORT),
 				LOCAL_REDIS_PORT: String(plan.dataPorts.LOCAL_REDIS_PORT),
 				LOCAL_KV_REST_PORT: String(plan.dataPorts.LOCAL_KV_REST_PORT),
@@ -1095,7 +1073,6 @@ function formatDataStatus(
 ) {
 	return [
 		`pg=${status.postgres ? "up" : "down"}`,
-		`neon=${status.neonProxy ? "up" : "down"}`,
 		`electric=${status.electric ? "up" : "down"}`,
 		`redis=${status.redis ? "up" : "down"}`,
 		`kv=${status.kvRest ? "up" : "down"}`,

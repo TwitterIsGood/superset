@@ -31,7 +31,6 @@ load_env() {
   LOCAL_DB_PROJECT="${LOCAL_DB_PROJECT:-$(worktree_default_db_project "$ROOT_DIR")}"
 
   LOCAL_PG_PORT="${LOCAL_PG_PORT:-$((SUPERSET_PORT_BASE + 14))}"
-  LOCAL_NEON_PROXY_PORT="${LOCAL_NEON_PROXY_PORT:-$((SUPERSET_PORT_BASE + 15))}"
   LOCAL_ELECTRIC_PORT="${LOCAL_ELECTRIC_PORT:-$((SUPERSET_PORT_BASE + 9))}"
   LOCAL_REDIS_PORT="${LOCAL_REDIS_PORT:-$((SUPERSET_PORT_BASE + 16))}"
   LOCAL_KV_REST_PORT="${LOCAL_KV_REST_PORT:-$((SUPERSET_PORT_BASE + 17))}"
@@ -47,7 +46,7 @@ load_env() {
   RELAY_PORT="${RELAY_PORT:-$((SUPERSET_PORT_BASE + 13))}"
   DESKTOP_AUTOMATION_PORT="${DESKTOP_AUTOMATION_PORT:-$((SUPERSET_PORT_BASE + 18))}"
 
-  DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@localhost:$LOCAL_NEON_PROXY_PORT/main}"
+  DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@localhost:$LOCAL_PG_PORT/main}"
   DATABASE_URL_UNPOOLED="${DATABASE_URL_UNPOOLED:-postgres://postgres:postgres@localhost:$LOCAL_PG_PORT/main}"
   KV_REST_API_TOKEN="${KV_REST_API_TOKEN:-local-kv-token}"
   KV_REST_API_URL="${KV_REST_API_URL:-http://localhost:$LOCAL_KV_REST_PORT}"
@@ -62,7 +61,7 @@ load_env() {
   NEXT_PUBLIC_RELAY_URL="${NEXT_PUBLIC_RELAY_URL:-$RELAY_URL}"
 
   export SUPERSET_WORKTREE_ID SUPERSET_WORKTREE_ROOT SUPERSET_WORKSPACE_NAME SUPERSET_HOME_DIR SUPERSET_PORT_BASE LOCAL_DB_PROJECT
-  export LOCAL_PG_PORT LOCAL_NEON_PROXY_PORT LOCAL_ELECTRIC_PORT LOCAL_REDIS_PORT LOCAL_KV_REST_PORT LOCAL_S3_PORT LOCAL_S3_CONSOLE_PORT
+  export LOCAL_PG_PORT LOCAL_ELECTRIC_PORT LOCAL_REDIS_PORT LOCAL_KV_REST_PORT LOCAL_S3_PORT LOCAL_S3_CONSOLE_PORT
   export WEB_PORT API_PORT DESKTOP_VITE_PORT DESKTOP_NOTIFICATIONS_PORT CADDY_ELECTRIC_PORT WRANGLER_PORT RELAY_PORT DESKTOP_AUTOMATION_PORT
   export DATABASE_URL DATABASE_URL_UNPOOLED KV_REST_API_TOKEN KV_REST_API_URL KV_URL
   export ELECTRIC_SECRET ELECTRIC_URL NEXT_PUBLIC_ELECTRIC_URL NEXT_PUBLIC_ELECTRIC_PROXY_URL
@@ -126,35 +125,31 @@ compose() {
 start_data_services() {
   echo "Starting worktree Docker data services ($LOCAL_DB_PROJECT)..."
   wait_for_docker "${WORKTREE_DEV_DOCKER_WAIT_ATTEMPTS:-180}"
-  if ! compose up -d --build --wait postgres neon-proxy electric redis kv-rest; then
+  if ! compose up -d --build --wait postgres electric redis kv-rest; then
     warn "docker compose --wait failed or is unsupported; falling back to detached startup"
-    compose up -d --build postgres neon-proxy electric redis kv-rest
+    compose up -d --build postgres electric redis kv-rest
   fi
 }
 
-db_proxy_query_ok() {
-  curl -sS --max-time 5 \
-    -X POST "http://localhost:${LOCAL_NEON_PROXY_PORT}/sql" \
-    -H "Neon-Connection-String: ${DATABASE_URL}" \
-    -H "Content-Type: application/json" \
-    -d '{"query":"select 1","params":[]}' 2>/dev/null |
-    grep -q '"command"'
+db_query_ok() {
+  compose exec -T postgres psql -U postgres -d main -At -v ON_ERROR_STOP=1 -c "select 1" 2>/dev/null |
+    grep -qx "1"
 }
 
-wait_for_db_proxy_query() {
+wait_for_db_query() {
   local max_attempts="${1:-60}"
   local attempt=1
   while true; do
-    if db_proxy_query_ok; then
-      success "neon proxy query ready"
+    if db_query_ok; then
+      success "postgres query ready"
       return
     fi
     if [ "$attempt" -ge "$max_attempts" ]; then
-      error "neon proxy did not serve SQL queries after ${max_attempts} attempts"
+      error "postgres did not serve SQL queries after ${max_attempts} attempts"
       exit 1
     fi
     if [ "$attempt" -eq 1 ]; then
-      warn "waiting for neon proxy SQL queries..."
+      warn "waiting for postgres SQL queries..."
     fi
     sleep 2
     attempt=$((attempt + 1))
@@ -353,7 +348,6 @@ print_status() {
   echo "  desktop vite     http://localhost:${DESKTOP_VITE_PORT}"
   echo "  desktop cdp      http://localhost:${DESKTOP_AUTOMATION_PORT}"
   echo "  postgres         localhost:${LOCAL_PG_PORT}"
-  echo "  neon-proxy       localhost:${LOCAL_NEON_PROXY_PORT}"
   echo "  electric         localhost:${LOCAL_ELECTRIC_PORT}"
   echo "  redis            localhost:${LOCAL_REDIS_PORT}"
   echo "  kv-rest          localhost:${LOCAL_KV_REST_PORT}"
@@ -365,10 +359,10 @@ print_status() {
   print_docker_status
   echo
   echo "probes:"
-  if db_proxy_query_ok; then
-    printf '  ✓ %-24s %s\n' "neon proxy SQL" "SELECT"
+  if db_query_ok; then
+    printf '  ✓ %-24s %s\n' "postgres SQL" "SELECT"
   else
-    printf '  ✗ %-24s failed %s\n' "neon proxy SQL" "http://localhost:${LOCAL_NEON_PROXY_PORT}/sql"
+    printf '  ✗ %-24s failed %s\n' "postgres SQL" "localhost:${LOCAL_PG_PORT}"
   fi
   probe_url "api session" "http://localhost:${API_PORT}/api/auth/get-session" "200"
   probe_url "relay health" "http://localhost:${RELAY_PORT}/health" "200"
@@ -504,7 +498,7 @@ start_all() {
   ensure_local_setup
   ensure_prereqs
   start_data_services
-  wait_for_db_proxy_query
+  wait_for_db_query
   run_migrations_and_seed
   prepare_desktop
   start_app_services

@@ -997,3 +997,36 @@ Moved online API, Web, Relay, and Electric Proxy into Docker Compose with host-b
 ### Next Steps
 
 - None - task complete
+
+
+## Session 30: Remove online Neon proxy
+
+**Date**: 2026-06-26
+**Task**: Remove online Neon proxy
+**Package**: db
+**Branch**: `main`
+
+### Summary
+
+Removed the `local-neon-http-proxy` dependency from online/dev DB access by moving `packages/db` to `pg` plus `drizzle-orm/node-postgres`, updated online/worktree env generation to point directly at Postgres, and restored production login after the old API container hit Neon driver `fetch failed` errors against `neon-proxy:4444`.
+
+### Main Changes
+
+- Online API/Web/Relay/Electric Proxy now run against `postgres:5432` inside Docker instead of `neon-proxy:4444`.
+- Removed the `neon-proxy` compose service and deleted its helper/test from `packages/db`.
+- Online startup no longer rebuilds data services on every start; it reuses existing images and only builds `kv-rest` if the image is missing.
+- Worktree/dev setup now writes direct Postgres `DATABASE_URL` values and cleans stale `LOCAL_NEON_PROXY_PORT` env.
+- Rebuilt online app containers, removed the orphan `superset-online-neon-proxy-1`, and verified public probes plus real login.
+
+### Testing
+
+- [OK] `bun test scripts/superset-online.test.ts scripts/dev-worktree.test.ts scripts/worktree-local-shell.test.ts`
+- [OK] `bun run --cwd packages/db typecheck`
+- [OK] `bun run lint`
+- [OK] `bun run typecheck`
+- [OK] `./scripts/superset-online.sh status`
+- [WARN] `bun test` full suite reached unrelated `packages/pty-daemon` integration timeouts and then a Bun 1.3.14 crash.
+
+### Status
+
+[OK] **Ready for commit**
