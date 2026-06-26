@@ -232,6 +232,146 @@ function pruneNodePty(
 	removeFilesByExtension(nodeModulesDir, nodePtyRoot, ".pdb", removedPaths);
 }
 
+function getAstGrepTargetPackages(
+	targetPlatform: string,
+	targetArchSet: Set<string>,
+): Set<string> {
+	const packages = new Set<string>();
+	for (const arch of targetArchSet) {
+		if (targetPlatform === "darwin") {
+			packages.add(`napi-darwin-${arch}`);
+			continue;
+		}
+		if (targetPlatform === "linux") {
+			packages.add(`napi-linux-${arch}-gnu`);
+			continue;
+		}
+		if (targetPlatform === "win32") {
+			packages.add(`napi-win32-${arch}-msvc`);
+		}
+	}
+	return packages;
+}
+
+function pruneAstGrep(
+	nodeModulesDir: string,
+	targetPlatform: string,
+	targetArchSet: Set<string>,
+	removedPaths: string[],
+): void {
+	const astGrepRoot = join(nodeModulesDir, "@ast-grep");
+	const targetPackages = getAstGrepTargetPackages(
+		targetPlatform,
+		targetArchSet,
+	);
+
+	for (const packageDir of listDirectories(astGrepRoot)) {
+		if (!packageDir.startsWith("napi-")) {
+			continue;
+		}
+		if (!targetPackages.has(packageDir)) {
+			removePath(nodeModulesDir, join(astGrepRoot, packageDir), removedPaths);
+		}
+	}
+}
+
+function getLibsqlTargetPackages(
+	targetPlatform: string,
+	targetArchSet: Set<string>,
+): Set<string> {
+	const packages = new Set<string>();
+	for (const arch of targetArchSet) {
+		if (targetPlatform === "darwin") {
+			packages.add(`darwin-${arch}`);
+			continue;
+		}
+		if (targetPlatform === "linux") {
+			packages.add(`linux-${arch}-gnu`);
+			continue;
+		}
+		if (targetPlatform === "win32") {
+			packages.add(`win32-${arch}-msvc`);
+		}
+	}
+	return packages;
+}
+
+function pruneLibsql(
+	nodeModulesDir: string,
+	targetPlatform: string,
+	targetArchSet: Set<string>,
+	removedPaths: string[],
+): void {
+	const libsqlRoot = join(nodeModulesDir, "@libsql");
+	const targetPackages = getLibsqlTargetPackages(targetPlatform, targetArchSet);
+
+	for (const packageDir of listDirectories(libsqlRoot)) {
+		if (!targetPackages.has(packageDir)) {
+			removePath(nodeModulesDir, join(libsqlRoot, packageDir), removedPaths);
+		}
+	}
+}
+
+function getParcelWatcherTargetPackages(
+	targetPlatform: string,
+	targetArchSet: Set<string>,
+): Set<string> {
+	const packages = new Set<string>();
+	for (const arch of targetArchSet) {
+		if (targetPlatform === "darwin") {
+			packages.add(`watcher-darwin-${arch}`);
+			continue;
+		}
+		if (targetPlatform === "linux") {
+			packages.add(`watcher-linux-${arch}-glibc`);
+			continue;
+		}
+		if (targetPlatform === "win32") {
+			packages.add(`watcher-win32-${arch}`);
+		}
+	}
+	return packages;
+}
+
+function pruneParcelWatcher(
+	nodeModulesDir: string,
+	targetPlatform: string,
+	targetArchSet: Set<string>,
+	removedPaths: string[],
+): void {
+	const parcelRoot = join(nodeModulesDir, "@parcel");
+	const watcherRoot = join(parcelRoot, "watcher");
+	const targetPackages = getParcelWatcherTargetPackages(
+		targetPlatform,
+		targetArchSet,
+	);
+
+	for (const packageDir of listDirectories(parcelRoot)) {
+		if (!packageDir.startsWith("watcher-")) {
+			continue;
+		}
+		if (!targetPackages.has(packageDir)) {
+			removePath(nodeModulesDir, join(parcelRoot, packageDir), removedPaths);
+		}
+	}
+
+	const hasTargetPackage = [...targetPackages].some((packageDir) =>
+		existsSync(join(parcelRoot, packageDir)),
+	);
+	if (hasTargetPackage) {
+		removePath(nodeModulesDir, join(watcherRoot, "build"), removedPaths);
+	}
+}
+
+function pruneBetterSqlite3(
+	nodeModulesDir: string,
+	removedPaths: string[],
+): void {
+	const betterSqliteRoot = join(nodeModulesDir, "better-sqlite3");
+	removePath(nodeModulesDir, join(betterSqliteRoot, "deps"), removedPaths);
+	removePath(nodeModulesDir, join(betterSqliteRoot, "src"), removedPaths);
+}
+
 export async function prunePackagedNativePayloads({
 	appOutDir,
 	targetArch,
@@ -258,6 +398,15 @@ export async function prunePackagedNativePayloads({
 	);
 	pruneKoffi(nodeModulesDir, normalizedPlatform, targetArchSet, removedPaths);
 	pruneNodePty(nodeModulesDir, normalizedPlatform, targetArchSet, removedPaths);
+	pruneAstGrep(nodeModulesDir, normalizedPlatform, targetArchSet, removedPaths);
+	pruneLibsql(nodeModulesDir, normalizedPlatform, targetArchSet, removedPaths);
+	pruneParcelWatcher(
+		nodeModulesDir,
+		normalizedPlatform,
+		targetArchSet,
+		removedPaths,
+	);
+	pruneBetterSqlite3(nodeModulesDir, removedPaths);
 
 	console.log(
 		`[prune:native-payloads] ${normalizedPlatform}/${normalizedArch}: removed ${removedPaths.length} non-target native payload path(s)`,

@@ -130,10 +130,31 @@ describe("Trellis runtime pack packaging", () => {
 		expect(buildWorkflow).toContain("zip_only");
 		expect(buildWorkflow).toContain('PACKAGE_TARGET_ARGS=("--mac" "zip"');
 		expect(buildWorkflow).toContain("if: inputs.macos_artifact_mode == 'full'");
+		expect(buildWorkflow).toContain("upload_resource_pack_artifacts");
+		expect(buildWorkflow).toContain(
+			"if: inputs.upload_resource_pack_artifacts && matrix.arch == 'arm64'",
+		);
+		expect(buildWorkflow).toContain('ELECTRON_BUILDER_NPM_REBUILD: "false"');
+		expect(buildWorkflow).toContain(
+			"node ./node_modules/electron-builder/cli.js --publish never",
+		);
+		expect(buildWorkflow).toContain(
+			"hashFiles('bun.lock', 'package.json', 'apps/desktop/package.json', 'packages/*/package.json')",
+		);
+		expect(buildWorkflow).not.toContain(
+			"$" +
+				"{{ runner.os }}-bun-" +
+				"$" +
+				"{{ steps.setup-bun.outputs.bun-revision }}-" +
+				"$" +
+				"{{ github.sha }}",
+		);
+		expect(buildWorkflow).not.toContain("bun run package -- --publish never");
 		expect(canaryWorkflow).toContain(
 			'BUILD_SCOPE" == "quick" && "$PUBLISH_RELEASE" == "false',
 		);
 		expect(canaryWorkflow).toContain("macos_artifact_mode=zip_only");
+		expect(canaryWorkflow).toContain("upload_resource_pack_artifacts=false");
 	});
 
 	test("defines a MastraCode runtime pack for the DuckDB-backed agent runtime", () => {
@@ -285,6 +306,7 @@ describe("Trellis runtime pack packaging", () => {
 
 		expect(electronBuilderConfig).toContain("!dist/resource-packs/**/*");
 		expect(electronBuilderConfig).toContain("!dist/resource-packs-test/**/*");
+		expect(electronBuilderConfig).toContain("!node_modules/**/*");
 		expect(electronBuilderConfig).toContain("packOnlyNodeModuleFileExcludes");
 		expect(hostServicePackageJson.dependencies).not.toHaveProperty(
 			"@mindfoldhq/trellis",

@@ -100,6 +100,40 @@ describe("prunePackagedNativePayloads", () => {
 		touch(join(nodeModulesDir, "node-pty/deps/winpty/README.md"));
 		touch(join(nodeModulesDir, "node-pty/third_party/conpty/README.md"));
 
+		touch(
+			join(
+				nodeModulesDir,
+				"@ast-grep/napi-darwin-arm64/ast-grep-napi.darwin-arm64.node",
+			),
+		);
+		touch(
+			join(
+				nodeModulesDir,
+				"@ast-grep/napi-darwin-x64/ast-grep-napi.darwin-x64.node",
+			),
+		);
+		touch(
+			join(
+				nodeModulesDir,
+				"@ast-grep/napi-linux-x64-gnu/ast-grep-napi.linux-x64-gnu.node",
+			),
+		);
+
+		touch(join(nodeModulesDir, "@libsql/darwin-arm64/index.node"));
+		touch(join(nodeModulesDir, "@libsql/darwin-x64/index.node"));
+		touch(join(nodeModulesDir, "@libsql/linux-x64-gnu/index.node"));
+
+		touch(join(nodeModulesDir, "@parcel/watcher-darwin-arm64/watcher.node"));
+		touch(join(nodeModulesDir, "@parcel/watcher-darwin-x64/watcher.node"));
+		touch(join(nodeModulesDir, "@parcel/watcher-linux-x64-glibc/watcher.node"));
+		touch(join(nodeModulesDir, "@parcel/watcher/build/Release/watcher.node"));
+		touch(join(nodeModulesDir, "@parcel/watcher/index.js"));
+
+		touch(join(nodeModulesDir, "better-sqlite3/build/Release/better.node"));
+		touch(join(nodeModulesDir, "better-sqlite3/deps/sqlite3/sqlite3.c"));
+		touch(join(nodeModulesDir, "better-sqlite3/src/better_sqlite3.cpp"));
+		touch(join(nodeModulesDir, "better-sqlite3/lib/index.js"));
+
 		const result = await prunePackagedNativePayloads({
 			appOutDir,
 			targetArch: "arm64",
@@ -148,6 +182,45 @@ describe("prunePackagedNativePayloads", () => {
 		expect(existsSync(join(nodeModulesDir, "node-pty/third_party"))).toBe(
 			false,
 		);
+
+		expect(
+			existsSync(join(nodeModulesDir, "@ast-grep/napi-darwin-arm64")),
+		).toBe(true);
+		expect(existsSync(join(nodeModulesDir, "@ast-grep/napi-darwin-x64"))).toBe(
+			false,
+		);
+		expect(
+			existsSync(join(nodeModulesDir, "@ast-grep/napi-linux-x64-gnu")),
+		).toBe(false);
+
+		expect(existsSync(join(nodeModulesDir, "@libsql/darwin-arm64"))).toBe(true);
+		expect(existsSync(join(nodeModulesDir, "@libsql/darwin-x64"))).toBe(false);
+		expect(existsSync(join(nodeModulesDir, "@libsql/linux-x64-gnu"))).toBe(
+			false,
+		);
+
+		expect(
+			existsSync(join(nodeModulesDir, "@parcel/watcher-darwin-arm64")),
+		).toBe(true);
+		expect(existsSync(join(nodeModulesDir, "@parcel/watcher-darwin-x64"))).toBe(
+			false,
+		);
+		expect(
+			existsSync(join(nodeModulesDir, "@parcel/watcher-linux-x64-glibc")),
+		).toBe(false);
+		expect(existsSync(join(nodeModulesDir, "@parcel/watcher/build"))).toBe(
+			false,
+		);
+		expect(existsSync(join(nodeModulesDir, "@parcel/watcher/index.js"))).toBe(
+			true,
+		);
+
+		expect(
+			existsSync(join(nodeModulesDir, "better-sqlite3/build/Release")),
+		).toBe(true);
+		expect(existsSync(join(nodeModulesDir, "better-sqlite3/deps"))).toBe(false);
+		expect(existsSync(join(nodeModulesDir, "better-sqlite3/src"))).toBe(false);
+		expect(existsSync(join(nodeModulesDir, "better-sqlite3/lib"))).toBe(true);
 	});
 
 	test("keeps Linux build fallback while pruning unrelated payloads", async () => {
@@ -172,6 +245,24 @@ describe("prunePackagedNativePayloads", () => {
 
 		touch(join(nodeModulesDir, "node-pty/build/Release/pty.node"));
 		touch(join(nodeModulesDir, "node-pty/prebuilds/darwin-arm64/pty.node"));
+
+		touch(
+			join(
+				nodeModulesDir,
+				"@ast-grep/napi-linux-x64-gnu/ast-grep-napi.linux-x64-gnu.node",
+			),
+		);
+		touch(
+			join(
+				nodeModulesDir,
+				"@ast-grep/napi-linux-x64-musl/ast-grep-napi.linux-x64-musl.node",
+			),
+		);
+		touch(join(nodeModulesDir, "@libsql/linux-x64-gnu/index.node"));
+		touch(join(nodeModulesDir, "@libsql/linux-x64-musl/index.node"));
+		touch(join(nodeModulesDir, "@parcel/watcher-linux-x64-glibc/watcher.node"));
+		touch(join(nodeModulesDir, "@parcel/watcher-linux-x64-musl/watcher.node"));
+		touch(join(nodeModulesDir, "@parcel/watcher/build/Release/watcher.node"));
 
 		await prunePackagedNativePayloads({
 			appOutDir,
@@ -207,5 +298,27 @@ describe("prunePackagedNativePayloads", () => {
 		expect(
 			existsSync(join(nodeModulesDir, "node-pty/prebuilds/darwin-arm64")),
 		).toBe(false);
+
+		expect(
+			existsSync(join(nodeModulesDir, "@ast-grep/napi-linux-x64-gnu")),
+		).toBe(true);
+		expect(
+			existsSync(join(nodeModulesDir, "@ast-grep/napi-linux-x64-musl")),
+		).toBe(false);
+		expect(existsSync(join(nodeModulesDir, "@libsql/linux-x64-gnu"))).toBe(
+			true,
+		);
+		expect(existsSync(join(nodeModulesDir, "@libsql/linux-x64-musl"))).toBe(
+			false,
+		);
+		expect(
+			existsSync(join(nodeModulesDir, "@parcel/watcher-linux-x64-glibc")),
+		).toBe(true);
+		expect(
+			existsSync(join(nodeModulesDir, "@parcel/watcher-linux-x64-musl")),
+		).toBe(false);
+		expect(existsSync(join(nodeModulesDir, "@parcel/watcher/build"))).toBe(
+			false,
+		);
 	});
 });

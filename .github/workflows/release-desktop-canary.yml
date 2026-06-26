@@ -51,6 +51,7 @@ jobs:
       macos_artifact_mode: ${{ steps.check.outputs.macos_artifact_mode }}
       build_linux: ${{ steps.check.outputs.build_linux }}
       mac_signing: ${{ steps.check.outputs.mac_signing }}
+      upload_resource_pack_artifacts: ${{ steps.check.outputs.upload_resource_pack_artifacts }}
 
     steps:
       - name: Checkout code
@@ -121,8 +122,10 @@ jobs:
           if [[ "$BUILD_SCOPE" == "quick" && "$PUBLISH_RELEASE" == "false" ]]; then
             echo "Artifact-only quick validation requested: building macOS updater ZIP only."
             echo "macos_artifact_mode=zip_only" >> $GITHUB_OUTPUT
+            echo "upload_resource_pack_artifacts=false" >> $GITHUB_OUTPUT
           else
             echo "macos_artifact_mode=full" >> $GITHUB_OUTPUT
+            echo "upload_resource_pack_artifacts=true" >> $GITHUB_OUTPUT
           fi
 
           if [ "$FORCE_BUILD" = "true" ]; then
@@ -159,6 +162,7 @@ jobs:
       build_linux: ${{ needs.check-changes.outputs.build_linux == 'true' }}
       mac_signing: ${{ needs.check-changes.outputs.mac_signing }}
       macos_artifact_mode: ${{ needs.check-changes.outputs.macos_artifact_mode }}
+      upload_resource_pack_artifacts: ${{ needs.check-changes.outputs.upload_resource_pack_artifacts == 'true' }}
     secrets: inherit
 
   release:

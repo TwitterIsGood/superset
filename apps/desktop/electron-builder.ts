@@ -30,6 +30,10 @@ const dmgBackgroundPath = join(
 const skipMacCodeSigning = process.env.SKIP_MAC_CODE_SIGNING === "true";
 const adHocMacCodeSigning = process.env.AD_HOC_MAC_CODE_SIGNING === "true";
 const skipDeveloperIdMacSigning = skipMacCodeSigning || adHocMacCodeSigning;
+const shouldRebuildNativeModules =
+	process.env.ELECTRON_BUILDER_NPM_REBUILD !== "false";
+const buildDependenciesFromSource =
+	process.env.ELECTRON_BUILDER_BUILD_FROM_SOURCE === "true";
 
 const config: Configuration = {
 	appId: "com.superset.desktop",
@@ -94,6 +98,10 @@ const config: Configuration = {
 		"!dist/resource-packs/**/*",
 		"!dist/resource-packs-test/**/*",
 		"package.json",
+		// Main/preload/renderer are bundled by electron-vite. Keep production
+		// node_modules out of app.asar by default, then re-include only the
+		// native/runtime modules listed below.
+		"!node_modules/**/*",
 		{
 			from: pkg.resources,
 			to: "resources",
@@ -113,8 +121,11 @@ const config: Configuration = {
 		"!**/*.spec.*",
 	],
 
-	// Rebuild native modules for Electron's Node.js version
-	npmRebuild: true,
+	// CI runs `install-app-deps` and `copy:native-modules` explicitly. Let that
+	// path skip electron-builder's duplicate native rebuild while preserving the
+	// safer default for local ad-hoc packaging.
+	npmRebuild: shouldRebuildNativeModules,
+	buildDependenciesFromSource,
 
 	afterPack: async (context) => {
 		await prunePackagedNativePayloads({
