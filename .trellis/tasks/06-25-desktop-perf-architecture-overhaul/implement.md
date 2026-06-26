@@ -616,6 +616,16 @@ cd packages/host-service && bun test
     - AI naming outputs are now small dynamic chunks: `ai-name` `6.2 KiB`, desktop `ai-branch-name` `2.7 KiB`, host-service `ai-branch-name` `2.9 KiB`, and `ai-workspace-names` `6.3 KiB`.
     - `rg` over `apps/desktop/dist/main/index.js` and `apps/desktop/dist/main/chunks` finds no `@mastra/core/agent`; AI naming implementations appear only in their small dynamic chunks.
   - Validation passed: `bun test packages/chat/src/server/desktop/title-generation/title-generation.test.ts apps/desktop/src/lib/trpc/routers/workspaces/utils/ai-name.test.ts apps/desktop/runtime-dependencies.test.ts packages/host-service/src/app.lazy-runtime.test.ts`, `bun run --cwd apps/desktop typecheck`, `bun run lint:fix`, `bun run lint`, and the compile-stats build above.
+- 2026-06-27 renderer asset slimming follow-up:
+  - Replaced the desktop `cursor.svg` app icon from a `1,575,673` byte SVG-wrapped base64 PNG with the existing lightweight vector form (`1,299` bytes). The import path stayed unchanged (`renderer/assets/app-icons/cursor.svg`) so UI callers did not change.
+  - Added a regression test that requires the Cursor app icon to stay below `10 KiB`, forbids embedded `base64,` payloads, and forbids `<image>` tags in that SVG.
+  - Removed the renderer ringtone URL table that used `new URL(..., import.meta.url)` for every built-in MP3. Notification ringtone playback now goes through the existing main-process `ringtone.playNotification` route for both built-in and custom sounds, while the actual files remain packaged once as unpacked `resources/sounds` for `getSoundPath()` / native playback.
+  - Added a regression test that prevents a renderer `ringtones/urls.ts` module from reappearing and forbids `resources/sounds` / `new URL(` references in renderer ringtone playback code.
+  - Compile evidence with `DESKTOP_BUILD_STATS=true DESKTOP_BUILD_STATS_DIR=performance-reports/build-stats DESKTOP_BUNDLE_CLI=false bun run --cwd apps/desktop compile:app`:
+    - After the Cursor icon patch alone, renderer total dropped from the prior `38.60 MiB` baseline to `37.10 MiB`; the `1.50 MiB` `cursor.svg` output disappeared from the top asset list.
+    - After moving built-in ringtone playback out of renderer static assets, renderer total dropped again to `34.67 MiB`; `mp3 outputs=0`, and the previous `1.19 MiB` `codecompleteedm.mp3` plus the other built-in ringtone assets no longer appear in renderer output.
+    - Main remains `9.31 MiB` and preload remains `0.00 MiB`, as expected for a renderer-asset-only change.
+  - Validation passed: `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run lint:fix`, `bun run lint`, `bun run --cwd apps/desktop typecheck`, and the compile-stats build above.
 
 ---
 

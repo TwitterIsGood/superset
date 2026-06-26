@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import hostServicePackageJson from "../../packages/host-service/package.json";
 import packageJson from "./package.json";
@@ -59,6 +59,52 @@ describe("Trellis runtime pack packaging", () => {
 				`**/node_modules/${moduleName}/**/*`,
 			);
 		}
+	});
+
+	test("keeps renderer app icons as lightweight vector assets", () => {
+		const cursorIconSource = readFileSync(
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"assets",
+				"app-icons",
+				"cursor.svg",
+			),
+			"utf8",
+		);
+
+		expect(Buffer.byteLength(cursorIconSource)).toBeLessThan(10 * 1024);
+		expect(cursorIconSource).not.toContain("base64,");
+		expect(cursorIconSource).not.toContain("<image");
+		expect(cursorIconSource).toContain("<path");
+	});
+
+	test("keeps built-in ringtone audio out of the renderer bundle", () => {
+		const ringtoneUrlModulePath = join(
+			import.meta.dirname,
+			"src",
+			"renderer",
+			"lib",
+			"ringtones",
+			"urls.ts",
+		);
+		const ringtonePlaySource = readFileSync(
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"lib",
+				"ringtones",
+				"play.ts",
+			),
+			"utf8",
+		);
+
+		expect(existsSync(ringtoneUrlModulePath)).toBe(false);
+		expect(ringtonePlaySource).not.toContain("resources/sounds");
+		expect(ringtonePlaySource).not.toContain("new URL(");
+		expect(ringtonePlaySource).toContain("ringtone.playNotification");
 	});
 
 	test("keeps CJS-only Trellis compatibility dependencies nested", () => {
