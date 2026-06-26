@@ -98,6 +98,7 @@ const createInputSchema = z
 			.object({
 				initialize: z.boolean().optional(),
 				runtimePackPath: z.string().min(1).optional(),
+				supersetCliRuntimePackPath: z.string().min(1).optional(),
 			})
 			.optional(),
 	})
@@ -1308,6 +1309,8 @@ export const workspacesRouter = router({
 							worktreePath: localWorkspace.worktreePath,
 							initialize: true,
 							trellisRuntimePackPath: input.trellisSetup?.runtimePackPath,
+							supersetCliRuntimePackPath:
+								input.trellisSetup?.supersetCliRuntimePackPath,
 							platforms: resolveTrellisPlatformsForAgentLaunches(
 								ctx,
 								input.agents,
@@ -1341,6 +1344,8 @@ export const workspacesRouter = router({
 							},
 							workspaceId: workspaceRow.id,
 							branch: resolvedBranch,
+							supersetCliRuntimePackPath:
+								input.trellisSetup?.supersetCliRuntimePackPath,
 						});
 						if (bridged.warning && bridged.warning !== result.warning) {
 							console.warn(

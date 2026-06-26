@@ -1,7 +1,10 @@
 import { Checkbox } from "@superset/ui/checkbox";
 import { cn } from "@superset/ui/utils";
 import { useQuery } from "@tanstack/react-query";
-import { TRELLIS_RUNTIME_PACK_ID } from "lib/pack-system/pack-ids";
+import {
+	SUPERSET_CLI_RUNTIME_PACK_ID,
+	TRELLIS_RUNTIME_PACK_ID,
+} from "lib/pack-system/pack-ids";
 import { AlertCircle, CheckCircle2, Loader2, Workflow } from "lucide-react";
 import { useEffect } from "react";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
@@ -85,7 +88,8 @@ function statusCopy(
 		case "runtime-error":
 			return {
 				title: "Runtime download failed",
-				description: "Workspace creation will use the bundled fallback.",
+				description:
+					"Retry the download or continue with the available fallback.",
 			};
 		default:
 			return {
@@ -108,6 +112,9 @@ export function TrellisSetupRow({
 	const { machineId } = useLocalHostService();
 	const shouldTrackRuntimePack = initialize && !!hostId && hostId === machineId;
 	const runtimePack = usePackStatus(TRELLIS_RUNTIME_PACK_ID, {
+		enabled: shouldTrackRuntimePack,
+	});
+	const cliRuntimePack = usePackStatus(SUPERSET_CLI_RUNTIME_PACK_ID, {
 		enabled: shouldTrackRuntimePack,
 	});
 	const canCheckWorkflow =
@@ -145,21 +152,39 @@ export function TrellisSetupRow({
 		(canPrepareProject ? "missing" : error ? "unavailable" : data?.state);
 	const runtimeState =
 		shouldTrackRuntimePack &&
-		runtimePack.status?.status !== "not_configured" &&
-		(runtimePack.status?.status === "downloading" ||
-			runtimePack.status?.status === "verifying")
+		((runtimePack.status?.status !== "not_configured" &&
+			(runtimePack.status?.status === "downloading" ||
+				runtimePack.status?.status === "verifying")) ||
+			(cliRuntimePack.status?.status !== "not_configured" &&
+				(cliRuntimePack.status?.status === "downloading" ||
+					cliRuntimePack.status?.status === "verifying")))
 			? "runtime-preparing"
-			: shouldTrackRuntimePack && runtimePack.status?.status === "error"
+			: shouldTrackRuntimePack &&
+					(runtimePack.status?.status === "error" ||
+						cliRuntimePack.status?.status === "error")
 				? "runtime-error"
 				: null;
 	const effectiveState = runtimeState ?? state;
 	const copy = statusCopy(effectiveState);
 	const canInitialize = state === "missing" && !disabled;
+	const runtimeProgresses = [
+		runtimePack.status?.progress,
+		cliRuntimePack.status?.progress,
+	].filter(
+		(progress): progress is NonNullable<typeof progress> =>
+			!!progress && progress.totalBytes > 0,
+	);
 	const runtimePercent =
-		runtimePack.status?.progress && runtimePack.status.progress.totalBytes > 0
+		runtimeProgresses.length > 0
 			? Math.round(
-					(runtimePack.status.progress.bytesDownloaded /
-						runtimePack.status.progress.totalBytes) *
+					(runtimeProgresses.reduce(
+						(total, progress) => total + progress.bytesDownloaded,
+						0,
+					) /
+						runtimeProgresses.reduce(
+							(total, progress) => total + progress.totalBytes,
+							0,
+						)) *
 						100,
 				)
 			: null;
@@ -213,9 +238,10 @@ export function TrellisSetupRow({
 				<PackErrorState
 					title={copy.title}
 					description={copy.description}
-					isRetrying={runtimePack.isResolving}
+					isRetrying={runtimePack.isResolving || cliRuntimePack.isResolving}
 					onRetry={() => {
 						void runtimePack.resolve();
+						void cliRuntimePack.resolve();
 					}}
 				/>
 			) : (

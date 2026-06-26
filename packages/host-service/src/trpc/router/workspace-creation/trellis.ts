@@ -104,6 +104,7 @@ export interface TrellisCommandArgs {
 	args: string[];
 	cwd: string;
 	timeoutMs: number;
+	env?: Record<string, string>;
 }
 
 export type TrellisCommandRunner = (
@@ -583,6 +584,39 @@ export function resolveTrellisBinPath(
 	);
 }
 
+function getSupersetCliBinaryName(
+	platform: NodeJS.Platform = process.platform,
+) {
+	return platform === "win32" ? "superset.exe" : "superset";
+}
+
+export function resolveSupersetCliRuntimePackBinaryPath(
+	runtimePackPath: string | undefined,
+	options: {
+		platform?: NodeJS.Platform;
+		exists?: (candidate: string) => boolean;
+	} = {},
+): string | null {
+	const packPath = runtimePackPath?.trim();
+	if (!packPath) return null;
+
+	const candidate = join(
+		packPath,
+		"bin",
+		getSupersetCliBinaryName(options.platform),
+	);
+	const packRoot = resolve(packPath);
+	const packRootWithSeparator = packRoot.endsWith(sep)
+		? packRoot
+		: `${packRoot}${sep}`;
+	const resolved = resolve(candidate);
+	if (resolved !== packRoot && !resolved.startsWith(packRootWithSeparator)) {
+		return null;
+	}
+	if (!(options.exists ?? existsSync)(resolved)) return null;
+	return resolved;
+}
+
 async function defaultTrellisCommandRunner(
 	args: TrellisCommandArgs,
 ): Promise<{ stdout: string; stderr: string }> {
@@ -593,6 +627,7 @@ async function defaultTrellisCommandRunner(
 		env: {
 			...process.env,
 			CI: "1",
+			...args.env,
 		},
 	});
 	return {
@@ -634,6 +669,7 @@ export async function applyTrellisSetup(args: {
 	runner?: TrellisCommandRunner;
 	trellisBinPath?: string;
 	trellisRuntimePackPath?: string;
+	supersetCliRuntimePackPath?: string;
 	timeoutMs?: number;
 }): Promise<TrellisSetupResult> {
 	const before = await getTrellisStatusAtPath(args.worktreePath);
@@ -680,12 +716,16 @@ export async function applyTrellisSetup(args: {
 			resolveTrellisBinPath({
 				runtimePackPath: args.trellisRuntimePackPath,
 			});
+		const supersetCliPath = resolveSupersetCliRuntimePackBinaryPath(
+			args.supersetCliRuntimePackPath,
+		);
 		const runtimeCommand = await resolveTrellisRuntimeCommand();
 		await runner({
 			command: runtimeCommand,
 			args: [trellisBinPath, ...buildTrellisInitArgs(platforms)],
 			cwd: args.worktreePath,
 			timeoutMs: args.timeoutMs ?? 120_000,
+			env: supersetCliPath ? { SUPERSET_CLI_PATH: supersetCliPath } : undefined,
 		});
 
 		const after = await getTrellisStatusAtPath(args.worktreePath);
@@ -707,6 +747,22 @@ export async function applyTrellisSetup(args: {
 
 function yamlCommandLine(command: string): string {
 	return `    - ${JSON.stringify(command)}`;
+}
+
+function quoteShellLiteral(value: string): string {
+	return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+function buildSupersetTaskSyncHookCommands(
+	supersetCliPath: string | null,
+): Record<TrellisSyncHookEvent, string> {
+	if (!supersetCliPath) return SUPERSET_TASK_SYNC_HOOK_COMMANDS;
+	const envPrefix = `SUPERSET_CLI_PATH=${quoteShellLiteral(supersetCliPath)}`;
+	return {
+		after_create: `${envPrefix} ${SUPERSET_TASK_SYNC_HOOK_COMMANDS.after_create}`,
+		after_start: `${envPrefix} ${SUPERSET_TASK_SYNC_HOOK_COMMANDS.after_start}`,
+		after_archive: `${envPrefix} ${SUPERSET_TASK_SYNC_HOOK_COMMANDS.after_archive}`,
+	};
 }
 
 function findTopLevelHooksLine(lines: string[]): number {
@@ -768,12 +824,6 @@ function ensureHookCommandInLines(args: {
 	const { lines, hooksStartIndex, event, command } = args;
 	const { hooksEndIndex } = args;
 
-	for (let index = hooksStartIndex + 1; index < hooksEndIndex; index += 1) {
-		if ((lines[index] ?? "").includes(command)) {
-			return { hooksEndIndex, changed: false };
-		}
-	}
-
 	const eventIndex = findEventLine(
 		lines,
 		hooksStartIndex,
@@ -792,6 +842,32 @@ function ensureHookCommandInLines(args: {
 	}
 
 	const insertIndex = eventBlockInsertIndex(lines, eventIndex, hooksEndIndex);
+	const managedCommandMarker = `${SUPERSET_TASK_SYNC_HOOK_RELATIVE_PATH} ${event}`;
+	const managedCommandIndexes: number[] = [];
+	for (let index = eventIndex + 1; index < insertIndex; index += 1) {
+		if ((lines[index] ?? "").includes(managedCommandMarker)) {
+			managedCommandIndexes.push(index);
+		}
+	}
+
+	if (managedCommandIndexes.length > 0) {
+		const desiredLine = yamlCommandLine(command);
+		let changed = false;
+		const [firstIndex, ...duplicateIndexes] = managedCommandIndexes;
+		if (firstIndex !== undefined && lines[firstIndex] !== desiredLine) {
+			lines[firstIndex] = desiredLine;
+			changed = true;
+		}
+		for (const duplicateIndex of [...duplicateIndexes].reverse()) {
+			lines.splice(duplicateIndex, 1);
+			changed = true;
+		}
+		return {
+			hooksEndIndex: hooksEndIndex - duplicateIndexes.length,
+			changed,
+		};
+	}
+
 	lines.splice(insertIndex, 0, yamlCommandLine(command));
 	return { hooksEndIndex: hooksEndIndex + 1, changed: true };
 }
@@ -1253,6 +1329,8 @@ export async function ensureSupersetTaskTrellisLink(args: {
 
 export async function installSupersetTaskSyncHook(args: {
 	worktreePath: string;
+	supersetCliRuntimePackPath?: string;
+	supersetCliPath?: string;
 }): Promise<SupersetTaskSyncHookInstallResult> {
 	const status = await getTrellisStatusAtPath(args.worktreePath);
 	if (status.state !== "ready") {
@@ -1286,9 +1364,12 @@ export async function installSupersetTaskSyncHook(args: {
 		const configPath =
 			status.configPath ?? join(args.worktreePath, ".trellis", "config.yaml");
 		const currentConfig = await readFile(configPath, "utf8");
+		const supersetCliPath =
+			args.supersetCliPath ??
+			resolveSupersetCliRuntimePackBinaryPath(args.supersetCliRuntimePackPath);
 		const merged = mergeTrellisHookConfig(
 			currentConfig,
-			SUPERSET_TASK_SYNC_HOOK_COMMANDS,
+			buildSupersetTaskSyncHookCommands(supersetCliPath),
 		);
 		if (merged.changed) {
 			await writeFile(configPath, merged.text, "utf8");
@@ -1321,11 +1402,15 @@ export async function applySupersetTaskTrellisBridge(args: {
 	};
 	workspaceId: string;
 	branch: string;
+	supersetCliRuntimePackPath?: string;
 }): Promise<TrellisSetupResult> {
 	if (args.trellisSetup.state !== "ready") return args.trellisSetup;
 
 	const [installResult, linkResult] = await Promise.all([
-		installSupersetTaskSyncHook({ worktreePath: args.worktreePath }),
+		installSupersetTaskSyncHook({
+			worktreePath: args.worktreePath,
+			supersetCliRuntimePackPath: args.supersetCliRuntimePackPath,
+		}),
 		ensureSupersetTaskTrellisLink({
 			worktreePath: args.worktreePath,
 			supersetTask: args.supersetTask,

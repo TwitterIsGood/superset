@@ -143,7 +143,12 @@ describe("Trellis runtime pack packaging", () => {
 		);
 		expect(buildWorkflow).toContain("upload_resource_pack_artifacts");
 		expect(buildWorkflow).toContain("bundle_cli");
+		expect(buildWorkflow).toContain("upload_sourcemaps");
 		expect(buildWorkflow).toContain("DESKTOP_BUNDLE_CLI");
+		expect(buildWorkflow).toContain(
+			"SENTRY_AUTH_TOKEN: $" +
+				"{{ inputs.upload_sourcemaps && secrets.SENTRY_AUTH_TOKEN || '' }}",
+		);
 		expect(buildWorkflow).toContain(
 			"if: inputs.upload_resource_pack_artifacts && matrix.arch == 'arm64'",
 		);
@@ -169,6 +174,7 @@ describe("Trellis runtime pack packaging", () => {
 		expect(canaryWorkflow).toContain("macos_artifact_mode=zip_only");
 		expect(canaryWorkflow).toContain("upload_resource_pack_artifacts=false");
 		expect(canaryWorkflow).toContain("bundle_cli=false");
+		expect(canaryWorkflow).toContain("upload_sourcemaps=false");
 	});
 
 	test("defines a MastraCode runtime pack for the DuckDB-backed agent runtime", () => {

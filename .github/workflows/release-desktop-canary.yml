@@ -53,6 +53,7 @@ jobs:
       mac_signing: ${{ steps.check.outputs.mac_signing }}
       upload_resource_pack_artifacts: ${{ steps.check.outputs.upload_resource_pack_artifacts }}
       bundle_cli: ${{ steps.check.outputs.bundle_cli }}
+      upload_sourcemaps: ${{ steps.check.outputs.upload_sourcemaps }}
 
     steps:
       - name: Checkout code
@@ -125,10 +126,12 @@ jobs:
             echo "macos_artifact_mode=zip_only" >> $GITHUB_OUTPUT
             echo "upload_resource_pack_artifacts=false" >> $GITHUB_OUTPUT
             echo "bundle_cli=false" >> $GITHUB_OUTPUT
+            echo "upload_sourcemaps=false" >> $GITHUB_OUTPUT
           else
             echo "macos_artifact_mode=full" >> $GITHUB_OUTPUT
             echo "upload_resource_pack_artifacts=true" >> $GITHUB_OUTPUT
             echo "bundle_cli=true" >> $GITHUB_OUTPUT
+            echo "upload_sourcemaps=true" >> $GITHUB_OUTPUT
           fi
 
           if [ "$FORCE_BUILD" = "true" ]; then
@@ -167,6 +170,7 @@ jobs:
       macos_artifact_mode: ${{ needs.check-changes.outputs.macos_artifact_mode }}
       upload_resource_pack_artifacts: ${{ needs.check-changes.outputs.upload_resource_pack_artifacts == 'true' }}
       bundle_cli: ${{ needs.check-changes.outputs.bundle_cli == 'true' }}
+      upload_sourcemaps: ${{ needs.check-changes.outputs.upload_sourcemaps == 'true' }}
     secrets: inherit
 
   release:

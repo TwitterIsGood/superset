@@ -62,6 +62,11 @@ on:
         required: false
         type: boolean
         default: true
+      upload_sourcemaps:
+        description: "Whether to generate and upload desktop Sentry sourcemaps during compile."
+        required: false
+        type: boolean
+        default: true
 
 env:
   DESKTOP_PRODUCTION_WEB_URL: http://bj1.v.lhb.ink:63000
@@ -157,7 +162,7 @@ jobs:
           NEXT_PUBLIC_STREAMS_URL: ${{ secrets.NEXT_PUBLIC_STREAMS_URL }}
           NEXT_PUBLIC_ELECTRIC_URL: ${{ env.DESKTOP_PRODUCTION_ELECTRIC_URL }}
           SENTRY_DSN_DESKTOP: ${{ secrets.SENTRY_DSN_DESKTOP }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ inputs.upload_sourcemaps && secrets.SENTRY_AUTH_TOKEN || '' }}
           RELAY_URL: ${{ env.DESKTOP_PRODUCTION_RELAY_URL }}
           SUPERSET_WORKSPACE_NAME: superset
           TARGET_ARCH: ${{ matrix.arch }}
@@ -541,7 +546,7 @@ jobs:
           NEXT_PUBLIC_STREAMS_URL: ${{ secrets.NEXT_PUBLIC_STREAMS_URL }}
           NEXT_PUBLIC_ELECTRIC_URL: ${{ env.DESKTOP_PRODUCTION_ELECTRIC_URL }}
           SENTRY_DSN_DESKTOP: ${{ secrets.SENTRY_DSN_DESKTOP }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ inputs.upload_sourcemaps && secrets.SENTRY_AUTH_TOKEN || '' }}
           RELAY_URL: ${{ env.DESKTOP_PRODUCTION_RELAY_URL }}
           SUPERSET_WORKSPACE_NAME: superset
           TARGET_ARCH: x64

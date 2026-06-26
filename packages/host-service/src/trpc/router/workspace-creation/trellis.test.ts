@@ -18,6 +18,7 @@ import {
 	getTrellisStatusAtPath,
 	installSupersetTaskSyncHook,
 	mergeTrellisHookConfig,
+	resolveSupersetCliRuntimePackBinaryPath,
 	resolveTrellisBinPath,
 	resolveTrellisBinPathFromPack,
 	resolveTrellisPlatformsFromAgents,
@@ -120,6 +121,25 @@ describe("applyTrellisSetup", () => {
 				exists: (candidate) => candidate === trellisBinPath,
 			}),
 		).toBe(trellisBinPath);
+	});
+
+	test("resolves Superset CLI bin from an on-demand runtime pack", () => {
+		const packPath =
+			"/Users/test/.superset/packs/superset-cli-runtime/0.2.22-darwin-arm64";
+		const cliPath = join(packPath, "bin", "superset");
+
+		expect(
+			resolveSupersetCliRuntimePackBinaryPath(packPath, {
+				platform: "darwin",
+				exists: (candidate) => candidate === cliPath,
+			}),
+		).toBe(cliPath);
+		expect(
+			resolveSupersetCliRuntimePackBinaryPath("", {
+				platform: "darwin",
+				exists: () => true,
+			}),
+		).toBeNull();
 	});
 
 	test("keeps explicit Trellis bin override ahead of runtime pack path", () => {
@@ -249,6 +269,32 @@ describe("applyTrellisSetup", () => {
 			"--claude",
 		]);
 		expect(calls[0]?.cwd).toBe(repoPath);
+	});
+
+	test("passes the Superset CLI pack binary to Trellis init when available", async () => {
+		const repoPath = await tempRepo();
+		const cliPackPath = join(repoPath, "packs", "superset-cli-runtime");
+		const cliPath = join(cliPackPath, "bin", "superset");
+		await mkdir(join(cliPackPath, "bin"), { recursive: true });
+		await writeFile(cliPath, "#!/bin/sh\n", { mode: 0o755 });
+		const calls: TrellisCommandArgs[] = [];
+
+		const result = await applyTrellisSetup({
+			worktreePath: repoPath,
+			initialize: true,
+			runner: async (args) => {
+				calls.push(args);
+				await mkdir(join(repoPath, ".trellis", "tasks"), { recursive: true });
+				await writeFile(join(repoPath, ".trellis", "config.yaml"), "");
+				return { stdout: "", stderr: "" };
+			},
+			trellisBinPath: "/tmp/trellis.js",
+			supersetCliRuntimePackPath: cliPackPath,
+			platforms: ["codex"],
+		});
+
+		expect(result.state).toBe("ready");
+		expect(calls[0]?.env).toEqual({ SUPERSET_CLI_PATH: cliPath });
 	});
 
 	test("does not guess a platform when no task agent is selected", async () => {
@@ -506,6 +552,58 @@ describe("Superset Task Trellis bridge", () => {
 		expect(config).toContain("superset_task_sync.py after_start");
 		expect(config).toContain("superset_task_sync.py after_archive");
 		expect(script).toContain("EVENT_TO_STATUS_TYPE");
+	});
+
+	test("installs sync hook commands with explicit Superset CLI pack path", async () => {
+		const repoPath = await readyTrellisRepo();
+		const cliPackPath = join(repoPath, "packs", "superset-cli-runtime");
+		const cliPath = join(cliPackPath, "bin", "superset");
+		await mkdir(join(cliPackPath, "bin"), { recursive: true });
+		await writeFile(cliPath, "#!/bin/sh\n", { mode: 0o755 });
+		await writeFile(
+			join(repoPath, ".trellis", "config.yaml"),
+			[
+				"hooks:",
+				"  after_start:",
+				`    - "python3 .trellis/scripts/hooks/superset_task_sync.py after_start"`,
+				"",
+			].join("\n"),
+		);
+
+		const result = await installSupersetTaskSyncHook({
+			worktreePath: repoPath,
+			supersetCliRuntimePackPath: cliPackPath,
+		});
+		const second = await installSupersetTaskSyncHook({
+			worktreePath: repoPath,
+			supersetCliRuntimePackPath: cliPackPath,
+		});
+		const config = await readFile(
+			join(repoPath, ".trellis", "config.yaml"),
+			"utf8",
+		);
+
+		expect(result.installed).toBe(true);
+		expect(result.configChanged).toBe(true);
+		expect(second.configChanged).toBe(false);
+		expect(config).toContain(`SUPERSET_CLI_PATH='${cliPath}' python3`);
+		expect(config.match(/superset_task_sync\.py after_start/g)).toHaveLength(1);
+	});
+
+	test("quotes explicit Superset CLI paths in sync hook commands", async () => {
+		const repoPath = await readyTrellisRepo();
+		const cliPath = join(repoPath, "pack with space", "bin", "super'set");
+		await installSupersetTaskSyncHook({
+			worktreePath: repoPath,
+			supersetCliPath: cliPath,
+		});
+
+		const config = await readFile(
+			join(repoPath, ".trellis", "config.yaml"),
+			"utf8",
+		);
+		expect(config).toContain(`${repoPath}/pack with space/bin/super`);
+		expect(config).toContain(`'\\"'\\"'set' python3`);
 	});
 
 	test("sync hook maps Trellis create/start/archive to Superset status updates", async () => {
