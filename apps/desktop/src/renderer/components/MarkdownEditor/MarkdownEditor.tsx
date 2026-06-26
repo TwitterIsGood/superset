@@ -33,11 +33,11 @@ import {
 	useEditor,
 } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { common, createLowlight } from "lowlight";
 import { useEffect, useRef } from "react";
 import { BubbleMenuToolbar } from "renderer/components/MarkdownRenderer/components/TipTapMarkdownRenderer/components/BubbleMenuToolbar";
 import { env } from "renderer/env.renderer";
 import { useInlineUrlPolicy } from "renderer/lib/clickPolicy";
+import { createMarkdownLowlight } from "renderer/lib/tiptap/createMarkdownLowlight";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { Markdown } from "tiptap-markdown";
 import { CodeBlockView } from "./components/CodeBlockView";
@@ -49,7 +49,7 @@ import {
 } from "./components/FileMention";
 import { SlashCommand } from "./components/SlashCommand";
 
-const lowlight = createLowlight(common);
+const lowlight = createMarkdownLowlight();
 
 const LINEAR_IMAGE_HOST = "uploads.linear.app";
 

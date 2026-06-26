@@ -242,6 +242,85 @@ describe("Trellis runtime pack packaging", () => {
 		);
 	});
 
+	test("keeps TipTap Markdown highlighting on a scoped lowlight grammar set", () => {
+		const markdownLowlightSource = readFileSync(
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"lib",
+				"tiptap",
+				"createMarkdownLowlight.ts",
+			),
+			"utf8",
+		);
+		const tiptapMarkdownSources = [
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"components",
+				"MarkdownEditor",
+				"MarkdownEditor.tsx",
+			),
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"components",
+				"MarkdownRenderer",
+				"components",
+				"TipTapMarkdownRenderer",
+				"createMarkdownExtensions.ts",
+			),
+		].map((path) => readFileSync(path, "utf8"));
+
+		expect(markdownLowlightSource).not.toContain('from "lowlight/lib/common"');
+		expect(markdownLowlightSource).not.toContain(
+			'import { common, createLowlight } from "lowlight"',
+		);
+		expect(markdownLowlightSource).toContain(
+			'from "highlight.js/lib/languages/typescript"',
+		);
+		expect(markdownLowlightSource).not.toContain(
+			'from "highlight.js/lib/languages/swift"',
+		);
+		expect(markdownLowlightSource).not.toContain(
+			'from "highlight.js/lib/languages/wasm"',
+		);
+		for (const source of tiptapMarkdownSources) {
+			expect(source).not.toContain("import { common, createLowlight }");
+			expect(source).toContain("createMarkdownLowlight()");
+		}
+	});
+
+	test("keeps renderer Sentry behind a narrow lazy client module", () => {
+		const sentrySource = readFileSync(
+			join(import.meta.dirname, "src", "renderer", "lib", "sentry.ts"),
+			"utf8",
+		);
+		const sentryClientSource = readFileSync(
+			join(import.meta.dirname, "src", "renderer", "lib", "sentry-client.ts"),
+			"utf8",
+		);
+		const errorRouteSource = readFileSync(
+			join(import.meta.dirname, "src", "renderer", "routes", "error.tsx"),
+			"utf8",
+		);
+
+		expect(sentrySource).not.toContain('@sentry/electron/renderer"');
+		expect(sentrySource).toContain('import("./sentry-client")');
+		expect(sentryClientSource).toContain("captureException,");
+		expect(sentryClientSource).toContain("\tinit,");
+		expect(sentryClientSource).not.toContain(
+			'import * as Sentry from "@sentry/electron/renderer"',
+		);
+		expect(errorRouteSource).not.toContain(
+			'import("@sentry/electron/renderer")',
+		);
+		expect(errorRouteSource).toContain("captureRendererException");
+	});
+
 	test("keeps CJS-only Trellis compatibility dependencies nested", () => {
 		expect(requiredMaterializedNodeModules).not.toContain("mimic-fn");
 		expect(trellisRuntimePackResourceCopies).toContainEqual(

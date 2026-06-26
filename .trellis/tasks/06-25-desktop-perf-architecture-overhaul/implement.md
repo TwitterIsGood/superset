@@ -650,6 +650,21 @@ cd packages/host-service && bun test
     - Mermaid is now an explicit lazy output (`assets/mermaid-GHXKKRXX-*.js`, `1.01 MiB`) with diagram chunks (`cytoscape`, `treemap`, architecture/sequence/etc.) separate from the ordinary desktop code-block modules.
     - Shiki themes/languages still exist as outputs (`one-light` `0.91 MiB`, `code-block-languages` `0.75 MiB`, `emacs-lisp` `0.74 MiB`, `cpp` `0.60 MiB`), but the shared code-block module no longer imports `codeToHast` as a startup value.
   - Validation passed: `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run lint:fix`, `bun run --cwd apps/desktop typecheck`, `bun run lint`, and the compile-stats builds above.
+- 2026-06-27 renderer Markdown/Sentry bundle slimming follow-up:
+  - Root cause: the TipTap Markdown editor/renderer imported `lowlight/common`, which registers a broad highlight.js language set even though the desktop code-block language dropdown exposes a much smaller common set.
+  - Added `renderer/lib/tiptap/createMarkdownLowlight.ts` and changed both TipTap Markdown entry points to use a scoped grammar set matching the product UI (`javascript`, `typescript`, `python`, `html/xml`, `css`, `json`, `bash/shell`, `sql`, `go`, `rust`, `java`, `c`, `cpp`, `ruby`, `php`, `yaml/yml`, `markdown`, `plaintext`).
+  - Root cause: renderer Sentry used the broad `@sentry/electron/renderer` namespace import from both startup and the route error page. Rollup then retained a large Browser SDK surface, including replay/feedback/canvas replay modules we do not explicitly use.
+  - Added a narrow lazy `renderer/lib/sentry-client.ts` wrapper for `init` and `captureException`, kept `renderer/lib/sentry.ts` as the only public renderer Sentry API, and changed the route error page to call `captureRendererException()` instead of dynamically importing the broad SDK entry.
+  - Added source-level regression tests that:
+    - Forbid TipTap Markdown entry points from importing `lowlight/common`.
+    - Require the scoped desktop Markdown lowlight helper.
+    - Forbid the route error page from importing `@sentry/electron/renderer` directly.
+    - Keep renderer Sentry behind the lazy narrow client wrapper rather than a namespace SDK import.
+  - Compile evidence with `DESKTOP_BUILD_STATS=true DESKTOP_BUILD_STATS_DIR=performance-reports/build-stats DESKTOP_BUNDLE_CLI=false bun run --cwd apps/desktop compile:app`:
+    - After the scoped lowlight change alone, renderer total dropped from `34.68 MiB` to `34.55 MiB`; `code-block-languages` dropped from about `0.75 MiB` to `0.63 MiB`.
+    - After the Sentry narrow-client change, renderer total dropped again to `33.85 MiB`; the previous `~0.90 MiB` Sentry chunk dominated by replay/feedback modules was replaced by `assets/sentry-client-*.js` at `0.20 MiB`.
+    - Main remains `9.31 MiB` and preload remains effectively `0.00 MiB`.
+  - Validation passed: `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run --cwd apps/desktop typecheck`, and the compile-stats build above.
 
 ---
 

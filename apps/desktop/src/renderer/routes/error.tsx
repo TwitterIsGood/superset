@@ -8,6 +8,7 @@ import {
 	HiOutlineClipboard,
 } from "react-icons/hi2";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
+import { captureRendererException } from "renderer/lib/sentry";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 const ERROR_DETAILS_ID = "error-details";
@@ -24,13 +25,9 @@ export function ErrorPage({ error, info }: ErrorComponentProps) {
 
 	useEffect(() => {
 		console.error("[renderer] Route error caught:", error, componentStack);
-		void import("@sentry/electron/renderer")
-			.then((Sentry) =>
-				Sentry.captureException(error, {
-					extra: componentStack ? { componentStack } : undefined,
-				}),
-			)
-			.catch(() => {});
+		void captureRendererException(error, {
+			extra: componentStack ? { componentStack } : undefined,
+		});
 	}, [error, componentStack]);
 
 	return (
