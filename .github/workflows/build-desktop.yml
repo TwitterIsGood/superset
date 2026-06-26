@@ -379,7 +379,8 @@ jobs:
           NODE
           test -f dist/resources/pack-system/pack-manifest-index.json
 
-      - name: Verify app-update.yml exists
+      - name: Verify macOS auto-update metadata and bundled CLI
+        if: inputs.macos_artifact_mode == 'full'
         working-directory: apps/desktop
         run: |
           # electron-builder uses mac-arm64/ for arm64 and mac/ for x64 (when host is arm64)
@@ -443,6 +444,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload auto-update manifest
+        if: inputs.macos_artifact_mode == 'full'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.artifact_prefix }}-mac-${{ matrix.arch }}-update-manifest
