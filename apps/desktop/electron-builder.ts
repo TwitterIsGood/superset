@@ -34,6 +34,21 @@ const shouldRebuildNativeModules =
 	process.env.ELECTRON_BUILDER_NPM_REBUILD !== "false";
 const buildDependenciesFromSource =
 	process.env.ELECTRON_BUILDER_BUILD_FROM_SOURCE === "true";
+const targetPlatform = process.env.TARGET_PLATFORM ?? process.platform;
+const bundledCliResourcePath = join(
+	process.cwd(),
+	"dist/resources/bin",
+	targetPlatform === "win32" ? "superset.exe" : "superset",
+);
+const bundledCliExtraResources = existsSync(bundledCliResourcePath)
+	? [
+			{
+				from: "dist/resources/bin",
+				to: "resources/bin",
+				filter: ["**/*"],
+			},
+		]
+	: [];
 
 const config: Configuration = {
 	appId: "com.superset.desktop",
@@ -81,11 +96,7 @@ const config: Configuration = {
 			to: "resources/host-migrations",
 			filter: ["**/*"],
 		},
-		{
-			from: "dist/resources/bin",
-			to: "resources/bin",
-			filter: ["**/*"],
-		},
+		...bundledCliExtraResources,
 		{
 			from: "dist/resources/pack-system",
 			to: "resources/pack-system",

@@ -57,6 +57,11 @@ on:
         required: false
         type: boolean
         default: true
+      bundle_cli:
+        description: "Whether to include the bundled Superset CLI binary in the base desktop artifact."
+        required: false
+        type: boolean
+        default: true
 
 env:
   DESKTOP_PRODUCTION_WEB_URL: http://bj1.v.lhb.ink:63000
@@ -156,6 +161,7 @@ jobs:
           RELAY_URL: ${{ env.DESKTOP_PRODUCTION_RELAY_URL }}
           SUPERSET_WORKSPACE_NAME: superset
           TARGET_ARCH: ${{ matrix.arch }}
+          DESKTOP_BUNDLE_CLI: ${{ inputs.bundle_cli }}
         run: bun run compile:app
 
       - name: Report package size after compile
@@ -529,6 +535,7 @@ jobs:
           RELAY_URL: ${{ env.DESKTOP_PRODUCTION_RELAY_URL }}
           SUPERSET_WORKSPACE_NAME: superset
           TARGET_ARCH: x64
+          DESKTOP_BUNDLE_CLI: ${{ inputs.bundle_cli }}
         run: bun run compile:app
 
       - name: Report package size after compile

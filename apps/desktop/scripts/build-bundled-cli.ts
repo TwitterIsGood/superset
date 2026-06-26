@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { chmodSync, mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { config } from "dotenv";
 
@@ -87,6 +87,14 @@ const outfile = resolve(
 	"dist/resources/bin",
 	TARGET_PLATFORM === "win32" ? "superset.exe" : "superset",
 );
+
+if (process.env.DESKTOP_BUNDLE_CLI === "false") {
+	rmSync(outfile, { force: true });
+	console.log(
+		`[desktop] bundled CLI disabled; removed stale output at ${outfile}`,
+	);
+	process.exit(0);
+}
 
 mkdirSync(dirname(outfile), { recursive: true });
 

@@ -131,6 +131,8 @@ describe("Trellis runtime pack packaging", () => {
 		expect(buildWorkflow).toContain('PACKAGE_TARGET_ARGS=("--mac" "zip"');
 		expect(buildWorkflow).toContain("if: inputs.macos_artifact_mode == 'full'");
 		expect(buildWorkflow).toContain("upload_resource_pack_artifacts");
+		expect(buildWorkflow).toContain("bundle_cli");
+		expect(buildWorkflow).toContain("DESKTOP_BUNDLE_CLI");
 		expect(buildWorkflow).toContain(
 			"if: inputs.upload_resource_pack_artifacts && matrix.arch == 'arm64'",
 		);
@@ -155,6 +157,7 @@ describe("Trellis runtime pack packaging", () => {
 		);
 		expect(canaryWorkflow).toContain("macos_artifact_mode=zip_only");
 		expect(canaryWorkflow).toContain("upload_resource_pack_artifacts=false");
+		expect(canaryWorkflow).toContain("bundle_cli=false");
 	});
 
 	test("defines a MastraCode runtime pack for the DuckDB-backed agent runtime", () => {
@@ -307,6 +310,7 @@ describe("Trellis runtime pack packaging", () => {
 		expect(electronBuilderConfig).toContain("!dist/resource-packs/**/*");
 		expect(electronBuilderConfig).toContain("!dist/resource-packs-test/**/*");
 		expect(electronBuilderConfig).toContain("!node_modules/**/*");
+		expect(electronBuilderConfig).toContain("bundledCliExtraResources");
 		expect(electronBuilderConfig).toContain("packOnlyNodeModuleFileExcludes");
 		expect(hostServicePackageJson.dependencies).not.toHaveProperty(
 			"@mindfoldhq/trellis",
