@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import hostServicePackageJson from "../../packages/host-service/package.json";
 import packageJson from "./package.json";
@@ -23,6 +23,28 @@ import {
 	trellisRuntimePackModuleNames,
 	trellisRuntimePackResourceCopies,
 } from "./scripts/trellis-runtime-pack-dependencies";
+
+function readSourceFiles(dir: string): Array<{ path: string; source: string }> {
+	const entries = readdirSync(dir, { withFileTypes: true });
+	const files: Array<{ path: string; source: string }> = [];
+
+	for (const entry of entries) {
+		const path = join(dir, entry.name);
+		if (entry.isDirectory()) {
+			files.push(...readSourceFiles(path));
+			continue;
+		}
+		if (!entry.isFile() || !/\.[cm]?[jt]sx?$/.test(entry.name)) {
+			continue;
+		}
+		if (statSync(path).size > 2 * 1024 * 1024) {
+			continue;
+		}
+		files.push({ path, source: readFileSync(path, "utf8") });
+	}
+
+	return files;
+}
 
 describe("Trellis runtime pack packaging", () => {
 	const trellisRuntimeModules = [
@@ -319,6 +341,17 @@ describe("Trellis runtime pack packaging", () => {
 			'import("@sentry/electron/renderer")',
 		);
 		expect(errorRouteSource).toContain("captureRendererException");
+	});
+
+	test("keeps react-syntax-highlighter out of the desktop renderer bundle", () => {
+		const rendererSources = readSourceFiles(
+			join(import.meta.dirname, "src", "renderer"),
+		);
+		const offenders = rendererSources
+			.filter(({ source }) => source.includes("react-syntax-highlighter"))
+			.map(({ path }) => path);
+
+		expect(offenders).toEqual([]);
 	});
 
 	test("keeps CJS-only Trellis compatibility dependencies nested", () => {

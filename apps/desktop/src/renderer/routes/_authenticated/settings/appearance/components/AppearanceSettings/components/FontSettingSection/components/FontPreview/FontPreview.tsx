@@ -1,10 +1,3 @@
-import type { CSSProperties } from "react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import {
-	oneDark,
-	oneLight,
-} from "react-syntax-highlighter/dist/esm/styles/prism";
-import { useTheme } from "renderer/stores";
 import { FontNotFoundBanner } from "./components/FontNotFoundBanner";
 
 const CODE_PREVIEW = `import { createTool } from "@mastra/core/tools";
@@ -52,8 +45,6 @@ export function FontPreview({
 	variant: "editor" | "terminal";
 	isCustomFont: boolean;
 }) {
-	const theme = useTheme();
-	const isDark = theme?.type !== "light";
 	const isTerminal = variant === "terminal";
 	const fontFamilyStyle = fontFamily || undefined;
 
@@ -76,25 +67,16 @@ export function FontPreview({
 					{TERMINAL_PREVIEW}
 				</div>
 			) : (
-				<SyntaxHighlighter
-					language="typescript"
-					style={(isDark ? oneDark : oneLight) as Record<string, CSSProperties>}
-					customStyle={{
-						margin: 0,
-						padding: "12px",
+				<pre
+					className="m-0 overflow-auto p-3 text-foreground"
+					style={{
+						fontFamily: fontFamilyStyle,
 						fontSize: `${fontSize}px`,
 						lineHeight: 1.5,
-						fontFamily: fontFamilyStyle,
-						background: "transparent",
-					}}
-					codeTagProps={{
-						style: {
-							fontFamily: fontFamilyStyle,
-						},
 					}}
 				>
-					{CODE_PREVIEW}
-				</SyntaxHighlighter>
+					<code>{CODE_PREVIEW}</code>
+				</pre>
 			)}
 			{isCustomFont && <FontNotFoundBanner fontFamily={fontFamily} />}
 		</div>

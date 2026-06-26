@@ -1,3 +1,4 @@
+import { CodeBlock as UiCodeBlock } from "@superset/ui/ai-elements/code-block";
 import { Avatar, AvatarFallback, AvatarImage } from "@superset/ui/avatar";
 import {
 	lazy,
@@ -17,17 +18,13 @@ import {
 } from "react-icons/lu";
 import ReactMarkdown from "react-markdown";
 import type { MosaicBranch } from "react-mosaic-component";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import {
-	oneDark,
-	oneLight,
-} from "react-syntax-highlighter/dist/esm/styles/prism";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import { useTheme } from "renderer/stores/theme";
+import type { BundledLanguage } from "shiki";
 import { BasePaneWindow, PaneTitle, PaneToolbarActions } from "../components";
 import "./comment-pane.css";
 
@@ -268,16 +265,11 @@ function CommentCodeBlock({
 	}
 
 	return (
-		<SyntaxHighlighter
-			style={
-				(isDark ? oneDark : oneLight) as Record<string, React.CSSProperties>
-			}
-			language={language}
-			PreTag="div"
-			className="rounded-md text-sm"
-		>
-			{codeString}
-		</SyntaxHighlighter>
+		<UiCodeBlock
+			code={codeString}
+			language={language as BundledLanguage}
+			className="border-0 bg-muted/50 text-sm"
+		/>
 	);
 }
 

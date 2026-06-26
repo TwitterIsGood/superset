@@ -1,10 +1,7 @@
+import { CodeBlock } from "@superset/ui/ai-elements/code-block";
 import { lazy, type ReactNode, Suspense } from "react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import {
-	oneDark,
-	oneLight,
-} from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "renderer/stores";
+import type { BundledLanguage } from "shiki";
 
 const LazyMermaidCodeBlock = lazy(() =>
 	import("renderer/components/MermaidCodeBlock").then((module) => ({
@@ -85,15 +82,10 @@ export function CommentCodeBlock({
 	}
 
 	return (
-		<SyntaxHighlighter
-			style={
-				(isDark ? oneDark : oneLight) as Record<string, React.CSSProperties>
-			}
-			language={language}
-			PreTag="div"
-			className="rounded-md text-sm"
-		>
-			{codeString}
-		</SyntaxHighlighter>
+		<CodeBlock
+			code={codeString}
+			language={language as BundledLanguage}
+			className="border-0 bg-muted/50 text-sm"
+		/>
 	);
 }

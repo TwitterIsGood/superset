@@ -665,6 +665,17 @@ cd packages/host-service && bun test
     - After the Sentry narrow-client change, renderer total dropped again to `33.85 MiB`; the previous `~0.90 MiB` Sentry chunk dominated by replay/feedback modules was replaced by `assets/sentry-client-*.js` at `0.20 MiB`.
     - Main remains `9.31 MiB` and preload remains effectively `0.00 MiB`.
   - Validation passed: `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run --cwd apps/desktop typecheck`, and the compile-stats build above.
+- 2026-06-27 renderer syntax-highlighter stack removal follow-up:
+  - Root cause: desktop renderer still had three `react-syntax-highlighter` call sites after moving shared code blocks toward Shiki. Those call sites pulled the Prism/Refractor highlighter stack plus `one-light`/`one-dark` styles into renderer output even though the app already ships Shiki for code blocks.
+  - Replaced PR/comment code-block renderers in `CommentMarkdown` and the legacy workspace `CommentPane` with the existing `@superset/ui/ai-elements/code-block` component. This keeps syntax highlighting on the Shiki-backed path and preserves the existing lazy Mermaid handling for `language-mermaid` fences.
+  - Replaced Appearance font preview's syntax-highlighter usage with a lightweight `<pre><code>` preview. That surface is for font inspection, not code semantics, so it does not need a full syntax-highlighting engine.
+  - Added a source-level regression test that recursively scans `apps/desktop/src/renderer` and fails if any renderer source imports or references `react-syntax-highlighter`.
+  - Compile evidence with `DESKTOP_BUILD_STATS=true DESKTOP_BUILD_STATS_DIR=performance-reports/build-stats DESKTOP_BUNDLE_CLI=false bun run --cwd apps/desktop compile:app`:
+    - Renderer total dropped from `33.85 MiB` to `32.93 MiB`.
+    - The previous `~0.91 MiB` `one-light` output dominated by `react-syntax-highlighter` / `refractor` modules is gone.
+    - The remaining `assets/one-light-*.js` is only a Shiki theme output at about `25 KiB`.
+    - Renderer transform count also dropped from `11237` modules to `10437`, reducing dev/build graph pressure.
+  - Validation passed so far: `rg` found no `react-syntax-highlighter` in desktop renderer/shared UI source, `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run --cwd apps/desktop typecheck`, and the compile-stats build above.
 
 ---
 
