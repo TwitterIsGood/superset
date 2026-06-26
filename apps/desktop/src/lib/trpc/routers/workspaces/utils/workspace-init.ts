@@ -4,7 +4,6 @@ import { track } from "main/lib/analytics";
 import { localDb } from "main/lib/local-db";
 import { workspaceInitManager } from "main/lib/workspace-init-manager";
 import type { WorkspaceInitStep } from "shared/types/workspace-init";
-import { attemptWorkspaceAutoRenameFromPrompt } from "./ai-name";
 import { resolveWorkspaceBaseBranch } from "./base-branch";
 import { getBranchBaseConfig, setBranchBaseConfig } from "./base-branch-config";
 import {
@@ -57,6 +56,9 @@ export async function initializeWorkspaceWorktree({
 	const completeReadyState = async (): Promise<void> => {
 		let warning: string | undefined;
 		try {
+			const { attemptWorkspaceAutoRenameFromPrompt } = await import(
+				"./ai-name"
+			);
 			const autoRenameResult = await attemptWorkspaceAutoRenameFromPrompt({
 				workspaceId,
 				prompt: namingPrompt,

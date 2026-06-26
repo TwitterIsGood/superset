@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { localDb } from "main/lib/local-db";
 import { z } from "zod";
 import { publicProcedure, router } from "../../..";
-import { generateBranchNameFromPrompt } from "../utils/ai-branch-name";
 import { resolveBranchPrefix } from "../utils/branch-prefix";
 import { listBranches } from "../utils/git";
 
@@ -58,6 +57,9 @@ export const createGenerateBranchNameProcedures = () => {
 					branchPrefix = undefined;
 				}
 
+				const { generateBranchNameFromPrompt } = await import(
+					"../utils/ai-branch-name"
+				);
 				const branchName = await generateBranchNameFromPrompt(
 					trimmedPrompt,
 					existingBranches,

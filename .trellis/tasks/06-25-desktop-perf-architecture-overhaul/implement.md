@@ -599,6 +599,23 @@ cd packages/host-service && bun test
   - Cleaned the current stale worktree `minio-init-run` container (`684ddcdf749d`). After cleanup, current `bun run dev:worktree:status` reports tracked memory `1553.6 MiB`: app processes `1016.0 MiB`, Docker compose `537.5 MiB`, top app process renderer `374.1 MiB`, electron-vite `212.7 MiB`, main `159.5 MiB`, host-service `97.1 MiB`.
   - Current `bun run online:status` reports online-like tracked memory around `993 MiB`, almost entirely Docker compose; online app tmux sessions are stopped.
   - Validation passed: `bun test scripts/worktree-local-shell.test.ts scripts/superset-online.test.ts apps/desktop/runtime-dependencies.test.ts` and `bun run lint`.
+- 2026-06-27 desktop compile bundle slimming follow-up:
+  - Root cause: workspace AI naming had been moved behind dynamic imports at some call sites, but the default desktop main build still bundled a large AI naming chunk because `generateTitleFromMessage` and host-service workspace naming used `@mastra/core/agent` for lightweight title/branch generation.
+  - Changed desktop workspace create/init/generate-branch-name procedures so AI naming helpers are loaded only at the exact mutation/background-completion boundary.
+  - Changed desktop and host-service AI branch/title helper modules so `@superset/chat/server/shared` and title generation are imported only inside the AI naming functions.
+  - Replaced the lightweight `generateTitleFromMessage({ agentModel })` path with direct AI SDK `generateText` instead of constructing a Mastra Agent. The existing `generateTitleFromMessage({ agent })` path remains intact for callers that already provide an agent.
+  - Replaced host-service workspace title+branch structured-output `Agent.generate()` with two small-model text calls plus the existing local sanitizer/schema. This removes the `@mastra/core/agent` dependency from workspace naming without changing the public `GeneratedWorkspaceNames` result shape.
+  - Added source-level regression tests guarding:
+    - desktop workspace router/procedure files must not statically import `ai-name` / `ai-branch-name`;
+    - desktop AI naming modules must not top-level import chat small-model/title helpers;
+    - `title-generation.ts` must not reference `@mastra/core/agent`;
+    - host-service workspace naming must not import or dynamically load `@mastra/core/agent`.
+  - Local compile evidence with `DESKTOP_BUILD_STATS=true DESKTOP_BUILD_STATS_DIR=performance-reports/build-stats DESKTOP_BUNDLE_CLI=false bun run --cwd apps/desktop compile:app`:
+    - Before replacing Mastra Agent title generation, main total was `13.81 MiB`; largest chunk was `chunks/index-DUg1kR9i.js` at `4.40 MiB`, dominated by `@mastra/core` modules.
+    - After the patch, main total is `9.31 MiB`; the old `4.40 MiB` Mastra Agent chunk is gone; largest output is now `index.js` at `3.21 MiB`.
+    - AI naming outputs are now small dynamic chunks: `ai-name` `6.2 KiB`, desktop `ai-branch-name` `2.7 KiB`, host-service `ai-branch-name` `2.9 KiB`, and `ai-workspace-names` `6.3 KiB`.
+    - `rg` over `apps/desktop/dist/main/index.js` and `apps/desktop/dist/main/chunks` finds no `@mastra/core/agent`; AI naming implementations appear only in their small dynamic chunks.
+  - Validation passed: `bun test packages/chat/src/server/desktop/title-generation/title-generation.test.ts apps/desktop/src/lib/trpc/routers/workspaces/utils/ai-name.test.ts apps/desktop/runtime-dependencies.test.ts packages/host-service/src/app.lazy-runtime.test.ts`, `bun run --cwd apps/desktop typecheck`, `bun run lint:fix`, `bun run lint`, and the compile-stats build above.
 
 ---
 

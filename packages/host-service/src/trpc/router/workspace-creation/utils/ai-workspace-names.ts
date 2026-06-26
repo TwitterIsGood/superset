@@ -1,5 +1,3 @@
-import { Agent } from "@mastra/core/agent";
-import { getSmallModel } from "@superset/chat/server/shared";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { workspaces } from "../../../../db/schema";
@@ -54,16 +52,20 @@ export type GeneratedWorkspaceNames = z.infer<typeof workspaceNamesSchema>;
 
 const INSTRUCTIONS = [
 	"You name new code workspaces from the user's initial prompt.",
-	"Return a structured object with two fields:",
-	`- title: a short human-readable label (<= ${WORKSPACE_TITLE_MAX} chars). Full words only; never cut mid-word. No trailing punctuation.`,
-	`- branchName: a kebab-case git branch name (<= ${BRANCH_NAME_MAX} chars, 2-4 words). Only a-z 0-9 and dashes. No prefixes.`,
-	"Both fields must describe the same underlying task; the branch is just a compact slug of the title.",
+	`Return only a short human-readable label (<= ${WORKSPACE_TITLE_MAX} chars).`,
+	"Use full words, do not cut mid-word, and do not include trailing punctuation.",
+].join("\n");
+
+const BRANCH_INSTRUCTIONS = [
+	"Generate a git branch name from the user's initial workspace prompt.",
+	`Return only one kebab-case branch name (<= ${BRANCH_NAME_MAX} chars, 2-4 words).`,
+	"Use only a-z, 0-9, and dashes. Do not include prefixes.",
 ].join("\n");
 
 /**
  * Generates both a workspace title and a git branch name from a prompt
- * using a single structured-output LLM call. Shares the same credentials
- * path as `generateTitleFromMessage` (small model via `getSmallModel`).
+ * using lightweight text calls. Shares the same credentials path as
+ * `generateTitleFromMessage` (small model via `getSmallModel`).
  */
 export async function generateWorkspaceNamesFromPrompt(
 	prompt: string,
@@ -71,24 +73,33 @@ export async function generateWorkspaceNamesFromPrompt(
 	const cleaned = prompt.trim();
 	if (!cleaned) return null;
 
+	const [{ generateTitleFromMessage }, { getSmallModel }] = await Promise.all([
+		import("@superset/chat/server/desktop/title-generation"),
+		import("@superset/chat/server/shared"),
+	]);
 	const model = await getSmallModel();
 	if (!model) return null;
 
-	const agent = new Agent({
-		id: "workspace-namer",
-		name: "Workspace Namer",
-		instructions: INSTRUCTIONS,
-		model,
-	});
-
 	try {
-		const { object } = await Promise.race([
-			agent.generate(cleaned, {
-				structuredOutput: {
-					schema: workspaceNamesSchema,
-					jsonPromptInjection: true,
-				},
-			}),
+		const [title, branchName] = await Promise.race([
+			Promise.all([
+				generateTitleFromMessage({
+					message: cleaned,
+					agentModel: model,
+					agentId: "workspace-title-namer",
+					agentName: "Workspace Title Namer",
+					instructions: INSTRUCTIONS,
+					tracingContext: { surface: "host-service-workspace-title" },
+				}),
+				generateTitleFromMessage({
+					message: cleaned,
+					agentModel: model,
+					agentId: "workspace-branch-namer",
+					agentName: "Workspace Branch Namer",
+					instructions: BRANCH_INSTRUCTIONS,
+					tracingContext: { surface: "host-service-workspace-branch" },
+				}),
+			]),
 			new Promise<never>((_, reject) =>
 				setTimeout(
 					() => reject(new Error(`timed out after ${GENERATE_TIMEOUT_MS}ms`)),
@@ -96,7 +107,10 @@ export async function generateWorkspaceNamesFromPrompt(
 				),
 			),
 		]);
-		return object;
+		return workspaceNamesSchema.parse({
+			title: title ?? "",
+			branchName: branchName ?? "",
+		});
 	} catch (error) {
 		console.warn(
 			"[generateWorkspaceNamesFromPrompt] generation failed:",

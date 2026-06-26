@@ -5,7 +5,6 @@ import { localDb } from "main/lib/local-db";
 import { workspaceInitManager } from "main/lib/workspace-init-manager";
 import { z } from "zod";
 import { publicProcedure, router } from "../../..";
-import { attemptWorkspaceAutoRenameFromPrompt } from "../utils/ai-name";
 import { resolveWorkspaceBaseBranch } from "../utils/base-branch";
 import { setBranchBaseConfig } from "../utils/base-branch-config";
 import { resolveBranchPrefix } from "../utils/branch-prefix";
@@ -586,6 +585,9 @@ export const createCreateProcedures = () => {
 						});
 						let autoRenameWarning: string | undefined;
 						try {
+							const { attemptWorkspaceAutoRenameFromPrompt } = await import(
+								"../utils/ai-name"
+							);
 							const autoRenameResult =
 								await attemptWorkspaceAutoRenameFromPrompt({
 									workspaceId: workspace.id,

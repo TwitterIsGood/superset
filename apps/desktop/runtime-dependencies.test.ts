@@ -535,4 +535,127 @@ describe("Trellis runtime pack packaging", () => {
 			);
 		}
 	});
+
+	test("keeps workspace AI naming helpers off the desktop router startup path", () => {
+		const createProcedure = readFileSync(
+			join(
+				import.meta.dirname,
+				"src",
+				"lib",
+				"trpc",
+				"routers",
+				"workspaces",
+				"procedures",
+				"create.ts",
+			),
+			"utf8",
+		);
+		const generateBranchNameProcedure = readFileSync(
+			join(
+				import.meta.dirname,
+				"src",
+				"lib",
+				"trpc",
+				"routers",
+				"workspaces",
+				"procedures",
+				"generate-branch-name.ts",
+			),
+			"utf8",
+		);
+		const workspaceInit = readFileSync(
+			join(
+				import.meta.dirname,
+				"src",
+				"lib",
+				"trpc",
+				"routers",
+				"workspaces",
+				"utils",
+				"workspace-init.ts",
+			),
+			"utf8",
+		);
+
+		for (const source of [
+			createProcedure,
+			generateBranchNameProcedure,
+			workspaceInit,
+		]) {
+			expect(source).not.toMatch(
+				/import\s+\{[^}]*attemptWorkspaceAutoRenameFromPrompt[^}]*\}\s+from\s+["'][^"']*ai-name["']/s,
+			);
+			expect(source).not.toMatch(
+				/import\s+\{[^}]*generateBranchNameFromPrompt[^}]*\}\s+from\s+["'][^"']*ai-branch-name["']/s,
+			);
+		}
+
+		expect(createProcedure).toMatch(
+			/import\(\s*["']\.\.\/utils\/ai-name["']\s*\)/,
+		);
+		expect(generateBranchNameProcedure).toMatch(
+			/import\(\s*["']\.\.\/utils\/ai-branch-name["']\s*\)/,
+		);
+		expect(workspaceInit).toMatch(/import\(\s*["']\.\/ai-name["']\s*\)/);
+	});
+
+	test("keeps desktop AI naming modules lazy-loadable without top-level chat imports", () => {
+		const aiName = readFileSync(
+			join(
+				import.meta.dirname,
+				"src",
+				"lib",
+				"trpc",
+				"routers",
+				"workspaces",
+				"utils",
+				"ai-name.ts",
+			),
+			"utf8",
+		);
+		const aiBranchName = readFileSync(
+			join(
+				import.meta.dirname,
+				"src",
+				"lib",
+				"trpc",
+				"routers",
+				"workspaces",
+				"utils",
+				"ai-branch-name.ts",
+			),
+			"utf8",
+		);
+		const titleGeneration = readFileSync(
+			join(
+				import.meta.dirname,
+				"..",
+				"..",
+				"packages",
+				"chat",
+				"src",
+				"server",
+				"desktop",
+				"title-generation",
+				"title-generation.ts",
+			),
+			"utf8",
+		);
+
+		for (const source of [aiName, aiBranchName]) {
+			expect(source).not.toMatch(
+				/import\s+\{[^}]*getSmallModel[^}]*\}\s+from\s+["']@superset\/chat\/server\/shared["']/s,
+			);
+			expect(source).not.toMatch(
+				/import\s+\{[^}]*generateTitleFromMessage[^}]*\}\s+from\s+["']@superset\/chat\/server\/desktop\/title-generation["']/s,
+			);
+			expect(source).toContain('import("@superset/chat/server/shared")');
+			expect(source).toContain(
+				'import("@superset/chat/server/desktop/title-generation")',
+			);
+		}
+
+		expect(titleGeneration).not.toContain("@mastra/core/agent");
+		expect(titleGeneration).toContain('import("ai")');
+	});
 });

@@ -6,12 +6,18 @@ type TitleAgent = {
 		tracingContext?: Record<string, unknown>;
 	}) => Promise<string | null | undefined>;
 };
-type TitleAgentCtor = new (options: {
-	id: string;
-	name: string;
-	instructions: string;
+type GenerateTextFn = (params: {
 	model: TitleModel;
-}) => TitleAgent;
+	system: string;
+	prompt: string;
+	temperature?: number;
+	maxOutputTokens?: number;
+	experimental_telemetry?: {
+		isEnabled?: boolean;
+		functionId?: string;
+		metadata?: Record<string, unknown>;
+	};
+}) => Promise<{ text?: string | null }>;
 
 type GenerateTitleFromMessageParams =
 	| {
@@ -47,25 +53,28 @@ export async function generateTitleFromMessage(
 		return title?.trim() || null;
 	}
 
-	const agentModuleId = "@mastra/core/agent";
-	const { Agent } = (await import(agentModuleId)) as {
-		Agent?: TitleAgentCtor;
+	const { generateText } = (await import("ai")) as {
+		generateText?: GenerateTextFn;
 	};
-	if (!Agent) {
-		throw new Error("Mastra Agent constructor is unavailable");
+	if (!generateText) {
+		throw new Error("AI SDK generateText is unavailable");
 	}
 
-	const titleAgent = new Agent({
-		id: params.agentId ?? "title-generator",
-		name: params.agentName ?? "Title Generator",
-		instructions: params.instructions ?? "You generate concise titles.",
+	const result = await generateText({
 		model: params.agentModel,
+		system: params.instructions ?? "You generate concise titles.",
+		prompt: cleanedMessage,
+		temperature: 0.2,
+		maxOutputTokens: 64,
+		experimental_telemetry: {
+			isEnabled: true,
+			functionId: params.agentId ?? "title-generator",
+			metadata: {
+				agentName: params.agentName ?? "Title Generator",
+				...tracingContext,
+			},
+		},
 	});
 
-	const title = await titleAgent.generateTitleFromUserMessage({
-		message: cleanedMessage,
-		tracingContext,
-	});
-
-	return title?.trim() || null;
+	return result.text?.trim() || null;
 }

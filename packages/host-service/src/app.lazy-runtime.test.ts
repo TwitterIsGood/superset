@@ -66,6 +66,12 @@ describe("host-service startup dependency boundaries", () => {
 
 	test("workspace AI naming stays lazy instead of importing Mastra at router load", () => {
 		const source = readSource("trpc/router/workspaces/workspaces.ts");
+		const aiWorkspaceNames = readSource(
+			"trpc/router/workspace-creation/utils/ai-workspace-names.ts",
+		);
+		const aiBranchName = readSource(
+			"trpc/router/workspace-creation/utils/ai-branch-name.ts",
+		);
 
 		expect(source).not.toMatch(
 			/import\s+\{[^}]*generateWorkspaceNamesFromPrompt[^}]*\}\s+from\s+["'][^"']*ai-workspace-names["']/s,
@@ -75,6 +81,30 @@ describe("host-service startup dependency boundaries", () => {
 		);
 		expect(source).toContain(
 			'import("../workspace-creation/utils/ai-workspace-names")',
+		);
+
+		expect(aiWorkspaceNames).not.toMatch(
+			/import\s+\{[^}]*Agent[^}]*\}\s+from\s+["']@mastra\/core\/agent["']/s,
+		);
+		expect(aiWorkspaceNames).not.toContain("@mastra/core/agent");
+		expect(aiWorkspaceNames).not.toMatch(
+			/import\s+\{[^}]*getSmallModel[^}]*\}\s+from\s+["']@superset\/chat\/server\/shared["']/s,
+		);
+		expect(aiWorkspaceNames).toContain(
+			'import("@superset/chat/server/desktop/title-generation")',
+		);
+		expect(aiWorkspaceNames).toContain(
+			'import("@superset/chat/server/shared")',
+		);
+		expect(aiBranchName).not.toMatch(
+			/import\s+\{[^}]*getSmallModel[^}]*\}\s+from\s+["']@superset\/chat\/server\/shared["']/s,
+		);
+		expect(aiBranchName).not.toMatch(
+			/import\s+\{[^}]*generateTitleFromMessage[^}]*\}\s+from\s+["']@superset\/chat\/server\/desktop\/title-generation["']/s,
+		);
+		expect(aiBranchName).toContain('import("@superset/chat/server/shared")');
+		expect(aiBranchName).toContain(
+			'import("@superset/chat/server/desktop/title-generation")',
 		);
 	});
 });

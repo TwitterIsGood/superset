@@ -1,5 +1,3 @@
-import { generateTitleFromMessage } from "@superset/chat/server/desktop/title-generation";
-import { getSmallModel } from "@superset/chat/server/shared";
 import { workspaces } from "@superset/local-db";
 import { deriveWorkspaceTitleFromPrompt } from "@superset/shared/workspace-launch";
 import { and, eq, isNull } from "drizzle-orm";
@@ -34,6 +32,10 @@ export async function generateWorkspaceNameFromPrompt(prompt: string): Promise<{
 	usedPromptFallback: boolean;
 	warning?: string;
 }> {
+	const [{ generateTitleFromMessage }, { getSmallModel }] = await Promise.all([
+		import("@superset/chat/server/desktop/title-generation"),
+		import("@superset/chat/server/shared"),
+	]);
 	const model = await getSmallModel();
 	if (model) {
 		try {
