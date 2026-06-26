@@ -7,7 +7,7 @@ This is a parent task. Work decomposes into 5 child workstreams that can largely
 ## Phase 0: Measurement Baseline (BLOCKING — all other phases depend on this)
 
 ### 0.1 Capture current-state metrics
-- [ ] Run `report:size` on a new GitHub Actions canary build for this worktree's changes, record final installer size (external CI trigger/artifact still required; local ad-hoc canary zip evidence is recorded below)
+- [x] Run `report:size` on a new GitHub Actions canary build for this worktree's changes, record final installer size. Latest full no-release Canary dry run `28254206256` produced macOS arm64 ZIP `145,424,568` bytes / DMG `150,883,297` bytes, macOS x64 ZIP `152,383,536` bytes / DMG `157,877,712` bytes, and Linux AppImage `154,767,120` bytes.
 - [x] Run `report:runtime` across local scenarios: cold start, workspace open, sidebar open, tab switching, 60min idle
 - [x] Capture startup marks report for current worktree dev cold start
 - [x] Capture process tree memory breakdown per role (electron-main, renderer, GPU, host-service, pty-daemon, terminal-host)
@@ -572,6 +572,11 @@ cd packages/host-service && bun test
   - Full-run gates passed: package-size budget, pack-only scans, no bundled CLI checks for `bundle_cli=false`, CLI runtime pack binary validation, auto-update metadata validation, macOS ad-hoc signing validation, and macOS arm64 runtime capture.
   - Object-storage upload path executed but skipped with the expected warning: `SUPERSET_OBJECT_STORAGE_*` GitHub secrets are incomplete. Local and online-like MinIO are already validated; production S3/CloudFront remains the deploy-environment setup item before a real no-CLI Canary can serve packs to users.
   - Tightened `apps/desktop/perf-budget.json` package budgets to match the new proven baseline: installer target `200 MiB`, hard limit `300 MiB` for ZIP, DMG, and AppImage. This turns the old 400-500MB class package size into a CI regression instead of a warning.
+- 2026-06-27 release object-storage safety gate:
+  - Fixed a release-risk gap exposed by the full no-release Canary run: resource-pack object-storage upload could skip when `SUPERSET_OBJECT_STORAGE_*` secrets were missing, even though published no-CLI Canary builds now depend on those packs.
+  - Added `require_resource_pack_object_storage` to `build-desktop.yml`. When true, missing `SUPERSET_OBJECT_STORAGE_ENDPOINT`, `SUPERSET_OBJECT_STORAGE_BUCKET`, `SUPERSET_OBJECT_STORAGE_ACCESS_KEY`, or `SUPERSET_OBJECT_STORAGE_SECRET_KEY` now fails the build with an explicit error instead of warning and continuing.
+  - Canary release calls set `require_resource_pack_object_storage` whenever `publish_release != false`; `publish_release=false` dry runs can still skip object-storage upload while retaining resource-pack artifacts for validation. Stable release calls require object storage only for `desktop-v*` tag releases, preserving manual workflow-dispatch validation.
+  - Production S3/CloudFront/public resource-pack URL remains unverified because the repository secrets are currently incomplete. The new behavior makes that an intentional release blocker rather than a silent broken publish.
 - 2026-06-27 dev memory attribution follow-up:
   - Added memory attribution to `.superset/worktree-dev.sh status`: app process RSS, current compose-project Docker RSS, tracked total, and top worktree app processes. This makes future "7GB dev memory" reports actionable by showing whether the cost is Electron/Vite, local API, Docker data services, or stale worktree processes.
   - Added the same memory attribution to `scripts/superset-online.sh status`, scoped to the `superset-online` app/run-dir processes plus the `superset-online` compose project, so online-like validation cannot be accidentally blamed on desktop Electron.

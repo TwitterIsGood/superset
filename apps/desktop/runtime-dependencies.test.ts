@@ -153,9 +153,16 @@ describe("Trellis runtime pack packaging", () => {
 			"Upload auto-update manifest\n        if: inputs.macos_artifact_mode == 'full'",
 		);
 		expect(buildWorkflow).toContain("upload_resource_pack_artifacts");
+		expect(buildWorkflow).toContain("require_resource_pack_object_storage");
 		expect(buildWorkflow).toContain("bundle_cli");
 		expect(buildWorkflow).toContain("upload_sourcemaps");
 		expect(buildWorkflow).toContain("DESKTOP_BUNDLE_CLI");
+		expect(buildWorkflow).toContain(
+			"Published desktop builds require SUPERSET_OBJECT_STORAGE_* secrets",
+		);
+		expect(buildWorkflow).toContain(
+			'if [[ "$REQUIRE_RESOURCE_PACK_OBJECT_STORAGE" == "true" ]]',
+		);
 		expect(buildWorkflow).toContain(
 			"SENTRY_AUTH_TOKEN: $" +
 				"{{ inputs.upload_sourcemaps && secrets.SENTRY_AUTH_TOKEN || '' }}",
@@ -190,9 +197,17 @@ describe("Trellis runtime pack packaging", () => {
 		expect(canaryWorkflow).toContain("upload_resource_pack_artifacts=false");
 		expect(canaryWorkflow).toContain("bundle_cli=false");
 		expect(canaryWorkflow).toContain("upload_sourcemaps=false");
+		expect(canaryWorkflow).toContain(
+			"require_resource_pack_object_storage: $" +
+				"{{ github.event.inputs.publish_release != 'false' }}",
+		);
 		expect(canaryWorkflow).not.toContain("bundle_cli=true");
 		expect(canaryWorkflow).toContain(
 			"Remove resource-pack CI payloads from release assets",
+		);
+		expect(stableReleaseWorkflow).toContain(
+			"require_resource_pack_object_storage: $" +
+				"{{ startsWith(github.ref, 'refs/tags/desktop-v') }}",
 		);
 		expect(stableReleaseWorkflow).toContain(
 			"Remove resource-pack CI payloads from release assets",

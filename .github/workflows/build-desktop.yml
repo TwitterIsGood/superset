@@ -57,6 +57,11 @@ on:
         required: false
         type: boolean
         default: true
+      require_resource_pack_object_storage:
+        description: "Whether missing object-storage secrets should fail the build. Published releases must require this."
+        required: false
+        type: boolean
+        default: false
       bundle_cli:
         description: "Whether to include the bundled Superset CLI binary in the base desktop artifact."
         required: false
@@ -214,8 +219,13 @@ jobs:
           SUPERSET_OBJECT_STORAGE_ACCESS_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_ACCESS_KEY }}
           SUPERSET_OBJECT_STORAGE_SECRET_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_SECRET_KEY }}
           SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE: ${{ secrets.SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE }}
+          REQUIRE_RESOURCE_PACK_OBJECT_STORAGE: ${{ inputs.require_resource_pack_object_storage }}
         run: |
           if [[ -z "${SUPERSET_OBJECT_STORAGE_ENDPOINT:-}" || -z "${SUPERSET_OBJECT_STORAGE_BUCKET:-}" || -z "${SUPERSET_OBJECT_STORAGE_ACCESS_KEY:-}" || -z "${SUPERSET_OBJECT_STORAGE_SECRET_KEY:-}" ]]; then
+            if [[ "$REQUIRE_RESOURCE_PACK_OBJECT_STORAGE" == "true" ]]; then
+              echo "::error::Published desktop builds require SUPERSET_OBJECT_STORAGE_* secrets so on-demand resource packs are available to users."
+              exit 1
+            fi
             echo "::warning::Skipping desktop resource pack object-storage upload because SUPERSET_OBJECT_STORAGE_* secrets are incomplete."
             exit 0
           fi
@@ -614,8 +624,13 @@ jobs:
           SUPERSET_OBJECT_STORAGE_ACCESS_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_ACCESS_KEY }}
           SUPERSET_OBJECT_STORAGE_SECRET_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_SECRET_KEY }}
           SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE: ${{ secrets.SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE }}
+          REQUIRE_RESOURCE_PACK_OBJECT_STORAGE: ${{ inputs.require_resource_pack_object_storage }}
         run: |
           if [[ -z "${SUPERSET_OBJECT_STORAGE_ENDPOINT:-}" || -z "${SUPERSET_OBJECT_STORAGE_BUCKET:-}" || -z "${SUPERSET_OBJECT_STORAGE_ACCESS_KEY:-}" || -z "${SUPERSET_OBJECT_STORAGE_SECRET_KEY:-}" ]]; then
+            if [[ "$REQUIRE_RESOURCE_PACK_OBJECT_STORAGE" == "true" ]]; then
+              echo "::error::Published desktop builds require SUPERSET_OBJECT_STORAGE_* secrets so on-demand resource packs are available to users."
+              exit 1
+            fi
             echo "::warning::Skipping desktop resource pack object-storage upload because SUPERSET_OBJECT_STORAGE_* secrets are incomplete."
             exit 0
           fi
