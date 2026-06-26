@@ -91,6 +91,9 @@ This is a parent task. Work decomposes into 5 child workstreams that can largely
 - [x] GitHub Actions step: upload Trellis pack artifact to S3
 - [x] Pack manifest index embedded in app at build time
 - [x] Add to `build-desktop.yml`
+- [x] Preserve fast artifact-only Canary validation: quick `publish_release=false` now skips runtime pack construction entirely, copies the embedded empty `pack-manifest-index.json`, and still runs pack-only guards against the packaged app.
+  - Validation: Canary quick dry run `28255974763` on `c5a10abb` passed; macOS arm64 job `11m16s`; ZIP artifact `144,632,231` bytes; resource pack artifact/object-storage upload steps were skipped.
+  - Remaining packaging bottlenecks from that run: dependency install `74s`, desktop native deps `50s`, `electron-vite` compile `4m40s`, target optional dependency install `60s`, Electron ZIP build `92s`. Pack build itself is no longer a quick-path bottleneck.
 
 ### 1.5 Move Trellis runtime to pack
 - [x] Remove Trellis modules from `runtime-dependencies.ts` (`trellisRuntimeModuleNames`, `packagedTrellisRuntimeResourceCopies`)
