@@ -676,6 +676,16 @@ cd packages/host-service && bun test
     - The remaining `assets/one-light-*.js` is only a Shiki theme output at about `25 KiB`.
     - Renderer transform count also dropped from `11237` modules to `10437`, reducing dev/build graph pressure.
   - Validation passed so far: `rg` found no `react-syntax-highlighter` in desktop renderer/shared UI source, `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run --cwd apps/desktop typecheck`, and the compile-stats build above.
+- 2026-06-27 renderer Mermaid/Shiki and diff worker follow-up:
+  - Root cause: shared `@superset/ui` CodeBlock had moved Shiki off startup, but still used `import("shiki")`, whose package entry re-exports the full bundle. Changed it to `shiki/core` + `shiki/engine/javascript` + explicit language/theme subpath imports for the product-supported language set. Unknown languages still fall back to plain text; line numbers, light/dark themes, and `colorize=false` behavior are preserved.
+  - Root cause: desktop `MermaidCodeBlock` imported `Streamdown` only to render a fenced Mermaid block. `streamdown` brings its own broad code-block/highlighting stack. Changed Mermaid rendering to call `@streamdown/mermaid` directly via `getMermaid(config).render()`, with the same theme modes and localized loading/error UI. The source-level guard now forbids `streamdown` from re-entering the Mermaid component.
+  - Runtime memory follow-up: authenticated layout configured `@pierre/diffs` with `poolSize: 8` and `preferredHighlighter: "shiki-wasm"`. Reduced the pool to `2` workers and switched to `"shiki-js"`. This is a direct runtime/dev memory reduction for diff-heavy sessions; source guard prevents reverting to the 8-worker/WASM configuration.
+  - Compile evidence with `DESKTOP_BUILD_STATS=true DESKTOP_BUILD_STATS_DIR=performance-reports/build-stats DESKTOP_BUNDLE_CLI=false bun run --cwd apps/desktop compile:app`:
+    - Main remains `9.31 MiB`; preload remains effectively `0.00 MiB`.
+    - Renderer total is `32.92 MiB` / `717` outputs, roughly flat from the previous `32.93 MiB` because `@pierre/diffs` still statically imports `shiki` full entry in its distributed worker/shared highlighter modules.
+    - Mermaid lazy chunk dropped from about `1.01 MiB` to `0.48 MiB` after removing `Streamdown` from Mermaid-only rendering.
+    - The `@pierre/diffs` package remains the primary full-Shiki source: top outputs still include `emacs-lisp` `0.74 MiB`, `cpp` `0.60 MiB`, `wasm` outputs totaling about `1.20 MiB`, and a `WorkerPoolContext` dependency map that enumerates Shiki languages/themes. Fully removing that requires a deeper replacement or patch of the diff highlighter/worker path, not just caller configuration.
+  - Validation passed: `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run --cwd apps/desktop typecheck`, and the compile-stats build above.
 
 ---
 

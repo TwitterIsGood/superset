@@ -1,5 +1,6 @@
 import { type MermaidConfig, mermaid } from "@streamdown/mermaid";
-import { Streamdown } from "streamdown";
+import { cn } from "@superset/ui/lib/utils";
+import { useEffect, useId, useMemo, useState } from "react";
 
 type MermaidThemeMode = "auto" | "base";
 
@@ -12,8 +13,6 @@ interface MermaidCodeBlockProps {
 	className?: string;
 }
 
-const mermaidPlugins = { mermaid };
-
 export function MermaidCodeBlock({
 	source,
 	isDark,
@@ -22,19 +21,71 @@ export function MermaidCodeBlock({
 	lightThemeVariables,
 	className,
 }: MermaidCodeBlockProps) {
-	const config: MermaidConfig =
-		mode === "base"
-			? {
-					theme: "base",
-					themeVariables: isDark ? darkThemeVariables : lightThemeVariables,
+	const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+	const [svg, setSvg] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const svgDataUrl = svg
+		? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+		: null;
+	const config: MermaidConfig = useMemo(
+		() =>
+			mode === "base"
+				? {
+						theme: "base",
+						themeVariables: isDark ? darkThemeVariables : lightThemeVariables,
+					}
+				: { theme: isDark ? "dark" : "default" },
+		[darkThemeVariables, isDark, lightThemeVariables, mode],
+	);
+
+	useEffect(() => {
+		let cancelled = false;
+		setError(null);
+		setSvg(null);
+
+		mermaid
+			.getMermaid(config)
+			.render(`superset-mermaid-${id}`, source)
+			.then(({ svg: renderedSvg }) => {
+				if (!cancelled) {
+					setSvg(renderedSvg);
 				}
-			: { theme: isDark ? "dark" : "default" };
+			})
+			.catch((renderError) => {
+				if (!cancelled) {
+					setError(
+						renderError instanceof Error
+							? renderError.message
+							: "Unable to render Mermaid diagram.",
+					);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [config, id, source]);
 
 	return (
-		<div className={className}>
-			<Streamdown mode="static" plugins={mermaidPlugins} mermaid={{ config }}>
-				{`\`\`\`mermaid\n${source}\n\`\`\``}
-			</Streamdown>
+		<div
+			className={cn(
+				"overflow-x-auto rounded-md border border-border bg-background p-4",
+				className,
+			)}
+		>
+			{error ? (
+				<pre className="m-0 whitespace-pre-wrap text-destructive text-sm select-text cursor-text">
+					{error}
+				</pre>
+			) : svg ? (
+				<img
+					alt="Mermaid diagram"
+					className="max-w-full"
+					src={svgDataUrl ?? undefined}
+				/>
+			) : (
+				<div className="h-24 animate-pulse rounded bg-muted" />
+			)}
 		</div>
 	);
 }

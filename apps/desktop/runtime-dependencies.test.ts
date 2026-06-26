@@ -227,7 +227,8 @@ describe("Trellis runtime pack packaging", () => {
 		].map((path) => readFileSync(path, "utf8"));
 
 		expect(lazyMermaidSource).toContain('from "@streamdown/mermaid"');
-		expect(lazyMermaidSource).toContain('from "streamdown"');
+		expect(lazyMermaidSource).not.toContain('from "streamdown"');
+		expect(lazyMermaidSource).toContain(".getMermaid(config)");
 		for (const source of desktopCodeBlockSources) {
 			expect(source).not.toContain('from "@streamdown/mermaid"');
 			expect(source).not.toContain('from "streamdown"');
@@ -258,9 +259,19 @@ describe("Trellis runtime pack packaging", () => {
 		expect(codeBlockSource).not.toContain(
 			"import { type BundledLanguage, codeToHast",
 		);
-		expect(codeBlockSource).toContain('shikiModulePromise ??= import("shiki")');
+		expect(codeBlockSource).not.toContain('import("shiki")');
+		expect(codeBlockSource).not.toContain('from "shiki"');
+		expect(codeBlockSource).toContain('from "shiki/core"');
+		expect(codeBlockSource).toContain('from "shiki/engine/javascript"');
+		expect(codeBlockSource).toContain('import("shiki/langs/typescript.mjs")');
+		expect(codeBlockSource).toContain('import("shiki/themes/one-light.mjs")');
+		expect(codeBlockSource).not.toContain("shikiModulePromise");
+		expect(codeBlockSource).not.toContain("bundle-full");
+		expect(codeBlockSource).not.toContain("emacs-lisp");
+		expect(codeBlockSource).not.toContain("swift");
+		expect(codeBlockSource).not.toContain("wasm");
 		expect(codeBlockSource).toContain(
-			"const { codeToHast } = await loadShiki()",
+			"const { codeToHast } = createSingletonShorthands",
 		);
 	});
 
@@ -352,6 +363,29 @@ describe("Trellis runtime pack packaging", () => {
 			.map(({ path }) => path);
 
 		expect(offenders).toEqual([]);
+	});
+
+	test("keeps the Pierre diff worker pool and highlighter lightweight", () => {
+		const authenticatedLayoutSource = readFileSync(
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"routes",
+				"_authenticated",
+				"layout.tsx",
+			),
+			"utf8",
+		);
+
+		expect(authenticatedLayoutSource).toContain("poolSize: 2");
+		expect(authenticatedLayoutSource).toContain(
+			'preferredHighlighter: "shiki-js"',
+		);
+		expect(authenticatedLayoutSource).not.toContain("poolSize: 8");
+		expect(authenticatedLayoutSource).not.toContain(
+			'preferredHighlighter: "shiki-wasm"',
+		);
 	});
 
 	test("keeps CJS-only Trellis compatibility dependencies nested", () => {

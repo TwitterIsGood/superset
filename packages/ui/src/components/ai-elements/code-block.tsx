@@ -12,13 +12,67 @@ import {
 	useState,
 } from "react";
 import { jsx, jsxs } from "react/jsx-runtime";
-import type { BundledLanguage, ShikiTransformer } from "shiki";
+import {
+	createBundledHighlighter,
+	createSingletonShorthands,
+	type ShikiTransformer,
+} from "shiki/core";
+import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 
+const shikiLanguages = {
+	javascript: () => import("shiki/langs/javascript.mjs"),
+	js: () => import("shiki/langs/javascript.mjs"),
+	typescript: () => import("shiki/langs/typescript.mjs"),
+	ts: () => import("shiki/langs/typescript.mjs"),
+	tsx: () => import("shiki/langs/tsx.mjs"),
+	jsx: () => import("shiki/langs/jsx.mjs"),
+	python: () => import("shiki/langs/python.mjs"),
+	py: () => import("shiki/langs/python.mjs"),
+	html: () => import("shiki/langs/html.mjs"),
+	css: () => import("shiki/langs/css.mjs"),
+	json: () => import("shiki/langs/json.mjs"),
+	bash: () => import("shiki/langs/bash.mjs"),
+	sh: () => import("shiki/langs/bash.mjs"),
+	shell: () => import("shiki/langs/bash.mjs"),
+	shellscript: () => import("shiki/langs/shellscript.mjs"),
+	sql: () => import("shiki/langs/sql.mjs"),
+	go: () => import("shiki/langs/go.mjs"),
+	rust: () => import("shiki/langs/rust.mjs"),
+	rs: () => import("shiki/langs/rust.mjs"),
+	java: () => import("shiki/langs/java.mjs"),
+	c: () => import("shiki/langs/c.mjs"),
+	cpp: () => import("shiki/langs/cpp.mjs"),
+	ruby: () => import("shiki/langs/ruby.mjs"),
+	rb: () => import("shiki/langs/ruby.mjs"),
+	php: () => import("shiki/langs/php.mjs"),
+	yaml: () => import("shiki/langs/yaml.mjs"),
+	yml: () => import("shiki/langs/yaml.mjs"),
+	markdown: () => import("shiki/langs/markdown.mjs"),
+	md: () => import("shiki/langs/markdown.mjs"),
+	diff: () => import("shiki/langs/diff.mjs"),
+} as const;
+
+const shikiThemes = {
+	"one-light": () => import("shiki/themes/one-light.mjs"),
+	"one-dark-pro": () => import("shiki/themes/one-dark-pro.mjs"),
+} as const;
+
+const createScopedHighlighter = createBundledHighlighter({
+	langs: shikiLanguages,
+	themes: shikiThemes,
+	engine: createJavaScriptRegexEngine,
+});
+
+const { codeToHast } = createSingletonShorthands(createScopedHighlighter);
+
+type CodeBlockLanguage = string;
+type HighlightedCode = Awaited<ReturnType<typeof codeToHast>>;
+
 type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
 	code: string;
-	language: BundledLanguage;
+	language: CodeBlockLanguage;
 	showLineNumbers?: boolean;
 	/** Starting line number offset (for partial file display). Default: 1 */
 	startLine?: number;
@@ -33,16 +87,6 @@ type CodeBlockContextType = {
 const CodeBlockContext = createContext<CodeBlockContextType>({
 	code: "",
 });
-
-type CodeToHast = typeof import("shiki").codeToHast;
-type HighlightedCode = Awaited<ReturnType<CodeToHast>>;
-
-let shikiModulePromise: Promise<typeof import("shiki")> | null = null;
-
-function loadShiki() {
-	shikiModulePromise ??= import("shiki");
-	return shikiModulePromise;
-}
 
 function createLineNumberTransformer(startLine = 1): ShikiTransformer {
 	return {
@@ -91,7 +135,7 @@ function plainTextToHast(code: string) {
 
 export async function highlightCode(
 	code: string,
-	language: BundledLanguage,
+	language: CodeBlockLanguage,
 	showLineNumbers = false,
 	startLine = 1,
 ): Promise<[HighlightedCode, HighlightedCode]> {
@@ -100,7 +144,6 @@ export async function highlightCode(
 		: [];
 
 	try {
-		const { codeToHast } = await loadShiki();
 		return await Promise.all([
 			codeToHast(code, {
 				lang: language,
@@ -114,17 +157,12 @@ export async function highlightCode(
 			}),
 		]);
 	} catch {
-		if (language === ("text" as BundledLanguage)) {
+		if (language === "text" || language === "plaintext" || language === "txt") {
 			const plainText = plainTextToHast(code);
 			return [plainText, plainText];
 		}
 		// Unknown/unsupported language — fall back to plain text
-		return highlightCode(
-			code,
-			"text" as BundledLanguage,
-			showLineNumbers,
-			startLine,
-		);
+		return highlightCode(code, "text", showLineNumbers, startLine);
 	}
 }
 

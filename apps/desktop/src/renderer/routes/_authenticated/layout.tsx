@@ -415,8 +415,8 @@ function AuthenticatedLayout() {
 				<LocalHostServiceProvider>
 					<DeletingWorkspacesProvider>
 						<WorkerPoolContextProvider
-							poolOptions={{ workerFactory: createPierreWorker, poolSize: 8 }}
-							highlighterOptions={{ preferredHighlighter: "shiki-wasm" }}
+							poolOptions={{ workerFactory: createPierreWorker, poolSize: 2 }}
+							highlighterOptions={{ preferredHighlighter: "shiki-js" }}
 						>
 							<AgentHooks />
 							<FileMenuListener />
