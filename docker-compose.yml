@@ -91,6 +91,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-superset}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-superset-local-artifacts}
       SUPERSET_OBJECT_STORAGE_BUCKET: ${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}
+      NO_PROXY: minio,localhost,127.0.0.1
+      no_proxy: minio,localhost,127.0.0.1
     entrypoint:
       - /bin/sh
       - -c

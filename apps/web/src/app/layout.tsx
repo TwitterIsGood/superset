@@ -1,6 +1,7 @@
 import { Toaster } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import type { Metadata, Viewport } from "next";
+
 // Use CSS fallback fonts instead of next/font/google to avoid runtime
 // Google Fonts fetches that fail on offline servers.
 const inter = { variable: "--font-inter" };
@@ -9,10 +10,6 @@ const ibmPlexMono = { variable: "--font-ibm-plex-mono" };
 import "./globals.css";
 
 import { Providers } from "./providers";
-
-
-
-
 
 export const metadata: Metadata = {
 	title: "Superset",

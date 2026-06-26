@@ -48,7 +48,7 @@ export default {
 		}
 
 		const token = authHeader.slice(7);
-		const auth = await verifyJWT(token, env.AUTH_URL);
+		const auth = await verifyJWT(token, env.AUTH_URL, env.AUTH_JWKS_URL);
 		if (!auth) {
 			return corsResponse(401, "Invalid or expired token");
 		}
