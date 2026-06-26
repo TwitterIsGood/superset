@@ -159,6 +159,23 @@ describe("Trellis runtime pack packaging", () => {
 		expect(buildWorkflow).toContain("require_resource_pack_object_storage");
 		expect(buildWorkflow).toContain("bundle_cli");
 		expect(buildWorkflow).toContain("upload_sourcemaps");
+		expect(buildWorkflow).toContain('DESKTOP_BUILD_STATS: "true"');
+		expect(buildWorkflow).toContain(
+			"DESKTOP_BUILD_STATS_DIR: performance-reports/build-stats",
+		);
+		expect(buildWorkflow).toContain("Upload compile bundle stats");
+		expect(buildWorkflow).toContain(
+			"$" +
+				"{{ inputs.artifact_prefix }}-mac-" +
+				"$" +
+				"{{ matrix.arch }}-compile-bundle-stats",
+		);
+		expect(buildWorkflow).toContain(
+			"$" + "{{ inputs.artifact_prefix }}-linux-compile-bundle-stats",
+		);
+		expect(buildWorkflow).toContain(
+			"path: apps/desktop/performance-reports/build-stats/**",
+		);
 		expect(buildWorkflow).toContain(
 			"Skipping runtime pack build for artifact-only validation.",
 		);

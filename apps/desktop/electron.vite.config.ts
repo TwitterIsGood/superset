@@ -13,6 +13,7 @@ import { mainExternalizedDependencies } from "./runtime-dependencies";
 import {
 	applyDesktopTargetEnvOverrides,
 	copyResourcesPlugin,
+	createBundleStatsPlugin,
 	createDesktopApiProxy,
 	defineEnv,
 	devPath,
@@ -64,6 +65,11 @@ const codeInspectorVitePlugin = isCodeInspectorEnabled()
 			port: Number(process.env.CODE_INSPECTOR_PORT) || undefined,
 		})
 	: null;
+const mainBundleStatsPlugin = createBundleStatsPlugin({ target: "main" });
+const preloadBundleStatsPlugin = createBundleStatsPlugin({ target: "preload" });
+const rendererBundleStatsPlugin = createBundleStatsPlugin({
+	target: "renderer",
+});
 
 export default defineConfig({
 	main: {
@@ -144,7 +150,7 @@ export default defineConfig({
 					dir: resolve(devPath, "main"),
 				},
 				external: ["electron", ...mainExternalizedDependencies],
-				plugins: [sentryPlugin].filter(Boolean),
+				plugins: [sentryPlugin, mainBundleStatsPlugin].filter(Boolean),
 			},
 		},
 		resolve: {
@@ -183,6 +189,7 @@ export default defineConfig({
 				watch: {
 					exclude: generatedOutputWatchIgnores,
 				},
+				plugins: [preloadBundleStatsPlugin].filter(Boolean),
 				input: {
 					index: resolve("src/preload/index.ts"),
 				},
@@ -290,6 +297,7 @@ export default defineConfig({
 						platform: process.platform,
 					}),
 					sentryPlugin,
+					rendererBundleStatsPlugin,
 				].filter(Boolean),
 
 				input: {

@@ -1,5 +1,5 @@
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { dirname, normalize, resolve } from "node:path";
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, normalize, relative, resolve } from "node:path";
 import type { Plugin } from "vite";
 
 import { main, resources } from "../package.json";
@@ -155,6 +155,206 @@ export const generatedOutputWatchIgnores = [
 	"**/.tmp/**",
 	"**/superset-dev-data/packs/**",
 ];
+
+type BuildStatsEnv = Record<string, string | undefined>;
+
+type BundleStatsPluginOptions = {
+	target: "main" | "preload" | "renderer";
+	env?: BuildStatsEnv;
+};
+
+type BundleOutputStats = {
+	fileName: string;
+	type: "asset" | "chunk";
+	bytes: number;
+	isEntry?: boolean;
+	isDynamicEntry?: boolean;
+	imports?: string[];
+	dynamicImports?: string[];
+	moduleCount?: number;
+	largestModules?: Array<{
+		id: string;
+		renderedLength: number;
+		originalLength: number;
+	}>;
+};
+
+type RollupOutputAsset = {
+	type: "asset";
+	fileName: string;
+	source: string | Uint8Array;
+};
+
+type RollupOutputChunk = {
+	type: "chunk";
+	fileName: string;
+	code: string;
+	isEntry: boolean;
+	isDynamicEntry: boolean;
+	imports: string[];
+	dynamicImports: string[];
+	modules: Record<
+		string,
+		{
+			originalLength: number;
+			renderedLength: number;
+		}
+	>;
+};
+
+type RollupOutput = RollupOutputAsset | RollupOutputChunk;
+type RollupOutputBundle = Record<string, RollupOutput>;
+
+function isBuildStatsEnabled(env: BuildStatsEnv): boolean {
+	return normalizeEnvValue(env.DESKTOP_BUILD_STATS)?.toLowerCase() === "true";
+}
+
+function getBundleOutputBytes(output: RollupOutput): number {
+	if (output.type === "asset") {
+		if (typeof output.source === "string") {
+			return Buffer.byteLength(output.source);
+		}
+		return output.source.byteLength;
+	}
+	return Buffer.byteLength(output.code);
+}
+
+function summarizeBundleOutput(
+	bundle: RollupOutputBundle,
+	cwd: string,
+): BundleOutputStats[] {
+	return Object.values(bundle)
+		.map((output) => {
+			const bytes = getBundleOutputBytes(output);
+			if (output.type === "asset") {
+				return {
+					fileName: output.fileName,
+					type: "asset" as const,
+					bytes,
+				};
+			}
+
+			const largestModules = Object.entries(output.modules)
+				.map(([id, moduleInfo]) => ({
+					id: relative(cwd, id),
+					originalLength: moduleInfo.originalLength,
+					renderedLength: moduleInfo.renderedLength,
+				}))
+				.sort((left, right) => right.renderedLength - left.renderedLength)
+				.slice(0, 20);
+
+			return {
+				fileName: output.fileName,
+				type: "chunk" as const,
+				bytes,
+				isEntry: output.isEntry,
+				isDynamicEntry: output.isDynamicEntry,
+				imports: output.imports,
+				dynamicImports: output.dynamicImports,
+				moduleCount: Object.keys(output.modules).length,
+				largestModules,
+			};
+		})
+		.sort((left, right) => right.bytes - left.bytes);
+}
+
+function formatBytes(bytes: number): string {
+	const mib = bytes / 1024 / 1024;
+	if (mib >= 1) return `${mib.toFixed(2)} MiB`;
+	return `${(bytes / 1024).toFixed(1)} KiB`;
+}
+
+function writeBundleStatsReport({
+	outputs,
+	reportDir,
+	target,
+}: {
+	outputs: BundleOutputStats[];
+	reportDir: string;
+	target: BundleStatsPluginOptions["target"];
+}): void {
+	mkdirSync(reportDir, { recursive: true });
+	const totalBytes = outputs.reduce((sum, output) => sum + output.bytes, 0);
+	const jsonPath = join(reportDir, `${target}.json`);
+	const markdownPath = join(reportDir, `${target}.md`);
+
+	writeFileSync(
+		jsonPath,
+		`${JSON.stringify(
+			{
+				generatedAt: new Date().toISOString(),
+				target,
+				totalBytes,
+				outputs,
+			},
+			null,
+			2,
+		)}\n`,
+	);
+
+	const lines = [
+		`# ${target} bundle stats`,
+		"",
+		`Total output: ${formatBytes(totalBytes)}`,
+		"",
+		"## Largest outputs",
+		"",
+		"| File | Type | Size | Modules |",
+		"| --- | --- | ---: | ---: |",
+		...outputs
+			.slice(0, 30)
+			.map(
+				(output) =>
+					`| \`${output.fileName}\` | ${output.type} | ${formatBytes(output.bytes)} | ${output.moduleCount ?? ""} |`,
+			),
+	];
+
+	for (const output of outputs.filter(
+		(entry) => entry.type === "chunk" && entry.largestModules?.length,
+	)) {
+		lines.push(
+			"",
+			`## Largest modules in ${output.fileName}`,
+			"",
+			"| Module | Rendered | Original |",
+			"| --- | ---: | ---: |",
+			...(output.largestModules ?? []).map(
+				(module) =>
+					`| \`${module.id}\` | ${formatBytes(module.renderedLength)} | ${formatBytes(module.originalLength)} |`,
+			),
+		);
+	}
+
+	writeFileSync(markdownPath, `${lines.join("\n")}\n`);
+	console.log(
+		`[desktop] ${target} bundle stats written to ${relative(process.cwd(), reportDir)}`,
+	);
+}
+
+export function createBundleStatsPlugin({
+	target,
+	env = process.env as BuildStatsEnv,
+}: BundleStatsPluginOptions): Plugin | null {
+	if (!isBuildStatsEnabled(env)) return null;
+	const reportDir = resolve(
+		normalizeEnvValue(env.DESKTOP_BUILD_STATS_DIR) ??
+			"performance-reports/build-stats",
+	);
+
+	return {
+		name: `desktop-bundle-stats:${target}`,
+		generateBundle(_outputOptions, bundle) {
+			writeBundleStatsReport({
+				outputs: summarizeBundleOutput(
+					bundle as RollupOutputBundle,
+					process.cwd(),
+				),
+				reportDir,
+				target,
+			});
+		},
+	};
+}
 
 const RESOURCES_TO_COPY = [
 	{

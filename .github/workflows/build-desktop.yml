@@ -172,11 +172,21 @@ jobs:
           SUPERSET_WORKSPACE_NAME: superset
           TARGET_ARCH: ${{ matrix.arch }}
           DESKTOP_BUNDLE_CLI: ${{ inputs.bundle_cli }}
+          DESKTOP_BUILD_STATS: "true"
+          DESKTOP_BUILD_STATS_DIR: performance-reports/build-stats
         run: bun run compile:app
 
       - name: Report package size after compile
         working-directory: apps/desktop
         run: bun run report:size --top=15
+
+      - name: Upload compile bundle stats
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.artifact_prefix }}-mac-${{ matrix.arch }}-compile-bundle-stats
+          path: apps/desktop/performance-reports/build-stats/**
+          retention-days: ${{ inputs.artifact_retention_days }}
+          if-no-files-found: error
 
       - name: Install target platform optional dependencies
         if: inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64'
@@ -584,11 +594,21 @@ jobs:
           SUPERSET_WORKSPACE_NAME: superset
           TARGET_ARCH: x64
           DESKTOP_BUNDLE_CLI: ${{ inputs.bundle_cli }}
+          DESKTOP_BUILD_STATS: "true"
+          DESKTOP_BUILD_STATS_DIR: performance-reports/build-stats
         run: bun run compile:app
 
       - name: Report package size after compile
         working-directory: apps/desktop
         run: bun run report:size --top=15
+
+      - name: Upload compile bundle stats
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.artifact_prefix }}-linux-compile-bundle-stats
+          path: apps/desktop/performance-reports/build-stats/**
+          retention-days: ${{ inputs.artifact_retention_days }}
+          if-no-files-found: error
 
       - name: Install target platform optional dependencies
         run: bun install --frozen --ignore-scripts --minimum-release-age=0 --cpu=x64 --os=linux

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
 	applyDesktopTargetEnvOverrides,
+	createBundleStatsPlugin,
 	createDesktopApiProxy,
 	defineEnv,
 	generatedOutputWatchIgnores,
@@ -136,6 +140,74 @@ describe("desktop Vite env helpers", () => {
 				"**/.tmp/**",
 				"**/superset-dev-data/packs/**",
 			]),
+		);
+	});
+
+	it("keeps bundle stats opt-in and writes JSON plus Markdown reports", () => {
+		expect(createBundleStatsPlugin({ target: "renderer", env: {} })).toBeNull();
+
+		const reportDir = mkdtempSync(join(tmpdir(), "desktop-build-stats-"));
+		const plugin = createBundleStatsPlugin({
+			target: "renderer",
+			env: {
+				DESKTOP_BUILD_STATS: "true",
+				DESKTOP_BUILD_STATS_DIR: reportDir,
+			},
+		});
+		const generateBundle = plugin?.generateBundle;
+		if (typeof generateBundle !== "function") {
+			throw new Error("Expected bundle stats plugin to expose generateBundle");
+		}
+
+		const bundle = {
+			"renderer/index.js": {
+				type: "chunk",
+				fileName: "renderer/index.js",
+				code: "console.log('hello');",
+				isEntry: true,
+				isDynamicEntry: false,
+				imports: [],
+				dynamicImports: ["renderer/lazy.js"],
+				modules: {
+					[join(process.cwd(), "apps/desktop/src/renderer/index.tsx")]: {
+						originalLength: 1200,
+						renderedLength: 300,
+					},
+				},
+			},
+			"renderer/style.css": {
+				type: "asset",
+				fileName: "renderer/style.css",
+				source: ".root{}",
+			},
+		};
+
+		generateBundle.call(
+			{} as ThisParameterType<typeof generateBundle>,
+			{} as Parameters<typeof generateBundle>[0],
+			bundle as Parameters<typeof generateBundle>[1],
+			false as Parameters<typeof generateBundle>[2],
+		);
+
+		const jsonPath = join(reportDir, "renderer.json");
+		const markdownPath = join(reportDir, "renderer.md");
+		expect(existsSync(jsonPath)).toBe(true);
+		expect(existsSync(markdownPath)).toBe(true);
+
+		const stats = JSON.parse(readFileSync(jsonPath, "utf8")) as {
+			target: string;
+			outputs: Array<{
+				fileName: string;
+				largestModules?: Array<{ id: string }>;
+			}>;
+		};
+		expect(stats.target).toBe("renderer");
+		expect(stats.outputs[0]?.fileName).toBe("renderer/index.js");
+		expect(stats.outputs[0]?.largestModules?.[0]?.id).toBe(
+			"apps/desktop/src/renderer/index.tsx",
+		);
+		expect(readFileSync(markdownPath, "utf8")).toContain(
+			"# renderer bundle stats",
 		);
 	});
 });
