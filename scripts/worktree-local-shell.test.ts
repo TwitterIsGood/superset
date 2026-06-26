@@ -173,6 +173,19 @@ describe("worktree local shell helpers", () => {
 		);
 	});
 
+	test("status reports worktree memory attribution", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+
+		expect(script).toContain("print_memory_status");
+		expect(script).toContain("worktree_app_memory_kib");
+		expect(script).toContain("worktree_docker_memory_kib");
+		expect(script).toContain("docker stats --no-stream");
+		expect(script).toContain('echo "memory:"');
+		expect(script).toContain('"tracked total"');
+		expect(script).toContain("top app processes:");
+		expect(script).toContain('print_memory_status\n  echo\n  echo "probes:"');
+	});
+
 	test("profile switches stop app sessions that are no longer managed", () => {
 		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
 
@@ -238,6 +251,10 @@ describe("worktree local shell helpers", () => {
 		);
 		expect(worktreeScript).toContain("S3-dependent flows may need retry");
 		expect(worktreeScript).toContain("compose rm -sf minio-init");
+		expect(worktreeScript).toContain("cleanup_stale_minio_init_containers");
+		expect(worktreeScript).toContain(
+			`docker ps -aq --filter "name=^/${shellExpansion("LOCAL_DB_PROJECT")}-minio-init-run-"`,
+		);
 
 		expect(onlineScript).not.toContain("compose run --rm minio-init");
 		expect(onlineScript).toContain("SUPERSET_ONLINE_MINIO_INIT_ATTEMPTS");
@@ -245,6 +262,10 @@ describe("worktree local shell helpers", () => {
 			'while [ "$attempt" -le "$' + '{MINIO_INIT_ATTEMPTS:-30}" ]; do',
 		);
 		expect(onlineScript).toContain("compose rm -sf minio-init");
+		expect(onlineScript).toContain("cleanup_stale_minio_init_containers");
+		expect(onlineScript).toContain(
+			`docker ps -aq --filter "name=^/${shellExpansion("COMPOSE_PROJECT_NAME")}-minio-init-run-"`,
+		);
 	});
 
 	test("minio init bypasses host proxy for the compose service hostname", () => {

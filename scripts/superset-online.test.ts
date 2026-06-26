@@ -48,4 +48,17 @@ describe("superset online public URL defaults", () => {
 			'online:start:loaded": "SUPERSET_ONLINE_LOAD_FIXTURE=1',
 		);
 	});
+
+	test("status reports online-like memory attribution", () => {
+		expect(SOURCE).toContain("print_memory_status");
+		expect(SOURCE).toContain("online_app_memory_kib");
+		expect(SOURCE).toContain("online_docker_memory_kib");
+		expect(SOURCE).toContain("docker stats --no-stream");
+		expect(SOURCE).toContain('echo "memory:"');
+		expect(SOURCE).toContain('"tracked total"');
+		expect(SOURCE).toContain("top app processes:");
+		expect(SOURCE).toContain(
+			'print_memory_status\n\techo\n\techo "local probes:"',
+		);
+	});
 });

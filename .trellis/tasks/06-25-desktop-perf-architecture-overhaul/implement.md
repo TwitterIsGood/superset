@@ -562,6 +562,23 @@ cd packages/host-service && bun test
     - `TARGET_PLATFORM=darwin TARGET_ARCH=arm64 bun run --cwd apps/desktop build:mastracode-pack -- --out-dir .tmp/native-pack-version-check --app-index-out .tmp/native-pack-version-check/pack-manifest-index.json` generated `mastracode-runtime@0.18.1-darwin-arm64` with `@duckdb/node-bindings-darwin-arm64`.
     - `TARGET_PLATFORM=darwin TARGET_ARCH=arm64 bun run --cwd apps/desktop build:cli-pack -- --out-dir .tmp/native-pack-version-check --app-index-out .tmp/native-pack-version-check/pack-manifest-index.json` generated `superset-cli-runtime@0.2.22-darwin-arm64`, and its `bin/superset --version` returned `0.2.22`.
     - The merged app manifest index contains all three platform-specific pack ids/versions above.
+  - Full no-release Canary dry run after formal no-CLI release-path patch passed on commit `d7d03c8a1`: run `28254206256`, `build_scope=full`, `publish_release=false`, `mac_signing=unsigned_internal`, no live `desktop-canary` release update.
+  - Full-run job durations: Linux x64 `8m30s`, macOS arm64 `11m06s`, macOS x64 `12m12s`; the skipped release-update job confirms this was a package/publish-shape validation without mutating the public Canary release.
+  - Full-run installer artifacts are now thin:
+    - macOS arm64 ZIP `145,424,568` bytes and DMG `150,883,297` bytes.
+    - macOS x64 ZIP `152,383,536` bytes and DMG `157,877,712` bytes.
+    - Linux x64 AppImage `154,767,120` bytes.
+  - Full-run resource-pack artifacts are split out of the installer and retained as CI artifacts: macOS arm64 `189,242,623` bytes, macOS x64 `197,756,325` bytes, Linux x64 `213,489,641` bytes. Release jobs remove these resource-pack payload directories before publishing GitHub Release assets, preserving the split: installers through GitHub Releases, on-demand packs through object storage.
+  - Full-run gates passed: package-size budget, pack-only scans, no bundled CLI checks for `bundle_cli=false`, CLI runtime pack binary validation, auto-update metadata validation, macOS ad-hoc signing validation, and macOS arm64 runtime capture.
+  - Object-storage upload path executed but skipped with the expected warning: `SUPERSET_OBJECT_STORAGE_*` GitHub secrets are incomplete. Local and online-like MinIO are already validated; production S3/CloudFront remains the deploy-environment setup item before a real no-CLI Canary can serve packs to users.
+  - Tightened `apps/desktop/perf-budget.json` package budgets to match the new proven baseline: installer target `200 MiB`, hard limit `300 MiB` for ZIP, DMG, and AppImage. This turns the old 400-500MB class package size into a CI regression instead of a warning.
+- 2026-06-27 dev memory attribution follow-up:
+  - Added memory attribution to `.superset/worktree-dev.sh status`: app process RSS, current compose-project Docker RSS, tracked total, and top worktree app processes. This makes future "7GB dev memory" reports actionable by showing whether the cost is Electron/Vite, local API, Docker data services, or stale worktree processes.
+  - Added the same memory attribution to `scripts/superset-online.sh status`, scoped to the `superset-online` app/run-dir processes plus the `superset-online` compose project, so online-like validation cannot be accidentally blamed on desktop Electron.
+  - Fixed stale MinIO one-shot cleanup for both worktree-local and online-like startup. Historical `*-minio-init-run-*` containers created by older init logic were not removed by `compose rm -sf minio-init`; startup now removes those project-prefixed stale containers before and after bounded MinIO init.
+  - Cleaned the current stale worktree `minio-init-run` container (`684ddcdf749d`). After cleanup, current `bun run dev:worktree:status` reports tracked memory `1553.6 MiB`: app processes `1016.0 MiB`, Docker compose `537.5 MiB`, top app process renderer `374.1 MiB`, electron-vite `212.7 MiB`, main `159.5 MiB`, host-service `97.1 MiB`.
+  - Current `bun run online:status` reports online-like tracked memory around `993 MiB`, almost entirely Docker compose; online app tmux sessions are stopped.
+  - Validation passed: `bun test scripts/worktree-local-shell.test.ts scripts/superset-online.test.ts apps/desktop/runtime-dependencies.test.ts` and `bun run lint`.
 
 ---
 

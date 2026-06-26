@@ -232,6 +232,21 @@ compose_build_args_for_data_services() {
   fi
 }
 
+cleanup_stale_minio_init_containers() {
+  if ! docker info >/dev/null 2>&1; then
+    return
+  fi
+
+  local ids=()
+  while IFS= read -r id; do
+    [ -n "$id" ] && ids+=("$id")
+  done < <(docker ps -aq --filter "name=^/${LOCAL_DB_PROJECT}-minio-init-run-" 2>/dev/null || true)
+
+  if [ "${#ids[@]}" -gt 0 ]; then
+    docker rm -f "${ids[@]}" >/dev/null 2>&1 || true
+  fi
+}
+
 run_minio_init() {
   local attempts="${WORKTREE_DEV_MINIO_INIT_ATTEMPTS:-30}"
   if compose run --rm \
@@ -283,7 +298,9 @@ start_data_services() {
     fi
   fi
   compose rm -sf minio-init >/dev/null 2>&1 || true
+  cleanup_stale_minio_init_containers
   run_minio_init
+  cleanup_stale_minio_init_containers
 }
 
 db_proxy_query_ok() {
@@ -641,6 +658,110 @@ print_docker_status() {
   fi
 }
 
+format_mib() {
+  local kib="${1:-0}"
+  awk -v kib="$kib" 'BEGIN { printf "%.1f MiB", kib / 1024 }'
+}
+
+docker_mem_to_kib() {
+  local value="$1"
+  awk -v raw="$value" '
+    BEGIN {
+      number = raw
+      sub(/[[:alpha:]]+$/, "", number)
+      unit = raw
+      sub(/^[0-9.]+/, "", unit)
+      if (unit == "GiB") {
+        printf "%.0f", number * 1024 * 1024
+      } else if (unit == "MiB") {
+        printf "%.0f", number * 1024
+      } else if (unit == "KiB") {
+        printf "%.0f", number
+      } else if (unit == "B") {
+        printf "%.0f", number / 1024
+      } else {
+        printf "0"
+      }
+    }
+  '
+}
+
+worktree_app_memory_kib() {
+  ps -axo rss=,args= | awk -v root="$ROOT_DIR" '
+    index($0, root) > 0 &&
+    $0 !~ /worktree-dev\.sh status/ &&
+    $0 !~ /ps -axo rss=,args=/ &&
+    $0 !~ /awk -v root=/ {
+      total += $1
+    }
+    END { printf "%d", total }
+  '
+}
+
+worktree_docker_memory_kib() {
+  if [ "$WORKTREE_DEV_REQUIRES_LOCAL_DATA" != "1" ] || ! docker info >/dev/null 2>&1; then
+    printf "0"
+    return
+  fi
+
+  local total=0
+  local line name usage value kib
+  while IFS=$'\t' read -r name usage; do
+    case "$name" in
+      "$LOCAL_DB_PROJECT"-*)
+        value="${usage%% / *}"
+        kib="$(docker_mem_to_kib "$value")"
+        total=$((total + kib))
+        ;;
+    esac
+  done < <(docker stats --no-stream --format '{{.Name}}\t{{.MemUsage}}' 2>/dev/null || true)
+
+  printf "%d" "$total"
+}
+
+print_worktree_top_process_memory() {
+  ps -axo rss=,pid=,comm=,args= | awk -v root="$ROOT_DIR" '
+    index($0, root) > 0 &&
+    $0 !~ /worktree-dev\.sh status/ &&
+    $0 !~ /ps -axo rss=,pid=,comm=,args=/ &&
+    $0 !~ /awk -v root=/ {
+      rss = $1
+      pid = $2
+      comm = $3
+      $1 = ""; $2 = ""; $3 = ""
+      gsub(/^[[:space:]]+/, "", $0)
+      printf "%012d\t%s\t%s\t%s\n", rss, pid, comm, $0
+    }
+  ' | sort -r | head -8 | awk -F '\t' '
+    {
+      rss = $1 + 0
+      command = $4
+      if (length(command) > 110) {
+        command = substr(command, 1, 107) "..."
+      }
+      printf "  %8.1f MiB  pid %-7s %-18s %s\n", rss / 1024, $2, $3, command
+    }
+  '
+}
+
+print_memory_status() {
+  local app_kib docker_kib total_kib
+  app_kib="$(worktree_app_memory_kib)"
+  docker_kib="$(worktree_docker_memory_kib)"
+  total_kib=$((app_kib + docker_kib))
+
+  echo "memory:"
+  printf '  %-24s %s\n' "app processes" "$(format_mib "$app_kib")"
+  if [ "$WORKTREE_DEV_REQUIRES_LOCAL_DATA" = "1" ]; then
+    printf '  %-24s %s\n' "docker compose" "$(format_mib "$docker_kib")"
+  else
+    printf '  %-24s skipped %s\n' "docker compose" "WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE"
+  fi
+  printf '  %-24s %s\n' "tracked total" "$(format_mib "$total_kib")"
+  echo "top app processes:"
+  print_worktree_top_process_memory || true
+}
+
 print_status() {
   load_env
   apply_profile_target_env
@@ -679,6 +800,8 @@ print_status() {
   else
     echo "docker compose project: skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE)"
   fi
+  echo
+  print_memory_status
   echo
   echo "probes:"
   if [ "$WORKTREE_DEV_USES_EXTERNAL_APP_SERVICES" = "1" ]; then

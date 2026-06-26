@@ -1,19 +1,19 @@
 {
 	"$schema": "./scripts/perf-budget.schema.json",
 	"packageSize": {
-		"notes": "Phase 0 regression guard. maxBytes is intentionally loose until the first measured canary baseline is recorded; targetBytes is the intended post-resource-pack direction.",
+		"notes": "Canary regression guard after moving heavy runtimes and the Superset CLI to on-demand resource packs. Published installer artifacts should stay well below 200 MiB; 300 MiB is the hard rollback line.",
 		"releaseArtifacts": {
 			"dmg": {
-				"maxBytes": 1073741824,
-				"targetBytes": 419430400
+				"maxBytes": 314572800,
+				"targetBytes": 209715200
 			},
 			"zip": {
-				"maxBytes": 1288490188,
-				"targetBytes": 524288000
+				"maxBytes": 314572800,
+				"targetBytes": 209715200
 			},
 			"AppImage": {
-				"maxBytes": 1073741824,
-				"targetBytes": 419430400
+				"maxBytes": 314572800,
+				"targetBytes": 209715200
 			}
 		}
 	},
