@@ -1,10 +1,12 @@
-import { mermaid } from "@streamdown/mermaid";
 import { ShowCode } from "@superset/ui/ai-elements/show-code";
-import type { ReactNode } from "react";
+import { lazy, type ReactNode, Suspense } from "react";
 import { useTheme } from "renderer/stores";
-import { Streamdown } from "streamdown";
 
-const mermaidPlugins = { mermaid };
+const LazyMermaidCodeBlock = lazy(() =>
+	import("renderer/components/MermaidCodeBlock").then((module) => ({
+		default: module.MermaidCodeBlock,
+	})),
+);
 
 interface CodeNode {
 	position?: {
@@ -40,13 +42,9 @@ export function CodeBlock({ children, className, node }: CodeBlockProps) {
 
 	if (language === "mermaid") {
 		return (
-			<Streamdown
-				mode="static"
-				plugins={mermaidPlugins}
-				mermaid={{ config: { theme: isDark ? "dark" : "default" } }}
-			>
-				{`\`\`\`mermaid\n${codeString}\n\`\`\``}
-			</Streamdown>
+			<Suspense fallback={<pre>{codeString}</pre>}>
+				<LazyMermaidCodeBlock source={codeString} isDark={isDark} />
+			</Suspense>
 		);
 	}
 

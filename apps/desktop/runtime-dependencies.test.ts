@@ -143,6 +143,105 @@ describe("Trellis runtime pack packaging", () => {
 		}
 	});
 
+	test("keeps desktop Mermaid rendering behind code-block lazy imports", () => {
+		const lazyMermaidSource = readFileSync(
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"components",
+				"MermaidCodeBlock",
+				"MermaidCodeBlock.tsx",
+			),
+			"utf8",
+		);
+		const desktopCodeBlockSources = [
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"components",
+				"MarkdownRenderer",
+				"components",
+				"CodeBlock",
+				"CodeBlock.tsx",
+			),
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"components",
+				"CommentMarkdown",
+				"components",
+				"CommentCodeBlock",
+				"CommentCodeBlock.tsx",
+			),
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"screens",
+				"main",
+				"components",
+				"WorkspaceView",
+				"ContentView",
+				"TabsContent",
+				"TabView",
+				"CommentPane",
+				"CommentPane.tsx",
+			),
+			join(
+				import.meta.dirname,
+				"src",
+				"renderer",
+				"components",
+				"MarkdownRenderer",
+				"components",
+				"TipTapMarkdownRenderer",
+				"components",
+				"EditableCodeBlockView",
+				"EditableCodeBlockView.tsx",
+			),
+		].map((path) => readFileSync(path, "utf8"));
+
+		expect(lazyMermaidSource).toContain('from "@streamdown/mermaid"');
+		expect(lazyMermaidSource).toContain('from "streamdown"');
+		for (const source of desktopCodeBlockSources) {
+			expect(source).not.toContain('from "@streamdown/mermaid"');
+			expect(source).not.toContain('from "streamdown"');
+			expect(source).toContain(
+				'import("renderer/components/MermaidCodeBlock")',
+			);
+		}
+	});
+
+	test("keeps Shiki highlighting off the shared code-block module startup path", () => {
+		const codeBlockSource = readFileSync(
+			join(
+				import.meta.dirname,
+				"..",
+				"..",
+				"packages",
+				"ui",
+				"src",
+				"components",
+				"ai-elements",
+				"code-block.tsx",
+			),
+			"utf8",
+		);
+
+		expect(codeBlockSource).not.toContain(" codeToHast,");
+		expect(codeBlockSource).not.toContain("import { codeToHast");
+		expect(codeBlockSource).not.toContain(
+			"import { type BundledLanguage, codeToHast",
+		);
+		expect(codeBlockSource).toContain('shikiModulePromise ??= import("shiki")');
+		expect(codeBlockSource).toContain(
+			"const { codeToHast } = await loadShiki()",
+		);
+	});
+
 	test("keeps CJS-only Trellis compatibility dependencies nested", () => {
 		expect(requiredMaterializedNodeModules).not.toContain("mimic-fn");
 		expect(trellisRuntimePackResourceCopies).toContainEqual(

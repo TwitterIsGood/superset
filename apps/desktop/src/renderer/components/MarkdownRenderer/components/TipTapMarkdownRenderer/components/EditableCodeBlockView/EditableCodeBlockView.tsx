@@ -1,4 +1,3 @@
-import { mermaid } from "@streamdown/mermaid";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -7,7 +6,7 @@ import {
 } from "@superset/ui/dropdown-menu";
 import type { NodeViewProps } from "@tiptap/react";
 import { NodeViewContent, NodeViewWrapper } from "@tiptap/react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import {
 	HiCheck,
 	HiChevronDown,
@@ -21,9 +20,12 @@ import {
 	getCodeBlockLanguageLabel,
 } from "renderer/lib/tiptap/code-block-languages";
 import { useTheme } from "renderer/stores";
-import { Streamdown } from "streamdown";
 
-const mermaidPlugins = { mermaid };
+const LazyMermaidCodeBlock = lazy(() =>
+	import("renderer/components/MermaidCodeBlock").then((module) => ({
+		default: module.MermaidCodeBlock,
+	})),
+);
 
 export function EditableCodeBlockView({
 	node,
@@ -142,13 +144,13 @@ export function EditableCodeBlockView({
 
 			{showMermaidPreview && (
 				<div contentEditable={false} className="w-full [&_.min-h-28]:min-h-80">
-					<Streamdown
-						mode="static"
-						plugins={mermaidPlugins}
-						mermaid={{ config: { theme: isDark ? "dark" : "default" } }}
-					>
-						{`\`\`\`\`mermaid\n${mermaidSource}\n\`\`\`\``}
-					</Streamdown>
+					<Suspense fallback={<pre>{mermaidSource}</pre>}>
+						<LazyMermaidCodeBlock
+							source={mermaidSource}
+							isDark={isDark}
+							className="[&_.min-h-28]:min-h-80"
+						/>
+					</Suspense>
 				</div>
 			)}
 

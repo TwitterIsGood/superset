@@ -1,14 +1,16 @@
-import { mermaid } from "@streamdown/mermaid";
-import type { ReactNode } from "react";
+import { lazy, type ReactNode, Suspense } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import {
 	oneDark,
 	oneLight,
 } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "renderer/stores";
-import { Streamdown } from "streamdown";
 
-const mermaidPlugins = { mermaid };
+const LazyMermaidCodeBlock = lazy(() =>
+	import("renderer/components/MermaidCodeBlock").then((module) => ({
+		default: module.MermaidCodeBlock,
+	})),
+);
 
 const MERMAID_DARK_VARS = {
 	background: "#1e1e2e",
@@ -62,18 +64,15 @@ export function CommentCodeBlock({
 
 	if (language === "mermaid") {
 		return (
-			<Streamdown
-				mode="static"
-				plugins={mermaidPlugins}
-				mermaid={{
-					config: {
-						theme: "base",
-						themeVariables: isDark ? MERMAID_DARK_VARS : MERMAID_LIGHT_VARS,
-					},
-				}}
-			>
-				{`\`\`\`mermaid\n${codeString}\n\`\`\``}
-			</Streamdown>
+			<Suspense fallback={<pre>{codeString}</pre>}>
+				<LazyMermaidCodeBlock
+					source={codeString}
+					isDark={isDark}
+					mode="base"
+					darkThemeVariables={MERMAID_DARK_VARS}
+					lightThemeVariables={MERMAID_LIGHT_VARS}
+				/>
+			</Suspense>
 		);
 	}
 

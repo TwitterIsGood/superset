@@ -12,7 +12,7 @@ import {
 	useState,
 } from "react";
 import { jsx, jsxs } from "react/jsx-runtime";
-import { type BundledLanguage, codeToHast, type ShikiTransformer } from "shiki";
+import type { BundledLanguage, ShikiTransformer } from "shiki";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 
@@ -34,7 +34,15 @@ const CodeBlockContext = createContext<CodeBlockContextType>({
 	code: "",
 });
 
-type HighlightedCode = Awaited<ReturnType<typeof codeToHast>>;
+type CodeToHast = typeof import("shiki").codeToHast;
+type HighlightedCode = Awaited<ReturnType<CodeToHast>>;
+
+let shikiModulePromise: Promise<typeof import("shiki")> | null = null;
+
+function loadShiki() {
+	shikiModulePromise ??= import("shiki");
+	return shikiModulePromise;
+}
 
 function createLineNumberTransformer(startLine = 1): ShikiTransformer {
 	return {
@@ -92,6 +100,7 @@ export async function highlightCode(
 		: [];
 
 	try {
+		const { codeToHast } = await loadShiki();
 		return await Promise.all([
 			codeToHast(code, {
 				lang: language,

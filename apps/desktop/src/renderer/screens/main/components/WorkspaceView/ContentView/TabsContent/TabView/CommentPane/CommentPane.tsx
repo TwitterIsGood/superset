@@ -1,7 +1,8 @@
-import { mermaid } from "@streamdown/mermaid";
 import { Avatar, AvatarFallback, AvatarImage } from "@superset/ui/avatar";
 import {
+	lazy,
 	type ReactNode,
+	Suspense,
 	useCallback,
 	useEffect,
 	useRef,
@@ -27,9 +28,14 @@ import remarkGfm from "remark-gfm";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import { useTheme } from "renderer/stores/theme";
-import { Streamdown } from "streamdown";
 import { BasePaneWindow, PaneTitle, PaneToolbarActions } from "../components";
 import "./comment-pane.css";
+
+const LazyMermaidCodeBlock = lazy(() =>
+	import("renderer/components/MermaidCodeBlock").then((module) => ({
+		default: module.MermaidCodeBlock,
+	})),
+);
 
 interface CommentPaneProps {
 	paneId: string;
@@ -195,8 +201,6 @@ export function CommentPane({
 	);
 }
 
-const mermaidPlugins = { mermaid };
-
 const MERMAID_DARK_VARS = {
 	background: "#1e1e2e",
 	primaryColor: "#313244",
@@ -243,18 +247,15 @@ function CommentCodeBlock({
 
 	if (language === "mermaid") {
 		return (
-			<Streamdown
-				mode="static"
-				plugins={mermaidPlugins}
-				mermaid={{
-					config: {
-						theme: "base",
-						themeVariables: isDark ? MERMAID_DARK_VARS : MERMAID_LIGHT_VARS,
-					},
-				}}
-			>
-				{`\`\`\`mermaid\n${codeString}\n\`\`\``}
-			</Streamdown>
+			<Suspense fallback={<pre>{codeString}</pre>}>
+				<LazyMermaidCodeBlock
+					source={codeString}
+					isDark={isDark}
+					mode="base"
+					darkThemeVariables={MERMAID_DARK_VARS}
+					lightThemeVariables={MERMAID_LIGHT_VARS}
+				/>
+			</Suspense>
 		);
 	}
 

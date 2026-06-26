@@ -636,6 +636,20 @@ cd packages/host-service && bun test
     - The previous `1.05 MiB` `addon-webgl` top-list output is gone from the static terminal path. WebGL is now a separate lazy output: `assets/addon-webgl-*.js` at `0.27 MiB`.
     - This is primarily a first-load/runtime-memory win for non-terminal and terminal-before-WebGL paths, not a base installer-size win.
   - Validation passed: `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run lint:fix`, `bun run --cwd apps/desktop typecheck`, `bun run lint`, and the compile-stats build above.
+- 2026-06-27 Markdown diagram/highlighting lazy-load follow-up:
+  - Root cause: several desktop Markdown/code-block paths imported `@streamdown/mermaid` and `streamdown` at module top level, so ordinary Markdown/code-block rendering paid the Mermaid/diagram dependency cost before a Mermaid fence was actually rendered.
+  - Added a shared desktop `MermaidCodeBlock` component that owns the static `@streamdown/mermaid` / `Streamdown` imports, then changed desktop MarkdownRenderer code blocks, PR comment code blocks, workspace comment pane code blocks, and editable TipTap code blocks to load that component through `React.lazy` only when `language === "mermaid"`.
+  - Preserved the previous Mermaid theme behavior: normal Markdown uses dark/default theme switching; comment renderers still use the base theme with the existing light/dark theme variables; editable code blocks keep the source/preview toggle.
+  - Changed `packages/ui/src/components/ai-elements/code-block.tsx` so the Shiki value import `codeToHast` is no longer on the shared code-block module startup path. `highlightCode()` now caches a dynamic `import("shiki")` promise and only loads Shiki when syntax highlighting actually runs.
+  - Added source-level regression tests that:
+    - Require desktop Mermaid callers to dynamically import `renderer/components/MermaidCodeBlock`.
+    - Forbid those desktop callers from statically importing `@streamdown/mermaid` or `streamdown`.
+    - Forbid shared `code-block.tsx` from top-level importing `codeToHast`, and require the dynamic Shiki import path.
+  - Compile evidence with `DESKTOP_BUILD_STATS=true DESKTOP_BUILD_STATS_DIR=performance-reports/build-stats DESKTOP_BUNDLE_CLI=false bun run --cwd apps/desktop compile:app`:
+    - Renderer total is `34.68 MiB` / `725` outputs. This pass is a load-path split, not a total artifact-size reduction; Mermaid/Shiki still ship as lazy chunks.
+    - Mermaid is now an explicit lazy output (`assets/mermaid-GHXKKRXX-*.js`, `1.01 MiB`) with diagram chunks (`cytoscape`, `treemap`, architecture/sequence/etc.) separate from the ordinary desktop code-block modules.
+    - Shiki themes/languages still exist as outputs (`one-light` `0.91 MiB`, `code-block-languages` `0.75 MiB`, `emacs-lisp` `0.74 MiB`, `cpp` `0.60 MiB`), but the shared code-block module no longer imports `codeToHast` as a startup value.
+  - Validation passed: `bun test apps/desktop/runtime-dependencies.test.ts`, `bun run lint:fix`, `bun run --cwd apps/desktop typecheck`, `bun run lint`, and the compile-stats builds above.
 
 ---
 
