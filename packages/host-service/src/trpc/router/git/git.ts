@@ -23,6 +23,7 @@ import {
 	getDefaultBranchName,
 	resolveBaseComparison,
 } from "./utils/git-helpers";
+import { gitQueryCache } from "./utils/git-query-cache";
 import { getGitStatusSnapshot } from "./utils/git-status";
 import { gitStatusRefreshLimiter } from "./utils/git-status-refresh-limiter";
 import {
@@ -54,40 +55,69 @@ function assertSafeRelativePath(filePath: string): void {
 	}
 }
 
+const GIT_QUERY_CACHE_TTL_MS = 1_500;
+
+function cachedGitQuery<T>({
+	workspaceId,
+	requestKey,
+	run,
+}: {
+	workspaceId: string;
+	requestKey: string;
+	run: () => Promise<T>;
+}): Promise<T> {
+	return gitQueryCache.run({
+		workspaceId,
+		requestKey,
+		ttlMs: GIT_QUERY_CACHE_TTL_MS,
+		run,
+	});
+}
+
+function clearWorkspaceGitQueryCache(workspaceId: string): void {
+	gitQueryCache.clearWorkspace(workspaceId);
+}
+
 export const gitRouter = router({
 	listBranches: queryProcedure
 		.input(z.object({ workspaceId: z.string() }))
 		.query(async ({ ctx, input }) => {
-			const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
-			const git = await ctx.git(worktreePath);
+			return cachedGitQuery({
+				workspaceId: input.workspaceId,
+				requestKey: "listBranches",
+				run: async () => {
+					const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
+					const git = await ctx.git(worktreePath);
 
-			// `%(HEAD)` emits "*" for the checked-out branch, " " otherwise.
-			// Single spawn — independent of branch count. Only `name`/`isHead`
-			// are read by the v2 sidebar's BaseBranchSelector; the other
-			// per-branch fields the previous implementation computed (upstream,
-			// ahead/behind, last-commit) cost 4 spawns each and were unused.
-			let branches: { name: string; isHead: boolean }[] = [];
-			try {
-				const raw = await git.raw([
-					"for-each-ref",
-					"refs/heads/",
-					"--format=%(HEAD)\t%(refname:short)",
-				]);
-				branches = raw
-					.trim()
-					.split("\n")
-					.filter(Boolean)
-					.map((line) => {
-						const tab = line.indexOf("\t");
-						if (tab < 0) return { name: line, isHead: false };
-						return {
-							isHead: line.slice(0, tab) === "*",
-							name: line.slice(tab + 1),
-						};
-					});
-			} catch {}
+					// `%(HEAD)` emits "*" for the checked-out branch, " " otherwise.
+					// Single spawn — independent of branch count. Only `name`/`isHead`
+					// are read by the v2 sidebar's BaseBranchSelector; the other
+					// per-branch fields the previous implementation computed (upstream,
+					// ahead/behind, last-commit) cost 4 spawns each and were unused.
+					let branches: { name: string; isHead: boolean }[] = [];
+					try {
+						const raw = await git.raw([
+							"for-each-ref",
+							"refs/heads/",
+							"--format=%(HEAD)\t%(refname:short)",
+						]);
+						branches = raw
+							.trim()
+							.split("\n")
+							.filter(Boolean)
+							.map((line) => {
+								const tab = line.indexOf("\t");
+								if (tab < 0) return { name: line, isHead: false };
+								return {
+									isHead: line.slice(0, tab) === "*",
+									name: line.slice(tab + 1),
+								};
+							});
+					} catch {}
 
-			return { branches };
+					return { branches };
+				},
+			});
 		}),
 
 	getStatus: queryProcedure
@@ -101,19 +131,26 @@ export const gitRouter = router({
 		)
 		.query(async ({ ctx, input }) => {
 			const requestKey = JSON.stringify({
+				type: "status",
 				baseBranch: input.baseBranch ?? null,
 			});
-			return gitStatusRefreshLimiter.run({
+			return cachedGitQuery({
 				workspaceId: input.workspaceId,
 				requestKey,
-				priority: input.priority,
 				run: async () => {
-					const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
-					const git = await ctx.git(worktreePath);
-					return getGitStatusSnapshot({
-						git,
-						worktreePath,
-						baseBranch: input.baseBranch,
+					return gitStatusRefreshLimiter.run({
+						workspaceId: input.workspaceId,
+						requestKey,
+						priority: input.priority,
+						run: async () => {
+							const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
+							const git = await ctx.git(worktreePath);
+							return getGitStatusSnapshot({
+								git,
+								worktreePath,
+								baseBranch: input.baseBranch,
+							});
+						},
 					});
 				},
 			});
@@ -128,33 +165,42 @@ export const gitRouter = router({
 			}),
 		)
 		.query(async ({ ctx, input }) => {
-			const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
-			const git = await ctx.git(worktreePath);
+			return cachedGitQuery({
+				workspaceId: input.workspaceId,
+				requestKey: JSON.stringify({
+					type: "listCommits",
+					baseBranch: input.baseBranch ?? null,
+				}),
+				run: async () => {
+					const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
+					const git = await ctx.git(worktreePath);
 
-			const base = await resolveBaseComparison(git, input.baseBranch);
-			const baseRef = base?.baseRef ?? "HEAD";
+					const base = await resolveBaseComparison(git, input.baseBranch);
+					const baseRef = base?.baseRef ?? "HEAD";
 
-			const commits: Commit[] = [];
-			try {
-				const raw = await git.raw([
-					"log",
-					`${baseRef}..HEAD`,
-					"--format=%H\t%h\t%s\t%an\t%aI",
-				]);
-				for (const line of raw.trim().split("\n")) {
-					if (!line) continue;
-					const [hash, shortHash, message, author, date] = line.split("\t");
-					commits.push({
-						hash: hash ?? "",
-						shortHash: shortHash ?? "",
-						message: message ?? "",
-						author: author ?? "",
-						date: date ?? "",
-					});
-				}
-			} catch {}
+					const commits: Commit[] = [];
+					try {
+						const raw = await git.raw([
+							"log",
+							`${baseRef}..HEAD`,
+							"--format=%H\t%h\t%s\t%an\t%aI",
+						]);
+						for (const line of raw.trim().split("\n")) {
+							if (!line) continue;
+							const [hash, shortHash, message, author, date] = line.split("\t");
+							commits.push({
+								hash: hash ?? "",
+								shortHash: shortHash ?? "",
+								message: message ?? "",
+								author: author ?? "",
+								date: date ?? "",
+							});
+						}
+					} catch {}
 
-			return { commits };
+					return { commits };
+				},
+			});
 		}),
 
 	getCommitFiles: queryProcedure
@@ -179,20 +225,26 @@ export const gitRouter = router({
 	getBaseBranch: queryProcedure
 		.input(z.object({ workspaceId: z.string() }))
 		.query(async ({ ctx, input }) => {
-			const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
-			const git = await ctx.git(worktreePath);
-			const currentBranch = (
-				await git.revparse(["--abbrev-ref", "HEAD"]).catch(() => "")
-			).trim();
-			if (!currentBranch || currentBranch === "HEAD") {
-				return { baseBranch: null as string | null };
-			}
-			const configured = (
-				await git
-					.raw(["config", `branch.${currentBranch}.base`])
-					.catch(() => "")
-			).trim();
-			return { baseBranch: (configured || null) as string | null };
+			return cachedGitQuery({
+				workspaceId: input.workspaceId,
+				requestKey: "getBaseBranch",
+				run: async () => {
+					const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
+					const git = await ctx.git(worktreePath);
+					const currentBranch = (
+						await git.revparse(["--abbrev-ref", "HEAD"]).catch(() => "")
+					).trim();
+					if (!currentBranch || currentBranch === "HEAD") {
+						return { baseBranch: null as string | null };
+					}
+					const configured = (
+						await git
+							.raw(["config", `branch.${currentBranch}.base`])
+							.catch(() => "")
+					).trim();
+					return { baseBranch: (configured || null) as string | null };
+				},
+			});
 		}),
 
 	setBaseBranch: protectedProcedure
@@ -227,6 +279,7 @@ export const gitRouter = router({
 					`branch.${currentBranch}.base`,
 				]).catch(() => {});
 			}
+			clearWorkspaceGitQueryCache(input.workspaceId);
 			return { baseBranch: input.baseBranch };
 		}),
 
@@ -262,6 +315,7 @@ export const gitRouter = router({
 			}
 
 			await git.raw(["branch", "-m", input.oldName, input.newName]);
+			clearWorkspaceGitQueryCache(input.workspaceId);
 			return { name: input.newName };
 		}),
 
@@ -283,6 +337,7 @@ export const gitRouter = router({
 			} else {
 				await git.raw(["checkout", "HEAD", "--", input.filePath]);
 			}
+			clearWorkspaceGitQueryCache(input.workspaceId);
 			return { success: true };
 		}),
 
@@ -293,6 +348,7 @@ export const gitRouter = router({
 			const git = await ctx.git(worktreePath);
 			await git.raw(["checkout", "--", "."]);
 			await git.raw(["clean", "-fd"]);
+			clearWorkspaceGitQueryCache(input.workspaceId);
 			return { success: true };
 		}),
 
@@ -345,6 +401,7 @@ export const gitRouter = router({
 			for (const filePath of deletePaths) {
 				await rm(join(worktreePath, filePath), { force: true });
 			}
+			clearWorkspaceGitQueryCache(input.workspaceId);
 			return { success: true };
 		}),
 
@@ -354,6 +411,7 @@ export const gitRouter = router({
 			const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
 			const git = await ctx.git(worktreePath);
 			await git.raw(["add", "-A"]);
+			clearWorkspaceGitQueryCache(input.workspaceId);
 			return { success: true };
 		}),
 
@@ -363,6 +421,7 @@ export const gitRouter = router({
 			const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
 			const git = await ctx.git(worktreePath);
 			await git.raw(["reset", "HEAD"]);
+			clearWorkspaceGitQueryCache(input.workspaceId);
 			return { success: true };
 		}),
 
@@ -449,68 +508,74 @@ export const gitRouter = router({
 		.meta({ timeoutMs: 30_000 })
 		.input(z.object({ workspaceId: z.string() }))
 		.query(async ({ ctx, input }) => {
-			const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
-			const git = await ctx.git(worktreePath);
+			return cachedGitQuery({
+				workspaceId: input.workspaceId,
+				requestKey: "getBranchSyncStatus",
+				run: async () => {
+					const worktreePath = resolveWorktreePath(ctx, input.workspaceId);
+					const git = await ctx.git(worktreePath);
 
-			const currentBranch = (
-				await git.revparse(["--abbrev-ref", "HEAD"]).catch(() => "")
-			).trim();
-			const isDetached = !currentBranch || currentBranch === "HEAD";
+					const currentBranch = (
+						await git.revparse(["--abbrev-ref", "HEAD"]).catch(() => "")
+					).trim();
+					const isDetached = !currentBranch || currentBranch === "HEAD";
 
-			const defaultBranch = await getDefaultBranchName(git);
-			const isDefaultBranch =
-				!isDetached && !!defaultBranch && currentBranch === defaultBranch;
+					const defaultBranch = await getDefaultBranchName(git);
+					const isDefaultBranch =
+						!isDetached && !!defaultBranch && currentBranch === defaultBranch;
 
-			const remotes = await git.getRemotes(false).catch(() => []);
-			const hasRepo = remotes.length > 0;
+					const remotes = await git.getRemotes(false).catch(() => []);
+					const hasRepo = remotes.length > 0;
 
-			let hasUpstream = false;
-			let pushCount = 0;
-			let pullCount = 0;
-			try {
-				await git.raw(["rev-parse", "--abbrev-ref", "@{upstream}"]);
-				hasUpstream = true;
-				const tracking = await git.raw([
-					"rev-list",
-					"--left-right",
-					"--count",
-					"@{upstream}...HEAD",
-				]);
-				const [pullStr, pushStr] = tracking.trim().split(/\s+/);
-				pullCount = Number.parseInt(pullStr || "0", 10);
-				pushCount = Number.parseInt(pushStr || "0", 10);
-			} catch {
-				// no upstream — counts stay zero
-			}
+					let hasUpstream = false;
+					let pushCount = 0;
+					let pullCount = 0;
+					try {
+						await git.raw(["rev-parse", "--abbrev-ref", "@{upstream}"]);
+						hasUpstream = true;
+						const tracking = await git.raw([
+							"rev-list",
+							"--left-right",
+							"--count",
+							"@{upstream}...HEAD",
+						]);
+						const [pullStr, pushStr] = tracking.trim().split(/\s+/);
+						pullCount = Number.parseInt(pullStr || "0", 10);
+						pushCount = Number.parseInt(pushStr || "0", 10);
+					} catch {
+						// no upstream — counts stay zero
+					}
 
-			// Read working-tree status separately from branch info so a transient
-			// `git status` failure (e.g. lock contention during a concurrent
-			// operation) doesn't poison the whole sync read. Log on failure so it
-			// isn't silent — `hasUncommitted` defaults to false in that case
-			// because over-reporting "uncommitted" on every blip is more annoying
-			// than under-reporting briefly until the next refetch.
-			let hasUncommitted = false;
-			try {
-				const status = await git.status();
-				hasUncommitted = status.files.length > 0;
-			} catch (error) {
-				console.warn(
-					"[git/getBranchSyncStatus] git.status() failed; treating working tree as clean for this read",
-					error,
-				);
-			}
+					// Read working-tree status separately from branch info so a transient
+					// `git status` failure (e.g. lock contention during a concurrent
+					// operation) doesn't poison the whole sync read. Log on failure so it
+					// isn't silent — `hasUncommitted` defaults to false in that case
+					// because over-reporting "uncommitted" on every blip is more annoying
+					// than under-reporting briefly until the next refetch.
+					let hasUncommitted = false;
+					try {
+						const status = await git.status();
+						hasUncommitted = status.files.length > 0;
+					} catch (error) {
+						console.warn(
+							"[git/getBranchSyncStatus] git.status() failed; treating working tree as clean for this read",
+							error,
+						);
+					}
 
-			return {
-				hasRepo,
-				hasUpstream,
-				pushCount,
-				pullCount,
-				isDefaultBranch,
-				isDetached,
-				hasUncommitted,
-				currentBranch: isDetached ? null : currentBranch,
-				defaultBranch,
-			};
+					return {
+						hasRepo,
+						hasUpstream,
+						pushCount,
+						pullCount,
+						isDefaultBranch,
+						isDetached,
+						hasUncommitted,
+						currentBranch: isDetached ? null : currentBranch,
+						defaultBranch,
+					};
+				},
+			});
 		}),
 
 	getPullRequest: queryProcedure

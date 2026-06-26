@@ -11,16 +11,25 @@ import tsconfigPathsPlugin from "vite-tsconfig-paths";
 import { dependencies, resources, version } from "./package.json";
 import { mainExternalizedDependencies } from "./runtime-dependencies";
 import {
+	applyDesktopTargetEnvOverrides,
 	copyResourcesPlugin,
+	createDesktopApiProxy,
 	defineEnv,
 	devPath,
+	generatedOutputWatchIgnores,
 	htmlEnvTransformPlugin,
+	isCodeInspectorEnabled,
 } from "./vite/helpers";
 
 // override: true ensures .env values take precedence over inherited env vars
 config({ path: resolve(__dirname, "../../.env"), override: true, quiet: true });
+applyDesktopTargetEnvOverrides();
 
 const DEV_SERVER_PORT = Number(process.env.DESKTOP_VITE_PORT);
+const desktopApiProxy = createDesktopApiProxy(
+	process.env.SUPERSET_DESKTOP_PROXY_API_TARGET,
+	process.env.SUPERSET_DESKTOP_PROXY_ORIGIN,
+);
 
 // Validate required env vars at build time using the Zod schema (single source of truth)
 await import("./src/main/env.main");
@@ -45,6 +54,14 @@ const sentryPlugin = process.env.SENTRY_AUTH_TOKEN
 			project: "desktop",
 			authToken: process.env.SENTRY_AUTH_TOKEN,
 			release: { name: version },
+		})
+	: null;
+const codeInspectorVitePlugin = isCodeInspectorEnabled()
+	? codeInspectorPlugin({
+			bundler: "vite",
+			hotKeys: ["altKey"],
+			hideConsole: true,
+			port: Number(process.env.CODE_INSPECTOR_PORT) || undefined,
 		})
 	: null;
 
@@ -106,6 +123,9 @@ export default defineConfig({
 		build: {
 			sourcemap: buildSourcemap,
 			rollupOptions: {
+				watch: {
+					exclude: generatedOutputWatchIgnores,
+				},
 				input: {
 					index: resolve("src/main/index.ts"),
 					// Terminal host daemon process - runs separately for terminal persistence
@@ -160,6 +180,9 @@ export default defineConfig({
 		build: {
 			outDir: resolve(devPath, "preload"),
 			rollupOptions: {
+				watch: {
+					exclude: generatedOutputWatchIgnores,
+				},
 				input: {
 					index: resolve("src/preload/index.ts"),
 				},
@@ -223,6 +246,10 @@ export default defineConfig({
 		server: {
 			port: DEV_SERVER_PORT,
 			strictPort: false,
+			...(desktopApiProxy ? { proxy: desktopApiProxy } : {}),
+			watch: {
+				ignored: generatedOutputWatchIgnores,
+			},
 		},
 
 		plugins: [
@@ -238,12 +265,7 @@ export default defineConfig({
 			}),
 			tsconfigPaths,
 			tailwindcss(),
-			codeInspectorPlugin({
-				bundler: "vite",
-				hotKeys: ["altKey"],
-				hideConsole: true,
-				port: Number(process.env.CODE_INSPECTOR_PORT) || undefined,
-			}),
+			...(codeInspectorVitePlugin ? [codeInspectorVitePlugin] : []),
 			reactPlugin(),
 			htmlEnvTransformPlugin(),
 		],
@@ -259,6 +281,9 @@ export default defineConfig({
 			outDir: resolve(devPath, "renderer"),
 
 			rollupOptions: {
+				watch: {
+					exclude: generatedOutputWatchIgnores,
+				},
 				plugins: [
 					injectProcessEnvPlugin({
 						NODE_ENV: "production",

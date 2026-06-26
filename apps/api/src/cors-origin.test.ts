@@ -5,6 +5,7 @@ describe("API CORS origins", () => {
 	test("does not allow arbitrary credentialed localhost origins in production", () => {
 		expect(
 			isAllowedCorsOrigin({
+				allowLocalhost: false,
 				allowedOrigins: ["https://app.superset.sh"],
 				nodeEnv: "production",
 				origin: "http://localhost:48733",
@@ -12,6 +13,7 @@ describe("API CORS origins", () => {
 		).toBe(false);
 		expect(
 			isAllowedCorsOrigin({
+				allowLocalhost: false,
 				allowedOrigins: ["https://app.superset.sh"],
 				nodeEnv: "production",
 				origin: "http://127.0.0.1:48733",
@@ -32,6 +34,17 @@ describe("API CORS origins", () => {
 				allowedOrigins: ["http://localhost:48733"],
 				nodeEnv: "production",
 				origin: "http://localhost:48733",
+			}),
+		).toBe(true);
+	});
+
+	test("allows localhost origins for explicit online-like local services", () => {
+		expect(
+			isAllowedCorsOrigin({
+				allowLocalhost: true,
+				allowedOrigins: ["https://app.superset.sh"],
+				nodeEnv: "production",
+				origin: "http://localhost:3280",
 			}),
 		).toBe(true);
 	});

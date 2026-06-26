@@ -48,6 +48,7 @@ import {
 interface BackgroundTerminalsButtonProps {
 	workspaceId: string;
 	store: StoreApi<WorkspaceStore<PaneViewerData>>;
+	sidebarOpen: boolean;
 }
 
 /**
@@ -60,6 +61,7 @@ export const BackgroundTerminalsButton = memo(
 	function BackgroundTerminalsButton({
 		workspaceId,
 		store,
+		sidebarOpen,
 	}: BackgroundTerminalsButtonProps) {
 		const [isOpen, setIsOpen] = useState(false);
 		const attachedTerminalIdsKey = useStore(store, (s) =>
@@ -105,14 +107,18 @@ export const BackgroundTerminalsButton = memo(
 		const sessionsInput = useMemo(() => ({ workspaceId }), [workspaceId]);
 		const utils = workspaceTrpc.useUtils();
 		const killSession = workspaceTrpc.terminal.killSession.useMutation();
+		const countPollingEnabled = !isOpen && sidebarOpen;
 		const backgroundCountQuery =
 			workspaceTrpc.terminal.countBackgroundSessions.useQuery(
 				backgroundCountInput,
 				{
-					enabled: !isOpen,
+					enabled: countPollingEnabled,
 					notifyOnChangeProps: ["data", "dataUpdatedAt"],
-					refetchInterval: getBackgroundTerminalCountRefetchInterval(isOpen),
-					refetchOnWindowFocus: false,
+					refetchInterval: getBackgroundTerminalCountRefetchInterval({
+						isMenuOpen: isOpen,
+						sidebarOpen,
+					}),
+					refetchOnWindowFocus: countPollingEnabled,
 					staleTime: 5_000,
 				},
 			);
@@ -301,5 +307,9 @@ function areBackgroundTerminalsButtonPropsEqual(
 	prev: BackgroundTerminalsButtonProps,
 	next: BackgroundTerminalsButtonProps,
 ) {
-	return prev.workspaceId === next.workspaceId && prev.store === next.store;
+	return (
+		prev.workspaceId === next.workspaceId &&
+		prev.store === next.store &&
+		prev.sidebarOpen === next.sidebarOpen
+	);
 }

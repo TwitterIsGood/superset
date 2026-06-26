@@ -1,6 +1,12 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { drizzle } from "drizzle-orm/bun-sqlite";
@@ -112,7 +118,25 @@ mock.module("mastracode", () => ({
 	createMastraCode: createMastraCodeMock,
 }));
 
+mock.module("@mastra/memory", () => ({
+	Memory: class TestMemory {},
+}));
+
 const { ChatRuntimeManager } = await import("./chat");
+
+function readChatRuntimeSource(): string {
+	return readFileSync(join(import.meta.dirname, "chat.ts"), "utf8");
+}
+
+function staticImportSpecifiers(source: string): string[] {
+	const importDeclarations =
+		source.match(/import(?:[\s\S]*?)from\s+["'][^"']+["'];/g) ?? [];
+	return importDeclarations.flatMap((declaration) => {
+		if (declaration.startsWith("import type")) return [];
+		const match = declaration.match(/from\s+["']([^"']+)["'];/);
+		return match?.[1] ? [match[1]] : [];
+	});
+}
 
 function createTestDb(): HostDb {
 	const sqlite = new Database(":memory:");
@@ -153,6 +177,20 @@ function seedWorkspace(db: HostDb, workspacePath: string): void {
 		})
 		.run();
 }
+
+describe("ChatRuntimeManager dependency boundary", () => {
+	it("keeps MastraCode runtime modules out of top-level value imports", () => {
+		const source = readChatRuntimeSource();
+
+		expect(staticImportSpecifiers(source)).not.toEqual(
+			expect.arrayContaining(["@mastra/memory", "mastracode"]),
+		);
+		expect(source).toContain("SUPERSET_MASTRACODE_RUNTIME_IMPORT_PATH");
+		expect(source).toContain("SUPERSET_MASTRA_MEMORY_IMPORT_PATH");
+		expect(source).toContain("loadMastracodeRuntimeModules");
+		expect(source).toContain("pathToFileURL");
+	});
+});
 
 describe("ChatRuntimeManager model provider integration", () => {
 	let envSnapshot: Partial<Record<EnvKey, string | undefined>>;

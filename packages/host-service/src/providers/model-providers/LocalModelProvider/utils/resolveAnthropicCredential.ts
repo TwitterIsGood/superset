@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
-import { createAuthStorage } from "mastracode";
+import { createSupersetAuthStorage } from "@superset/chat/server/desktop/auth-storage";
 import type { LocalResolvedCredential } from "./credentials";
 import { isObjectRecord } from "./credentials";
 
@@ -84,7 +84,7 @@ function getAnthropicCredentialFromKeychain(): LocalResolvedCredential | null {
 
 async function getAnthropicCredentialFromAuthStorage(): Promise<LocalResolvedCredential | null> {
 	try {
-		const authStorage = createAuthStorage();
+		const authStorage = createSupersetAuthStorage();
 		authStorage.reload();
 		const credential = authStorage.get(ANTHROPIC_PROVIDER_ID);
 		if (!isObjectRecord(credential)) return null;

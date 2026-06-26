@@ -69,7 +69,10 @@ export function DashboardSidebarProjectSection({
 				onRemoveFromSidebar={confirmRemoveFromSidebar}
 				onRename={startRename}
 			>
-				<div className={cn("border-b border-border last:border-b-0")}>
+				<div
+					data-dashboard-sidebar-project-section={project.id}
+					className={cn("border-b border-border last:border-b-0")}
+				>
 					<DashboardSidebarCollapsedProjectContent
 						projectName={project.name}
 						iconUrl={project.iconUrl}
@@ -86,7 +89,10 @@ export function DashboardSidebarProjectSection({
 	}
 
 	return (
-		<div className={cn("border-b border-border last:border-b-0")}>
+		<div
+			data-dashboard-sidebar-project-section={project.id}
+			className={cn("border-b border-border last:border-b-0")}
+		>
 			<DashboardSidebarProjectContextMenu
 				onCreateSection={handleNewSection}
 				onOpenInFinder={handleOpenInFinder}
@@ -107,6 +113,7 @@ export function DashboardSidebarProjectSection({
 					onStartRename={startRename}
 					onToggleCollapse={() => onToggleCollapse(project.id)}
 					onNewWorkspace={handleNewWorkspace}
+					data-dashboard-sidebar-project-row={project.id}
 					{...(dragHandleAttributes ?? {})}
 					{...(dragHandleListeners ?? {})}
 				/>

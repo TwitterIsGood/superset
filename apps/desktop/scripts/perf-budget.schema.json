@@ -1,0 +1,161 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"title": "Superset Desktop Performance Budget",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["packageSize"],
+	"properties": {
+		"$schema": {
+			"type": "string"
+		},
+		"packageSize": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["releaseArtifacts"],
+			"properties": {
+				"notes": {
+					"type": "string"
+				},
+				"releaseArtifacts": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["dmg", "zip", "AppImage"],
+					"properties": {
+						"dmg": {
+							"$ref": "#/$defs/byteBudget"
+						},
+						"zip": {
+							"$ref": "#/$defs/byteBudget"
+						},
+						"AppImage": {
+							"$ref": "#/$defs/byteBudget"
+						}
+					}
+				}
+			}
+		},
+		"startup": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"notes": {
+					"type": "string"
+				},
+				"required": {
+					"type": "boolean"
+				},
+				"maxRegressionPercent": {
+					"type": "number",
+					"minimum": 0
+				},
+				"baselinePath": {
+					"type": "string"
+				},
+				"marks": {
+					"type": "object",
+					"additionalProperties": {
+						"$ref": "#/$defs/millisecondBudget"
+					}
+				}
+			}
+		},
+		"runtime": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"notes": {
+					"type": "string"
+				},
+				"processTree": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"desktopMemory": {
+							"$ref": "#/$defs/byteBudget"
+						},
+						"allMemory": {
+							"$ref": "#/$defs/byteBudget"
+						},
+						"desktopProcessCount": {
+							"$ref": "#/$defs/countBudget"
+						},
+						"allProcessCount": {
+							"$ref": "#/$defs/countBudget"
+						}
+					}
+				},
+				"renderer": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"domNodes": {
+							"$ref": "#/$defs/countBudget"
+						},
+						"usedJsHeap": {
+							"$ref": "#/$defs/byteBudget"
+						},
+						"consoleErrors": {
+							"$ref": "#/$defs/countBudget"
+						}
+					}
+				},
+				"routes": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"openDuration": {
+							"$ref": "#/$defs/millisecondBudget"
+						}
+					}
+				}
+			}
+		}
+	},
+	"$defs": {
+		"byteBudget": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["maxBytes"],
+			"properties": {
+				"maxBytes": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				},
+				"targetBytes": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				}
+			}
+		},
+		"millisecondBudget": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["maxMs"],
+			"properties": {
+				"maxMs": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				},
+				"targetMs": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				}
+			}
+		},
+		"countBudget": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["max"],
+			"properties": {
+				"max": {
+					"type": "number",
+					"minimum": 0
+				},
+				"target": {
+					"type": "number",
+					"minimum": 0
+				}
+			}
+		}
+	}
+}

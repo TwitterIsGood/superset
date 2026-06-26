@@ -9,6 +9,7 @@ export type PullRequest = NonNullable<RouterOutputs["git"]["getPullRequest"]>;
 export type UnavailableReason = "no-repo" | "default-branch" | "detached-head";
 
 export type PRFlowState =
+	| { kind: "idle" }
 	| { kind: "loading" }
 	| { kind: "unavailable"; reason: UnavailableReason }
 	| { kind: "no-pr"; sync: BranchSyncStatus }
@@ -70,6 +71,7 @@ export type ActionButtonVariant =
 
 export function selectActionButton(state: PRFlowState): ActionButtonVariant {
 	switch (state.kind) {
+		case "idle":
 		case "loading":
 			return { kind: "hidden" };
 		case "unavailable":
@@ -116,6 +118,7 @@ export function selectPRLink(state: PRFlowState): PRLinkVariant {
 
 export function selectStatusBadge(state: PRFlowState): string | null {
 	switch (state.kind) {
+		case "idle":
 		case "loading":
 			return null;
 		case "unavailable":

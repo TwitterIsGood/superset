@@ -1,23 +1,24 @@
 import { app } from "electron";
 import { env } from "main/env.main";
 import { PostHog } from "posthog-node";
-import { DEFAULT_TELEMETRY_ENABLED } from "shared/constants";
+import { shouldTrackAnalytics } from "./telemetry-gate";
+import { isTelemetryEnabled } from "./telemetry-settings";
 
 export let posthog: PostHog | null = null;
 let userId: string | null = null;
 
 function getClient(): PostHog | null {
+	if (posthog) return posthog;
+
 	if (!env.NEXT_PUBLIC_POSTHOG_KEY) {
 		return null;
 	}
 
-	if (!posthog) {
-		posthog = new PostHog(env.NEXT_PUBLIC_POSTHOG_KEY, {
-			host: env.NEXT_PUBLIC_POSTHOG_HOST,
-			flushAt: 1,
-			flushInterval: 0,
-		});
-	}
+	posthog = new PostHog(env.NEXT_PUBLIC_POSTHOG_KEY, {
+		host: env.NEXT_PUBLIC_POSTHOG_HOST,
+		flushAt: 1,
+		flushInterval: 0,
+	});
 	return posthog;
 }
 
@@ -29,10 +30,6 @@ export function getUserId(): string | null {
 	return userId;
 }
 
-function isTelemetryEnabled(): boolean {
-	return DEFAULT_TELEMETRY_ENABLED;
-}
-
 export function setUserId(id: string | null): void {
 	userId = id;
 }
@@ -41,8 +38,9 @@ export function track(
 	event: string,
 	properties?: Record<string, unknown>,
 ): void {
-	if (!userId) return;
-	if (!isTelemetryEnabled()) return;
+	if (!shouldTrackAnalytics(userId, isTelemetryEnabled())) {
+		return;
+	}
 
 	const client = getClient();
 	if (client) {

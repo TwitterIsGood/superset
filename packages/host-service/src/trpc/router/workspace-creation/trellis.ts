@@ -10,7 +10,15 @@ import {
 	writeFile,
 } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { basename, delimiter, dirname, isAbsolute, join } from "node:path";
+import {
+	basename,
+	delimiter,
+	dirname,
+	isAbsolute,
+	join,
+	resolve,
+	sep,
+} from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
 import { protectedProcedure } from "../../index";
@@ -509,9 +517,64 @@ export function resolveUnpackedAsarPath(
 	return unpackedPath !== path && exists(unpackedPath) ? unpackedPath : path;
 }
 
-export function resolveTrellisBinPath(): string {
+export function resolveTrellisBinPathFromPack(
+	runtimePackPath: string | undefined,
+	exists: (candidate: string) => boolean = existsSync,
+): string | null {
+	const packPath = runtimePackPath?.trim();
+	if (!packPath) return null;
+
+	const candidates = [
+		join(
+			packPath,
+			"node_modules",
+			"@mindfoldhq",
+			"trellis",
+			"bin",
+			"trellis.js",
+		),
+		join(packPath, "bin", "trellis.js"),
+	];
+
+	const packRoot = resolve(packPath);
+	const packRootWithSeparator = packRoot.endsWith(sep)
+		? packRoot
+		: `${packRoot}${sep}`;
+	for (const candidate of candidates) {
+		const resolved = resolve(candidate);
+		if (resolved !== packRoot && !resolved.startsWith(packRootWithSeparator)) {
+			continue;
+		}
+		if (exists(resolved)) return resolved;
+	}
+
+	return null;
+}
+
+export function resolveTrellisBinPath(
+	args: {
+		runtimePackPath?: string;
+		exists?: (candidate: string) => boolean;
+	} = {},
+): string {
 	const override = process.env.SUPERSET_TRELLIS_BIN_PATH?.trim();
 	if (override) return override;
+
+	const packedRuntime = resolveTrellisBinPathFromPack(
+		args.runtimePackPath,
+		args.exists,
+	);
+	if (packedRuntime) return packedRuntime;
+
+	const allowBundledFallback =
+		process.env.SUPERSET_ALLOW_BUNDLED_TRELLIS_RUNTIME === "true" ||
+		process.env.NODE_ENV === "development" ||
+		process.env.NODE_ENV === "test";
+	if (!allowBundledFallback) {
+		throw new Error(
+			"Guided workflow runtime pack is not installed. Download the Trellis runtime pack and retry.",
+		);
+	}
 
 	const require = createRequire(import.meta.url);
 	const packageJsonPath = require.resolve("@mindfoldhq/trellis/package.json");
@@ -570,6 +633,7 @@ export async function applyTrellisSetup(args: {
 	platforms?: readonly TrellisPlatform[];
 	runner?: TrellisCommandRunner;
 	trellisBinPath?: string;
+	trellisRuntimePackPath?: string;
 	timeoutMs?: number;
 }): Promise<TrellisSetupResult> {
 	const before = await getTrellisStatusAtPath(args.worktreePath);
@@ -611,7 +675,11 @@ export async function applyTrellisSetup(args: {
 
 	try {
 		const runner = args.runner ?? defaultTrellisCommandRunner;
-		const trellisBinPath = args.trellisBinPath ?? resolveTrellisBinPath();
+		const trellisBinPath =
+			args.trellisBinPath ??
+			resolveTrellisBinPath({
+				runtimePackPath: args.trellisRuntimePackPath,
+			});
 		const runtimeCommand = await resolveTrellisRuntimeCommand();
 		await runner({
 			command: runtimeCommand,

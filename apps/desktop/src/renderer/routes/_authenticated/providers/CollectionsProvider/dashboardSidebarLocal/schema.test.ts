@@ -12,6 +12,7 @@ describe("healV2UserPreferences", () => {
 		expect(healV2UserPreferences(undefined)).toEqual(
 			DEFAULT_V2_USER_PREFERENCES,
 		);
+		expect(DEFAULT_V2_USER_PREFERENCES.rightSidebarOpen).toBe(false);
 	});
 
 	it("preserves stored top-level fields and fills missing ones", () => {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+	putObjectStorageObject,
 	readCapabilityArtifactReference,
 	storeCapabilityArtifact,
 } from "./artifact-storage";
@@ -56,6 +57,35 @@ afterEach(() => {
 });
 
 describe("capability artifact storage", () => {
+	test("uploads generic object-storage objects with signed S3 PUT", async () => {
+		configureObjectStorage();
+		const calls: Array<{ url: string; method: string; headers: Headers }> = [];
+		globalThis.fetch = async (input, init) => {
+			calls.push({
+				url: input.toString(),
+				method: init?.method ?? "GET",
+				headers: new Headers(init?.headers),
+			});
+			return new Response(null, { status: 200 });
+		};
+
+		await putObjectStorageObject({
+			key: "packs/trellis-runtime/1.0.0/manifest.json",
+			body: new TextEncoder().encode("{}"),
+			contentType: "application/json",
+		});
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0]).toMatchObject({
+			method: "PUT",
+			url: "http://127.0.0.1:9000/superset-artifacts/packs/trellis-runtime/1.0.0/manifest.json",
+		});
+		expect(calls[0]?.headers.get("content-type")).toBe("application/json");
+		expect(calls[0]?.headers.get("authorization")).toContain(
+			"AWS4-HMAC-SHA256",
+		);
+	});
+
 	test("stores object-storage artifacts behind an internal reference", async () => {
 		configureObjectStorage();
 		const calls: Array<{ url: string; method: string; headers: Headers }> = [];

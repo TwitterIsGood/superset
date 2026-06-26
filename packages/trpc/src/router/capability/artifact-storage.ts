@@ -262,22 +262,38 @@ async function s3Request(args: {
 	});
 }
 
+export function isObjectStorageConfigured(): boolean {
+	return getObjectStorageConfig() !== null;
+}
+
+export async function putObjectStorageObject(args: {
+	key: string;
+	body: Uint8Array;
+	contentType?: string;
+}): Promise<void> {
+	const response = await s3Request({
+		method: "PUT",
+		key: normalizeCapabilityArtifactPathname(args.key),
+		body: args.body,
+		contentType: args.contentType,
+	});
+	if (!response.ok) {
+		throw new Error(
+			`Object storage upload failed for ${args.key} with HTTP ${response.status}.`,
+		);
+	}
+}
+
 async function putObjectArtifact(args: {
 	pathname: string;
 	archiveBuffer: Buffer;
 }): Promise<StoredCapabilityArtifact> {
 	const pathname = normalizeCapabilityArtifactPathname(args.pathname);
-	const response = await s3Request({
-		method: "PUT",
+	await putObjectStorageObject({
 		key: pathname,
-		body: new Uint8Array(args.archiveBuffer),
+		body: args.archiveBuffer,
 		contentType: "application/zip",
 	});
-	if (!response.ok) {
-		throw new Error(
-			`Capability artifact object storage upload failed with HTTP ${response.status}.`,
-		);
-	}
 
 	return {
 		url: capabilityArtifactReference(pathname),

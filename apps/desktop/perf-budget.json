@@ -1,0 +1,76 @@
+{
+	"$schema": "./scripts/perf-budget.schema.json",
+	"packageSize": {
+		"notes": "Phase 0 regression guard. maxBytes is intentionally loose until the first measured canary baseline is recorded; targetBytes is the intended post-resource-pack direction.",
+		"releaseArtifacts": {
+			"dmg": {
+				"maxBytes": 1073741824,
+				"targetBytes": 419430400
+			},
+			"zip": {
+				"maxBytes": 1288490188,
+				"targetBytes": 524288000
+			},
+			"AppImage": {
+				"maxBytes": 1073741824,
+				"targetBytes": 419430400
+			}
+		}
+	},
+	"startup": {
+		"notes": "Phase 0 regression guard for packaged-app startup marks. Replace perf-baseline.json with measured canary values after the first baseline capture.",
+		"required": true,
+		"maxRegressionPercent": 15,
+		"baselinePath": "./perf-baseline.json",
+		"marks": {
+			"main-window:first-show": {
+				"maxMs": 5000,
+				"targetMs": 2000
+			},
+			"main-window:renderer-did-finish-load": {
+				"maxMs": 4500,
+				"targetMs": 1800
+			}
+		}
+	},
+	"runtime": {
+		"notes": "Phase 0 dev/canary process-tree guard. maxBytes is intentionally loose until measured baselines are checked in; targets capture the requested steady-state direction.",
+		"processTree": {
+			"desktopMemory": {
+				"maxBytes": 8589934592,
+				"targetBytes": 4294967296
+			},
+			"allMemory": {
+				"maxBytes": 10737418240,
+				"targetBytes": 6442450944
+			},
+			"desktopProcessCount": {
+				"max": 40,
+				"target": 24
+			},
+			"allProcessCount": {
+				"max": 60,
+				"target": 36
+			}
+		},
+		"renderer": {
+			"domNodes": {
+				"max": 30000,
+				"target": 15000
+			},
+			"usedJsHeap": {
+				"maxBytes": 2147483648,
+				"targetBytes": 1073741824
+			},
+			"consoleErrors": {
+				"max": 0
+			}
+		},
+		"routes": {
+			"openDuration": {
+				"maxMs": 5000,
+				"targetMs": 2000
+			}
+		}
+	}
+}

@@ -78,6 +78,7 @@ apply_public_env_defaults() {
 apply_online_env() {
 	export NODE_ENV="development"
 	export SUPERSET_ONLINE_SERVICE="1"
+	export SUPERSET_ALLOW_LOCALHOST_CORS="1"
 	export SUPERSET_HOME_DIR="${SUPERSET_ONLINE_HOME_DIR:-$RUN_DIR/superset-home}"
 	export SUPERSET_NEXT_DIST_DIR=".next-online"
 	export SKIP_ENV_VALIDATION="${SKIP_ENV_VALIDATION:-}"
@@ -178,14 +179,70 @@ compose() {
 		"$@"
 }
 
+compose_build_args_for_data_services() {
+	if [[ "${SUPERSET_ONLINE_REBUILD_DATA:-0}" == "1" ]]; then
+		printf '%s\n' "--build"
+		return
+	fi
+
+	if ! docker image inspect superset-local-kv-rest:latest >/dev/null 2>&1; then
+		log "superset-local-kv-rest:latest is missing; building data service image" >&2
+		printf '%s\n' "--build"
+	fi
+}
+
+run_minio_init() {
+	local attempts="${SUPERSET_ONLINE_MINIO_INIT_ATTEMPTS:-30}"
+	if compose run --rm \
+		-e MINIO_INIT_ATTEMPTS="$attempts" \
+		-e NO_PROXY="localhost,127.0.0.1,minio" \
+		-e no_proxy="localhost,127.0.0.1,minio" \
+		--entrypoint /bin/sh minio-init -c '
+attempt=1
+while [ "$attempt" -le "${MINIO_INIT_ATTEMPTS:-30}" ]; do
+  if mc alias set superset http://minio:9000 "${MINIO_ROOT_USER:-superset}" "${MINIO_ROOT_PASSWORD:-superset-local-artifacts}"; then
+    mc mb --ignore-existing "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}" &&
+      mc anonymous set none "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}" &&
+      mc anonymous set download "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}/packs"
+    exit $?
+  fi
+  sleep 1
+  attempt=$((attempt + 1))
+done
+exit 1
+'; then
+		log "minio artifact bucket ready"
+	else
+		log "minio artifact bucket initialization did not complete; S3-dependent flows may need retry"
+	fi
+}
+
 start_data_services() {
 	log "starting isolated Docker data services on 430xx ports"
 	wait_for_docker "${ONLINE_DOCKER_WAIT_ATTEMPTS:-300}"
-	if ! compose up -d --build --wait postgres neon-proxy electric redis kv-rest minio; then
-		log "docker compose --wait failed or is unsupported; falling back to detached startup"
-		compose up -d --build postgres neon-proxy electric redis kv-rest minio
+	local build_args=()
+	while IFS= read -r build_arg; do
+		[[ -n "$build_arg" ]] && build_args+=("$build_arg")
+	done < <(compose_build_args_for_data_services)
+
+	local services=("postgres" "neon-proxy" "electric" "redis" "kv-rest" "minio")
+	local up_ok=0
+	if [[ "${#build_args[@]}" -gt 0 ]]; then
+		compose up -d "${build_args[@]}" --wait "${services[@]}" || up_ok=$?
+	else
+		compose up -d --wait "${services[@]}" || up_ok=$?
 	fi
-	compose run --rm minio-init
+
+	if [[ "$up_ok" -ne 0 ]]; then
+		log "docker compose --wait failed or is unsupported; falling back to detached startup"
+		if [[ "${#build_args[@]}" -gt 0 ]]; then
+			compose up -d "${build_args[@]}" "${services[@]}"
+		else
+			compose up -d "${services[@]}"
+		fi
+	fi
+	compose rm -sf minio-init >/dev/null 2>&1 || true
+	run_minio_init
 }
 
 db_proxy_query_ok() {
@@ -225,6 +282,28 @@ run_migrations_and_seed() {
 		log "ensuring development admin account exists"
 		bun run --cwd "$ROOT_DIR" db:seed-dev
 	fi
+}
+
+desktop_perf_fixture_args() {
+	printf '%s\n' \
+		"--slug" "${SUPERSET_ONLINE_FIXTURE_SLUG:-desktop-perf-loaded}" \
+		"--projects" "${SUPERSET_ONLINE_FIXTURE_PROJECTS:-10}" \
+		"--workspaces-per-project" "${SUPERSET_ONLINE_FIXTURE_WORKSPACES_PER_PROJECT:-20}" \
+		"--tasks" "${SUPERSET_ONLINE_FIXTURE_TASKS:-300}" \
+		"--host-backed-workspaces" "${SUPERSET_ONLINE_FIXTURE_HOST_BACKED_WORKSPACES:-0}"
+}
+
+ensure_desktop_perf_fixture_if_requested() {
+	if [[ "${SUPERSET_ONLINE_LOAD_FIXTURE:-0}" != "1" ]]; then
+		return
+	fi
+
+	log "ensuring loaded desktop performance fixture"
+	local args=()
+	while IFS= read -r arg; do
+		args+=("$arg")
+	done < <(desktop_perf_fixture_args)
+	NODE_ENV=development bun run --cwd "$ROOT_DIR" desktop:perf-fixture -- ensure "${args[@]}"
 }
 
 query_online_schema_missing() {
@@ -474,6 +553,39 @@ probe_online_schema_guard() {
 	fi
 }
 
+print_desktop_perf_fixture_status() {
+	echo "dense desktop fixture:"
+	if ! db_proxy_query_ok; then
+		printf '  - %-24s %s\n' "desktop-perf-loaded" "database unavailable"
+		return
+	fi
+
+	local args=()
+	while IFS= read -r arg; do
+		args+=("$arg")
+	done < <(desktop_perf_fixture_args)
+
+	local output
+	if ! output="$(NODE_ENV=development bun run --cwd "$ROOT_DIR" desktop:perf-fixture -- stats "${args[@]}" 2>/dev/null)"; then
+		printf '  ✗ %-24s %s\n' "desktop-perf-loaded" "stats failed"
+		return
+	fi
+
+	if command -v jq >/dev/null 2>&1; then
+		local summary
+		summary="$(
+			printf '%s' "$output" | jq -r \
+				'"\(.slug): \(.projectCount) projects / \(.workspaceCount) workspaces / \(.taskCount) tasks / \(.hostBackedWorkspaceCount) host-backed (loaded=\(.isLoaded))"'
+		)"
+		printf '  %s\n' "$summary"
+		if [[ "$(printf '%s' "$output" | jq -r '.isLoaded')" != "true" ]]; then
+			printf '  ! %-24s %s\n' "loaded data" "run: bun run online:start:loaded"
+		fi
+	else
+		printf '  %s\n' "$(printf '%s' "$output" | tr '\n' ' ' | sed 's/[[:space:]][[:space:]]*/ /g')"
+	fi
+}
+
 wait_for_probe() {
 	local label="$1"
 	local url="$2"
@@ -568,6 +680,8 @@ print_status() {
 	probe_url "public api session" "${PUBLIC_API_URL}/api/auth/get-session" "200"
 	probe_url "public electric" "${PUBLIC_ELECTRIC_URL}/v1/shape" "401"
 	probe_url "public relay health" "${PUBLIC_RELAY_URL}/health" "200"
+	echo
+	print_desktop_perf_fixture_status
 }
 
 write_launch_agent() {
@@ -645,6 +759,7 @@ start_all() {
 	wait_for_db_proxy_query
 	wait_for_object_storage
 	run_migrations_and_seed
+	ensure_desktop_perf_fixture_if_requested
 	start_app_services
 	wait_for_local_services
 	print_status

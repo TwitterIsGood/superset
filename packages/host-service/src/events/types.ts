@@ -124,4 +124,28 @@ export interface FsUnwatchCommand {
 	workspaceId: string;
 }
 
-export type ClientMessage = FsWatchCommand | FsUnwatchCommand;
+export type SubscribableServerEventType =
+	| "git:changed"
+	| "agent:lifecycle"
+	| "terminal:lifecycle"
+	| "port:changed"
+	| "workspace:create-progress"
+	| "project:create-progress";
+
+export interface SubscribeCommand {
+	type: "subscribe";
+	event: SubscribableServerEventType;
+	workspaceId: string | "*";
+}
+
+export interface UnsubscribeCommand {
+	type: "unsubscribe";
+	event: SubscribableServerEventType;
+	workspaceId: string | "*";
+}
+
+export type ClientMessage =
+	| FsWatchCommand
+	| FsUnwatchCommand
+	| SubscribeCommand
+	| UnsubscribeCommand;

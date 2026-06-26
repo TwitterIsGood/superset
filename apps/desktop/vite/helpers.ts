@@ -18,13 +18,13 @@ export function resolveEnvValue(
 	return normalizeEnvValue(value) ?? fallback;
 }
 
-function copyDir({ src, dest }: { src: string; dest: string }): void {
+function copyPath({ src, dest }: { src: string; dest: string }): void {
 	if (!existsSync(src)) return;
 
 	if (existsSync(dest)) {
 		rmSync(dest, { recursive: true });
 	}
-	mkdirSync(dest, { recursive: true });
+	mkdirSync(dirname(dest), { recursive: true });
 	cpSync(src, dest, { recursive: true });
 }
 
@@ -34,6 +34,127 @@ export function defineEnv(
 ): string {
 	return JSON.stringify(normalizeEnvValue(value) ?? fallback);
 }
+
+type MutableEnv = Record<string, string | undefined>;
+
+const DESKTOP_TARGET_ENV_OVERRIDES = [
+	{
+		target: "NEXT_PUBLIC_API_URL",
+		sources: [
+			"SUPERSET_DESKTOP_TARGET_API_URL",
+			"WORKTREE_DEV_EXTERNAL_API_URL",
+		],
+	},
+	{
+		target: "NEXT_PUBLIC_ELECTRIC_URL",
+		sources: [
+			"SUPERSET_DESKTOP_TARGET_ELECTRIC_URL",
+			"WORKTREE_DEV_EXTERNAL_ELECTRIC_URL",
+		],
+	},
+	{
+		target: "NEXT_PUBLIC_ELECTRIC_PROXY_URL",
+		sources: [
+			"SUPERSET_DESKTOP_TARGET_ELECTRIC_URL",
+			"WORKTREE_DEV_EXTERNAL_ELECTRIC_URL",
+		],
+	},
+	{
+		target: "RELAY_URL",
+		sources: [
+			"SUPERSET_DESKTOP_TARGET_RELAY_URL",
+			"WORKTREE_DEV_EXTERNAL_RELAY_URL",
+		],
+	},
+	{
+		target: "NEXT_PUBLIC_RELAY_URL",
+		sources: [
+			"SUPERSET_DESKTOP_TARGET_RELAY_URL",
+			"WORKTREE_DEV_EXTERNAL_RELAY_URL",
+		],
+	},
+	{
+		target: "NEXT_PUBLIC_WEB_URL",
+		sources: [
+			"SUPERSET_DESKTOP_TARGET_WEB_URL",
+			"WORKTREE_DEV_EXTERNAL_WEB_URL",
+		],
+	},
+] as const;
+
+export function applyDesktopTargetEnvOverrides(
+	env: MutableEnv = process.env as MutableEnv,
+): string[] {
+	const appliedTargets: string[] = [];
+
+	for (const override of DESKTOP_TARGET_ENV_OVERRIDES) {
+		const value = override.sources
+			.map((source) => normalizeEnvValue(env[source]))
+			.find((sourceValue): sourceValue is string => !!sourceValue);
+
+		if (!value) continue;
+		env[override.target] = value;
+		appliedTargets.push(override.target);
+	}
+
+	return appliedTargets;
+}
+
+function createProxyOptions({
+	origin,
+	target,
+}: {
+	origin?: string;
+	target: string;
+}) {
+	return {
+		changeOrigin: true,
+		cookieDomainRewrite: "",
+		...(origin ? { headers: { Origin: origin } } : {}),
+		secure: false,
+		target,
+	};
+}
+
+export function createDesktopApiProxy(
+	target: string | undefined,
+	origin?: string,
+) {
+	const normalizedTarget = normalizeEnvValue(target);
+	if (!normalizedTarget) return undefined;
+	const normalizedOrigin = normalizeEnvValue(origin);
+
+	return {
+		"/api": createProxyOptions({
+			origin: normalizedOrigin,
+			target: normalizedTarget,
+		}),
+		"/trpc": createProxyOptions({
+			origin: normalizedOrigin,
+			target: normalizedTarget,
+		}),
+	};
+}
+
+type CodeInspectorEnv = Record<string, string | undefined>;
+
+export function isCodeInspectorEnabled(
+	env: CodeInspectorEnv = process.env as CodeInspectorEnv,
+): boolean {
+	const value = normalizeEnvValue(
+		env.DESKTOP_ENABLE_CODE_INSPECTOR ?? env.CODE_INSPECTOR,
+	);
+	if (!value) return false;
+	return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+}
+
+export const generatedOutputWatchIgnores = [
+	"**/dist/resource-packs/**",
+	"**/dist/resource-packs-test/**",
+	"**/release/**",
+	"**/.tmp/**",
+	"**/superset-dev-data/packs/**",
+];
 
 const RESOURCES_TO_COPY = [
 	{
@@ -47,6 +168,20 @@ const RESOURCES_TO_COPY = [
 	{
 		src: resolve(__dirname, "..", resources, "browser-extension"),
 		dest: resolve(__dirname, "..", devPath, "resources/browser-extension"),
+	},
+	{
+		src: resolve(
+			__dirname,
+			"..",
+			resources,
+			"pack-system/pack-manifest-index.json",
+		),
+		dest: resolve(
+			__dirname,
+			"..",
+			devPath,
+			"resources/pack-system/pack-manifest-index.json",
+		),
 	},
 	{
 		src: resolve(__dirname, "../../../packages/local-db/drizzle"),
@@ -72,7 +207,7 @@ export function copyResourcesPlugin(): Plugin {
 		name: "copy-resources",
 		writeBundle() {
 			for (const resource of RESOURCES_TO_COPY) {
-				copyDir(resource);
+				copyPath(resource);
 			}
 		},
 	};

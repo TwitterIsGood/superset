@@ -236,89 +236,6 @@ function copyDependencyForPackage(
 	return nestedDependencyPath;
 }
 
-function materializePackageDependencyTree(
-	nodeModulesDir: string,
-	packageName: string,
-	packagePath = join(nodeModulesDir, packageName),
-	visited = new Set<string>(),
-): void {
-	const packageJsonPath = join(packagePath, "package.json");
-	if (!existsSync(packageJsonPath)) return;
-
-	type PackageJson = {
-		dependencies?: Record<string, string>;
-		name?: string;
-		version?: string;
-	};
-	const packageJson = JSON.parse(
-		readFileSync(packageJsonPath, "utf8"),
-	) as PackageJson;
-	const resolvedPackageName = packageJson.name ?? packageName;
-	const visitKey = `${resolvedPackageName}@${packageJson.version ?? packagePath}`;
-	if (visited.has(visitKey)) return;
-	visited.add(visitKey);
-
-	const dependencies = packageJson.dependencies ?? {};
-	for (const [dependencyName, dependencyRange] of Object.entries(
-		dependencies,
-	)) {
-		const dependencyPath = copyDependencyForPackage(
-			nodeModulesDir,
-			resolvedPackageName,
-			dependencyName,
-			dependencyRange,
-			true,
-		);
-		if (!dependencyPath) continue;
-		materializePackageDependencyTree(
-			nodeModulesDir,
-			dependencyName,
-			dependencyPath,
-			visited,
-		);
-	}
-}
-
-function copyNestedDependencyForPackage(
-	nodeModulesDir: string,
-	parentModuleName: string,
-	dependencyName: string,
-	dependencyRange: string,
-	required: boolean,
-): void {
-	const nestedDependencyPath = join(
-		nodeModulesDir,
-		parentModuleName,
-		"node_modules",
-		dependencyName,
-	);
-	const nestedVersion = readInstalledModuleVersion(nestedDependencyPath);
-	if (nestedVersion && satisfies(nestedVersion, dependencyRange)) {
-		const nestedStats = lstatSync(nestedDependencyPath);
-		if (nestedStats.isSymbolicLink()) {
-			const realPath = realpathSync(nestedDependencyPath);
-			rmSync(nestedDependencyPath);
-			cpSync(realPath, nestedDependencyPath, {
-				recursive: true,
-			});
-		}
-		return;
-	}
-
-	rmSync(nestedDependencyPath, { force: true, recursive: true });
-	console.log(
-		`  ${dependencyName}: materializing ${dependencyRange} as nested copy for ${parentModuleName}`,
-	);
-
-	copyExactModuleVersion(
-		nodeModulesDir,
-		dependencyName,
-		dependencyRange,
-		nestedDependencyPath,
-		required,
-	);
-}
-
 /**
  * Fetch an npm package tarball and extract it to destPath.
  * Used when cross-compiling and the target platform package isn't in the Bun store.
@@ -565,68 +482,6 @@ function copyParcelWatcherPlatformPackages(nodeModulesDir: string): void {
 	}
 }
 
-function copyDuckdbPlatformPackages(nodeModulesDir: string): void {
-	const nodeBindingsPath = join(nodeModulesDir, "@duckdb", "node-bindings");
-	const nodeBindingsPkgJsonPath = join(nodeBindingsPath, "package.json");
-	if (!existsSync(nodeBindingsPkgJsonPath)) return;
-
-	type DuckdbBindingsPackageJson = {
-		optionalDependencies?: Record<string, string>;
-	};
-	const nodeBindingsPkg = JSON.parse(
-		readFileSync(nodeBindingsPkgJsonPath, "utf8"),
-	) as DuckdbBindingsPackageJson;
-	const optionalDeps = nodeBindingsPkg.optionalDependencies ?? {};
-
-	console.log("\nPreparing duckdb platform package...");
-
-	// The native binding is a `cpu`/`os`-gated optional dependency, so Bun only
-	// installs the host's. For the target arch, fetch it from npm when missing.
-	const targetSuffix = `${TARGET_PLATFORM}-${TARGET_ARCH}`;
-	const targetEntry = Object.entries(optionalDeps).find(([name]) =>
-		name.endsWith(targetSuffix),
-	);
-	if (!targetEntry) {
-		console.error(
-			`  [ERROR] No @duckdb/node-bindings optional dependency matched ${targetSuffix}`,
-		);
-		process.exit(1);
-	}
-
-	const [targetName, targetVersion] = targetEntry;
-	const destPath = join(nodeModulesDir, targetName);
-	if (existsSync(destPath)) {
-		copyModuleIfSymlink(nodeModulesDir, targetName, true);
-		return;
-	}
-
-	copyExactModuleVersion(
-		nodeModulesDir,
-		targetName,
-		targetVersion,
-		destPath,
-		true,
-	);
-}
-
-function copyTrellisCompatibilityDependencies(nodeModulesDir: string): void {
-	console.log("\nPreparing Trellis runtime compatibility dependencies...");
-	copyNestedDependencyForPackage(
-		nodeModulesDir,
-		"onetime",
-		"mimic-fn",
-		"^2.1.0",
-		true,
-	);
-	copyNestedDependencyForPackage(
-		nodeModulesDir,
-		"restore-cursor",
-		"signal-exit",
-		"^3.0.2",
-		true,
-	);
-}
-
 function prepareNativeModules() {
 	console.log("Preparing external runtime modules for electron-builder...");
 	console.log(
@@ -641,17 +496,10 @@ function prepareNativeModules() {
 		copyModuleIfSymlink(nodeModulesDir, moduleName, true);
 	}
 
-	console.log("\nPreparing Claude ACP runtime dependency tree...");
-	materializePackageDependencyTree(nodeModulesDir, "@anthropic-ai/sdk");
-	materializePackageDependencyTree(nodeModulesDir, "@modelcontextprotocol/sdk");
-	materializePackageDependencyTree(nodeModulesDir, "json-schema-to-ts");
-
 	console.log("\nPreparing ast-grep platform package...");
 	copyAstGrepPlatformPackages(nodeModulesDir);
 	copyParcelWatcherPlatformPackages(nodeModulesDir);
 	copyLibsqlDependencies(nodeModulesDir);
-	copyDuckdbPlatformPackages(nodeModulesDir);
-	copyTrellisCompatibilityDependencies(nodeModulesDir);
 
 	console.log("\nDone!");
 }

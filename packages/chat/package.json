@@ -16,6 +16,26 @@
 			"types": "./src/server/desktop/index.ts",
 			"default": "./src/server/desktop/index.ts"
 		},
+		"./server/desktop/chat-service": {
+			"types": "./src/server/desktop/chat-service/index.ts",
+			"default": "./src/server/desktop/chat-service/index.ts"
+		},
+		"./server/desktop/auth-storage": {
+			"types": "./src/server/desktop/chat-service/auth-storage.ts",
+			"default": "./src/server/desktop/chat-service/auth-storage.ts"
+		},
+		"./server/desktop/router": {
+			"types": "./src/server/desktop/router/index.ts",
+			"default": "./src/server/desktop/router/index.ts"
+		},
+		"./server/desktop/slash-commands": {
+			"types": "./src/server/desktop/slash-commands/index.ts",
+			"default": "./src/server/desktop/slash-commands/index.ts"
+		},
+		"./server/desktop/title-generation": {
+			"types": "./src/server/desktop/title-generation/index.ts",
+			"default": "./src/server/desktop/title-generation/index.ts"
+		},
 		"./server/trpc": {
 			"types": "./src/server/trpc/index.ts",
 			"default": "./src/server/trpc/index.ts"

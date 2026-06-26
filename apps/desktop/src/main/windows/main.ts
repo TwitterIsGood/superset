@@ -219,34 +219,32 @@ export async function MainWindow() {
 	});
 	notificationManager.start();
 
+	const handleAgentLifecycle = (event: AgentLifecycleEvent) => {
+		notificationManager.handleAgentLifecycle(event);
+	};
 	notificationsEmitter.on(
 		NOTIFICATION_EVENTS.AGENT_LIFECYCLE,
-		(event: AgentLifecycleEvent) => {
-			notificationManager.handleAgentLifecycle(event);
-		},
+		handleAgentLifecycle,
 	);
 
 	// Forward low-volume terminal lifecycle events to the renderer via the existing
 	// notifications subscription. This is used only for correctness (e.g. clearing
 	// stuck agent lifecycle statuses when terminal panes aren't mounted).
-	getWorkspaceRuntimeRegistry()
-		.getDefault()
-		.terminal.on(
-			"terminalExit",
-			(event: {
-				paneId: string;
-				exitCode: number;
-				signal?: number;
-				reason?: "killed" | "exited" | "error";
-			}) => {
-				notificationsEmitter.emit(NOTIFICATION_EVENTS.TERMINAL_EXIT, {
-					paneId: event.paneId,
-					exitCode: event.exitCode,
-					signal: event.signal,
-					reason: event.reason,
-				});
-			},
-		);
+	const terminalRuntime = getWorkspaceRuntimeRegistry().getDefault().terminal;
+	const handleTerminalExit = (event: {
+		paneId: string;
+		exitCode: number;
+		signal?: number;
+		reason?: "killed" | "exited" | "error";
+	}) => {
+		notificationsEmitter.emit(NOTIFICATION_EVENTS.TERMINAL_EXIT, {
+			paneId: event.paneId,
+			exitCode: event.exitCode,
+			signal: event.signal,
+			reason: event.reason,
+		});
+	};
+	terminalRuntime.on("terminalExit", handleTerminalExit);
 
 	// macOS Sequoia+: occluded/minimized windows can lose compositor layers
 	if (PLATFORM.IS_MAC) {
@@ -406,8 +404,11 @@ export async function MainWindow() {
 		browserManager.unregisterAll();
 		server.close();
 		notificationManager.dispose();
-		notificationsEmitter.removeAllListeners();
-		getWorkspaceRuntimeRegistry().getDefault().terminal.detachAllListeners();
+		notificationsEmitter.off(
+			NOTIFICATION_EVENTS.AGENT_LIFECYCLE,
+			handleAgentLifecycle,
+		);
+		terminalRuntime.off("terminalExit", handleTerminalExit);
 		ipcHandler?.detachWindow(window);
 		currentWindow = null;
 	});

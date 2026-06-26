@@ -19,24 +19,7 @@ import type {
 	DashboardSidebarSection,
 	DashboardSidebarWorkspace,
 } from "../../types";
-
-// ── ID helpers ───────────────────────────────────────────────────────
-
-const WS = "ws::";
-const SEC = "sec::";
-
-export const wsId = (id: string) => `${WS}${id}`;
-export const secId = (id: string) => `${SEC}${id}`;
-export const isSec = (id: UniqueIdentifier) => String(id).startsWith(SEC);
-
-export const parseId = (id: UniqueIdentifier) => {
-	const s = String(id);
-	if (s.startsWith(WS))
-		return { type: "workspace" as const, realId: s.slice(WS.length) };
-	if (s.startsWith(SEC))
-		return { type: "section" as const, realId: s.slice(SEC.length) };
-	return null;
-};
+import { isSec, parseId, secId, wsId } from "./sidebarDndIds";
 
 // ── Measuring config ─────────────────────────────────────────────────
 

@@ -16,6 +16,7 @@ export type {
 	ProjectCreateProgressMessage,
 	ProjectCreateProgressStage,
 	ServerMessage,
+	SubscribableServerEventType,
 	TerminalLifecycleMessage,
 	WorkspaceCreateProgressMessage,
 	WorkspaceCreateProgressStage,

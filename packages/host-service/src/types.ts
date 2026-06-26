@@ -1,5 +1,5 @@
 import type { Octokit } from "@octokit/rest";
-import type { ChatService } from "@superset/chat/server/desktop";
+import type { ChatService } from "@superset/chat/server/desktop/chat-service";
 import type { AppRouter } from "@superset/trpc";
 import type { TRPCClient } from "@trpc/client";
 import type { HostDb } from "./db";
@@ -18,6 +18,8 @@ export interface HostServiceRuntime {
 	getChat: () => Promise<ChatRuntimeManager>;
 	filesystem: WorkspaceFilesystemManager;
 	pullRequests: PullRequestRuntimeManager;
+	ensureGitWatcherStarted: () => void;
+	ensurePullRequestRuntimeStarted: () => void;
 }
 
 export interface HostServiceContext {

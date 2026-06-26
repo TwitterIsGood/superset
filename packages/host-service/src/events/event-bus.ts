@@ -7,7 +7,11 @@ import { portManager } from "../ports/port-manager.ts";
 import { getLabelsForWorkspace } from "../ports/static-ports.ts";
 import type { WorkspaceFilesystemManager } from "../runtime/filesystem/index.ts";
 import type { GitWatcher } from "./git-watcher.ts";
-import type { ClientMessage, ServerMessage } from "./types.ts";
+import type {
+	ClientMessage,
+	ServerMessage,
+	SubscribableServerEventType,
+} from "./types.ts";
 
 type WsSocket = {
 	send: (data: string) => void;
@@ -22,6 +26,8 @@ interface FsSubscription {
 
 interface ClientState {
 	fsSubscriptions: Map<string, FsSubscription>;
+	eventSubscriptions: Map<SubscribableServerEventType, Set<string | "*">>;
+	usesEventSubscriptions: boolean;
 }
 
 function sendMessage(socket: WsSocket, message: ServerMessage): void {
@@ -33,18 +39,58 @@ function parseClientMessage(data: unknown): ClientMessage | null {
 	try {
 		const raw = typeof data === "string" ? data : String(data);
 		const parsed = JSON.parse(raw);
+		if (!parsed || typeof parsed !== "object") return null;
 		if (
-			parsed &&
-			typeof parsed === "object" &&
 			typeof parsed.type === "string" &&
-			typeof parsed.workspaceId === "string"
+			typeof parsed.workspaceId === "string" &&
+			(parsed.type === "fs:watch" || parsed.type === "fs:unwatch")
 		) {
-			if (parsed.type === "fs:watch" || parsed.type === "fs:unwatch") {
-				return parsed as ClientMessage;
-			}
+			return parsed as ClientMessage;
+		}
+		if (
+			typeof parsed.type === "string" &&
+			typeof parsed.event === "string" &&
+			typeof parsed.workspaceId === "string" &&
+			(parsed.type === "subscribe" || parsed.type === "unsubscribe") &&
+			isSubscribableServerEventType(parsed.event) &&
+			(parsed.workspaceId === "*" || parsed.workspaceId.length > 0)
+		) {
+			return parsed as ClientMessage;
 		}
 	} catch (error) {
 		console.warn("[event-bus] malformed client message — ignored", { error });
+	}
+	return null;
+}
+
+function isSubscribableServerEventType(
+	event: string,
+): event is SubscribableServerEventType {
+	return (
+		event === "git:changed" ||
+		event === "agent:lifecycle" ||
+		event === "terminal:lifecycle" ||
+		event === "port:changed" ||
+		event === "workspace:create-progress" ||
+		event === "project:create-progress"
+	);
+}
+
+function getMessageInterestKey(message: ServerMessage): {
+	event: SubscribableServerEventType;
+	key: string;
+} | null {
+	if (
+		message.type === "git:changed" ||
+		message.type === "agent:lifecycle" ||
+		message.type === "terminal:lifecycle" ||
+		message.type === "port:changed" ||
+		message.type === "workspace:create-progress"
+	) {
+		return { event: message.type, key: message.workspaceId };
+	}
+	if (message.type === "project:create-progress") {
+		return { event: message.type, key: message.requestId };
 	}
 	return null;
 }
@@ -112,7 +158,11 @@ export class EventBus {
 	}
 
 	handleOpen(socket: WsSocket): void {
-		this.clients.set(socket, { fsSubscriptions: new Map() });
+		this.clients.set(socket, {
+			fsSubscriptions: new Map(),
+			eventSubscriptions: new Map(),
+			usesEventSubscriptions: false,
+		});
 	}
 
 	handleMessage(socket: WsSocket, data: unknown): void {
@@ -126,6 +176,10 @@ export class EventBus {
 			this.startFsWatch(socket, state, message.workspaceId);
 		} else if (message.type === "fs:unwatch") {
 			this.stopFsWatch(state, message.workspaceId);
+		} else if (message.type === "subscribe") {
+			this.subscribeEvent(state, message.event, message.workspaceId);
+		} else if (message.type === "unsubscribe") {
+			this.unsubscribeEvent(state, message.event, message.workspaceId);
 		}
 	}
 
@@ -141,7 +195,8 @@ export class EventBus {
 		// One bad socket must not block fan-out to the rest. Drop dead sockets
 		// rather than logging on every broadcast forever.
 		const dead: WsSocket[] = [];
-		for (const socket of this.clients.keys()) {
+		for (const [socket, state] of this.clients) {
+			if (!this.shouldSendToClient(state, message)) continue;
 			try {
 				sendMessage(socket, message);
 			} catch (error) {
@@ -153,6 +208,47 @@ export class EventBus {
 			const state = this.clients.get(socket);
 			if (state) this.cleanupClient(socket, state);
 			this.clients.delete(socket);
+		}
+	}
+
+	private shouldSendToClient(
+		state: ClientState,
+		message: ServerMessage,
+	): boolean {
+		const interest = getMessageInterestKey(message);
+		if (!interest) return true;
+		// Backward compatibility: clients that never sent subscribe/unsubscribe
+		// still receive broadcasts and filter locally.
+		if (!state.usesEventSubscriptions) return true;
+		const subscriptions = state.eventSubscriptions.get(interest.event);
+		return Boolean(subscriptions?.has("*") || subscriptions?.has(interest.key));
+	}
+
+	private subscribeEvent(
+		state: ClientState,
+		event: SubscribableServerEventType,
+		workspaceId: string | "*",
+	): void {
+		state.usesEventSubscriptions = true;
+		let subscriptions = state.eventSubscriptions.get(event);
+		if (!subscriptions) {
+			subscriptions = new Set();
+			state.eventSubscriptions.set(event, subscriptions);
+		}
+		subscriptions.add(workspaceId);
+	}
+
+	private unsubscribeEvent(
+		state: ClientState,
+		event: SubscribableServerEventType,
+		workspaceId: string | "*",
+	): void {
+		state.usesEventSubscriptions = true;
+		const subscriptions = state.eventSubscriptions.get(event);
+		if (!subscriptions) return;
+		subscriptions.delete(workspaceId);
+		if (subscriptions.size === 0) {
+			state.eventSubscriptions.delete(event);
 		}
 	}
 
@@ -348,18 +444,21 @@ export interface RegisterEventBusRouteOptions {
 	app: Hono;
 	eventBus: EventBus;
 	upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
+	onClientOpen?: () => void;
 }
 
 export function registerEventBusRoute({
 	app,
 	eventBus,
 	upgradeWebSocket,
+	onClientOpen,
 }: RegisterEventBusRouteOptions) {
 	app.get(
 		"/events",
 		upgradeWebSocket(() => {
 			return {
 				onOpen: (_event, ws) => {
+					onClientOpen?.();
 					eventBus.handleOpen(ws);
 				},
 				onMessage: (event, ws) => {

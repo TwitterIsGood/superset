@@ -28,6 +28,11 @@ on:
           - auto
           - required
           - unsigned_internal
+      publish_release:
+        description: "Update the desktop-canary GitHub Release after building"
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -43,6 +48,7 @@ jobs:
       version_timestamp: ${{ steps.check.outputs.version_timestamp }}
       build_scope: ${{ steps.check.outputs.build_scope }}
       macos_arches_json: ${{ steps.check.outputs.macos_arches_json }}
+      macos_artifact_mode: ${{ steps.check.outputs.macos_artifact_mode }}
       build_linux: ${{ steps.check.outputs.build_linux }}
       mac_signing: ${{ steps.check.outputs.mac_signing }}
 
@@ -70,6 +76,7 @@ jobs:
           FORCE_BUILD="${{ github.event.inputs.force_build }}"
           BUILD_SCOPE="${{ github.event.inputs.build_scope }}"
           MAC_SIGNING="${{ github.event.inputs.mac_signing }}"
+          PUBLISH_RELEASE="${{ github.event.inputs.publish_release }}"
 
           if [ -z "$BUILD_SCOPE" ]; then
             BUILD_SCOPE="quick"
@@ -77,6 +84,10 @@ jobs:
 
           if [ -z "$MAC_SIGNING" ]; then
             MAC_SIGNING="auto"
+          fi
+
+          if [ -z "$PUBLISH_RELEASE" ]; then
+            PUBLISH_RELEASE="true"
           fi
 
           case "$BUILD_SCOPE" in
@@ -107,6 +118,12 @@ jobs:
 
           echo "build_scope=$BUILD_SCOPE" >> $GITHUB_OUTPUT
           echo "mac_signing=$MAC_SIGNING" >> $GITHUB_OUTPUT
+          if [[ "$BUILD_SCOPE" == "quick" && "$PUBLISH_RELEASE" == "false" ]]; then
+            echo "Artifact-only quick validation requested: building macOS updater ZIP only."
+            echo "macos_artifact_mode=zip_only" >> $GITHUB_OUTPUT
+          else
+            echo "macos_artifact_mode=full" >> $GITHUB_OUTPUT
+          fi
 
           if [ "$FORCE_BUILD" = "true" ]; then
             echo "Force build requested, skipping change detection..."
@@ -141,12 +158,13 @@ jobs:
       macos_arches_json: ${{ needs.check-changes.outputs.macos_arches_json }}
       build_linux: ${{ needs.check-changes.outputs.build_linux == 'true' }}
       mac_signing: ${{ needs.check-changes.outputs.mac_signing }}
+      macos_artifact_mode: ${{ needs.check-changes.outputs.macos_artifact_mode }}
     secrets: inherit
 
   release:
     name: Update Canary Release
     needs: [check-changes, build]
-    if: needs.check-changes.outputs.should_build == 'true'
+    if: needs.check-changes.outputs.should_build == 'true' && github.event.inputs.publish_release != 'false'
     runs-on: ubuntu-latest
 
     steps:
@@ -163,6 +181,7 @@ jobs:
           MAC_APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           MAC_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MAC_SIGNING: ${{ needs.check-changes.outputs.mac_signing }}
+          REF_NAME: ${{ github.ref_name }}
           SHORT_SHA: ${{ needs.check-changes.outputs.short_sha }}
         run: |
           if [[ "$MAC_SIGNING" == "unsigned_internal" ]]; then
@@ -179,7 +198,7 @@ jobs:
           cat > release-body.md <<EOF
           **Internal Testing Build**
 
-          This is an automated canary build from \`main\` branch.
+          This is an automated canary build from \`${REF_NAME}\` ref.
 
           - Commit: ${{ github.sha }}
           - Short SHA: ${SHORT_SHA}

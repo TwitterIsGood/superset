@@ -1,7 +1,7 @@
 // Smoke / happy-path integration test for pty-daemon.
 //
-// Runs under Node (`node --experimental-strip-types --test`); see
-// test/control-plane.test.ts for the exhaustive control-plane scenarios.
+// Runs under Node's test runner via `tsx --test`; see
+// test/control-plane.node-test.ts for the exhaustive control-plane scenarios.
 
 import { strict as assert } from "node:assert";
 import * as fs from "node:fs";

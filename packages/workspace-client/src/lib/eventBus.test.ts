@@ -19,13 +19,16 @@ class MockWebSocket {
 	onmessage: ((event: { data: unknown }) => void) | null = null;
 	onclose: CloseHandler | null = null;
 	onerror: (() => void) | null = null;
+	sentMessages: string[] = [];
 
 	constructor(url: string) {
 		this.url = url;
 		MockWebSocket.instances.push(this);
 	}
 
-	send() {}
+	send(data: string) {
+		this.sentMessages.push(data);
+	}
 
 	close(code = 1000, reason = "") {
 		this.readyState = MockWebSocket.CLOSED;
@@ -121,6 +124,13 @@ describe("eventBus", () => {
 		if (!socket) throw new Error("expected mock socket");
 		socket.readyState = MockWebSocket.OPEN;
 		socket.onopen?.();
+		expect(socket.sentMessages.map((message) => JSON.parse(message))).toEqual([
+			{
+				type: "subscribe",
+				event: "project:create-progress",
+				workspaceId: "project-create-1",
+			},
+		]);
 
 		socket.onmessage?.({
 			data: JSON.stringify({
@@ -152,6 +162,13 @@ describe("eventBus", () => {
 		]);
 
 		removeListener();
+		expect(
+			socket.sentMessages.map((message) => JSON.parse(message)),
+		).toContainEqual({
+			type: "unsubscribe",
+			event: "project:create-progress",
+			workspaceId: "project-create-1",
+		});
 		release();
 	});
 });

@@ -29,4 +29,23 @@ describe("superset online public URL defaults", () => {
 		expect(SOURCE).toContain("EXPO_PUBLIC_RELAY_URL");
 		expect(SOURCE).not.toContain("EXPO_PUBLIC_POSTHOG_KEY=");
 	});
+
+	test("supports an explicit loaded desktop fixture mode", () => {
+		const packageJson = readFileSync(
+			join(import.meta.dir, "..", "package.json"),
+			{
+				encoding: "utf8",
+			},
+		);
+
+		expect(SOURCE).toContain("SUPERSET_ONLINE_LOAD_FIXTURE");
+		expect(SOURCE).toContain("ensure_desktop_perf_fixture_if_requested");
+		expect(SOURCE).toContain("desktop:perf-fixture -- ensure");
+		expect(SOURCE).toContain("desktop:perf-fixture -- stats");
+		expect(SOURCE).toContain("dense desktop fixture:");
+		expect(SOURCE).toContain("run: bun run online:start:loaded");
+		expect(packageJson).toContain(
+			'online:start:loaded": "SUPERSET_ONLINE_LOAD_FIXTURE=1',
+		);
+	});
 });

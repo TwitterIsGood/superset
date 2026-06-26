@@ -37,6 +37,14 @@ function buildWorkspace(index: number) {
 	};
 }
 
+function markRuntimeStarted(manager: PullRequestRuntimeManager) {
+	(
+		manager as unknown as {
+			started: boolean;
+		}
+	).started = true;
+}
+
 function buildGitMock(rawCalls: RawCallLog[], worktreePath: string) {
 	const recordingRaw = mock(async (args: string[]) => {
 		rawCalls.push({ worktreePath, args });
@@ -117,6 +125,7 @@ async function runSync(workspaceCount: number) {
 			refreshProject: () => Promise<void>;
 		}
 	).refreshProject = mock(async () => undefined);
+	markRuntimeStarted(manager);
 
 	// The sweep now routes through enqueueWorkspaceSync → syncOneWorkspace,
 	// which re-reads each workspace via `select().from().where().get()`.

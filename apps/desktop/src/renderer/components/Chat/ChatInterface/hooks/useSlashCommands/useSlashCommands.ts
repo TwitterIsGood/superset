@@ -1,4 +1,4 @@
-import type { ChatServiceRouter } from "@superset/chat/server/desktop";
+import type { ChatServiceRouter } from "@superset/chat/server/desktop/router";
 import { findSlashCommandByNameOrAlias } from "@superset/chat/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

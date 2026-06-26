@@ -33,6 +33,10 @@ export function RightSidebarToggle() {
 			<TooltipTrigger asChild>
 				<button
 					type="button"
+					aria-label={
+						isOpen ? "Close workspace sidebar" : "Open workspace sidebar"
+					}
+					data-testid="workspace-right-sidebar-toggle"
 					onClick={toggle}
 					className="no-drag group flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
 				>

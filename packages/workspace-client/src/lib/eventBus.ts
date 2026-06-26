@@ -3,6 +3,7 @@ import type {
 	ClientMessage,
 	ProjectCreateProgressStage,
 	ServerMessage,
+	SubscribableServerEventType,
 	WorkspaceCreateProgressStage,
 } from "@superset/host-service/events";
 import type { AgentIdentity } from "@superset/shared/agent-identity";
@@ -100,6 +101,8 @@ interface ListenerEntry {
 	callback: (...args: unknown[]) => void;
 }
 
+type SubscribableEventType = Extract<EventType, SubscribableServerEventType>;
+
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
 const HOST_UNAVAILABLE_RECONNECT_BASE_MS = 30_000;
@@ -111,6 +114,7 @@ interface ConnectionState {
 	socket: WebSocket | null;
 	refCount: number;
 	listeners: Set<ListenerEntry>;
+	eventSubscriptions: Map<string, number>;
 	fsWatchedWorkspaces: Map<string, number>;
 	reconnectAttempts: number;
 	reconnectReason: EventBusReconnectReason;
@@ -130,6 +134,61 @@ function buildEventBusUrl(hostUrl: string, wsToken: string | null): string {
 function sendCommand(state: ConnectionState, message: ClientMessage): void {
 	if (state.socket?.readyState === WebSocket.OPEN) {
 		state.socket.send(JSON.stringify(message));
+	}
+}
+
+function isSubscribableEventType(
+	type: EventType,
+): type is SubscribableEventType {
+	return type !== "fs:events";
+}
+
+function subscriptionKey(
+	type: SubscribableEventType,
+	workspaceId: string | "*",
+) {
+	return `${type}\u0000${workspaceId}`;
+}
+
+function parseSubscriptionKey(
+	key: string,
+): { type: SubscribableEventType; workspaceId: string | "*" } | null {
+	const [type, workspaceId] = key.split("\u0000");
+	if (
+		!type ||
+		workspaceId === undefined ||
+		!isSubscribableEventType(type as EventType)
+	) {
+		return null;
+	}
+	return { type: type as SubscribableEventType, workspaceId };
+}
+
+function subscribeServerEvent(
+	state: ConnectionState,
+	type: SubscribableEventType,
+	workspaceId: string | "*",
+): void {
+	const key = subscriptionKey(type, workspaceId);
+	const count = state.eventSubscriptions.get(key) ?? 0;
+	state.eventSubscriptions.set(key, count + 1);
+	if (count === 0) {
+		sendCommand(state, { type: "subscribe", event: type, workspaceId });
+	}
+}
+
+function unsubscribeServerEvent(
+	state: ConnectionState,
+	type: SubscribableEventType,
+	workspaceId: string | "*",
+): void {
+	const key = subscriptionKey(type, workspaceId);
+	const count = state.eventSubscriptions.get(key) ?? 0;
+	if (count <= 1) {
+		state.eventSubscriptions.delete(key);
+		sendCommand(state, { type: "unsubscribe", event: type, workspaceId });
+	} else {
+		state.eventSubscriptions.set(key, count - 1);
 	}
 }
 
@@ -269,6 +328,15 @@ function connect(
 			for (const workspaceId of state.fsWatchedWorkspaces.keys()) {
 				sendCommand(state, { type: "fs:watch", workspaceId });
 			}
+			for (const key of state.eventSubscriptions.keys()) {
+				const subscription = parseSubscriptionKey(key);
+				if (!subscription) continue;
+				sendCommand(state, {
+					type: "subscribe",
+					event: subscription.type,
+					workspaceId: subscription.workspaceId,
+				});
+			}
 		};
 
 		socket.onmessage = (event) => {
@@ -326,6 +394,7 @@ function getOrCreateConnection(
 		socket: null,
 		refCount: 0,
 		listeners: new Set(),
+		eventSubscriptions: new Map(),
 		fsWatchedWorkspaces: new Map(),
 		reconnectAttempts: 0,
 		reconnectReason: "transient",
@@ -393,9 +462,15 @@ export function getEventBus(
 				callback: listener as (...args: unknown[]) => void,
 			};
 			state.listeners.add(entry);
+			if (isSubscribableEventType(type)) {
+				subscribeServerEvent(state, type, workspaceId);
+			}
 
 			return () => {
 				state.listeners.delete(entry);
+				if (isSubscribableEventType(type)) {
+					unsubscribeServerEvent(state, type, workspaceId);
+				}
 				maybeCleanupConnection(hostUrl);
 			};
 		},

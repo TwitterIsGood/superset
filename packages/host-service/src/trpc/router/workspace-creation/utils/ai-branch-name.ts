@@ -1,4 +1,4 @@
-import { generateTitleFromMessage } from "@superset/chat/server/desktop";
+import { generateTitleFromMessage } from "@superset/chat/server/desktop/title-generation";
 import { getSmallModel } from "@superset/chat/server/shared";
 import { deduplicateBranchName } from "./sanitize-branch";
 

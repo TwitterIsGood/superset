@@ -2,6 +2,7 @@ import { toast } from "@superset/ui/sonner";
 import { useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { authClient } from "renderer/lib/auth-client";
+import { useTrellisRuntimePack } from "renderer/lib/pack-system";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import type { NewWorkspacePromptContextApi } from "renderer/stores/new-workspace-prompt-context";
 import { useWorkspaceCreates } from "renderer/stores/workspace-creates";
@@ -29,6 +30,7 @@ export function useSubmitWorkspace(
 	const { machineId } = useLocalHostService();
 	const { data: session } = authClient.useSession();
 	const activeOrganizationId = session?.session?.activeOrganizationId;
+	const trellisRuntimePack = useTrellisRuntimePack();
 
 	return useCallback(async () => {
 		if (!projectId) {
@@ -103,6 +105,10 @@ export function useSubmitWorkspace(
 
 		const trimmedPrompt = draft.prompt.trim();
 		const workspaceId = crypto.randomUUID();
+		const trellisSetup = await trellisRuntimePack.prepareTrellisSetup({
+			initialize: draft.trellisInitialize,
+			useLocalPack: hostId === machineId,
+		});
 		const snapshot = {
 			id: workspaceId,
 			projectId,
@@ -111,7 +117,7 @@ export function useSubmitWorkspace(
 			pr: isPrCheckout ? draft.linkedPR?.prNumber : undefined,
 			baseBranch: draft.baseBranch ?? undefined,
 			taskId: linkedTaskId,
-			trellisSetup: draft.trellisInitialize ? { initialize: true } : undefined,
+			trellisSetup,
 			agents,
 			namingPrompt:
 				!isPrCheckout && !wantAgent && trimmedPrompt
@@ -203,6 +209,7 @@ export function useSubmitWorkspace(
 		promptContext,
 		selectedAgent,
 		submit,
+		trellisRuntimePack.prepareTrellisSetup,
 		uploadAttachments,
 	]);
 }

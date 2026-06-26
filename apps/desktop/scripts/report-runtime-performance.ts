@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { promisify } from "node:util";
 import { DesktopAutomation } from "../../../packages/desktop-mcp/src/automation/index.ts";
 import {
@@ -187,10 +187,7 @@ interface RuntimeReport {
 
 const desktopDir = resolve(import.meta.dirname, "..");
 const rootDir = resolve(desktopDir, "../..");
-const taskArtifactsDir = resolve(
-	rootDir,
-	".trellis/tasks/06-09-desktop-performance-packaging-optimization/artifacts",
-);
+const defaultReportDir = resolve(desktopDir, "performance-reports");
 const defaultDurationMs = 10_000;
 const defaultIntervalMs = 1_000;
 const execTimeoutMs = 15_000;
@@ -217,7 +214,7 @@ function parseCliOptions(argv: string[]): CliOptions {
 		durationMs: defaultDurationMs,
 		intervalMs: defaultIntervalMs,
 		topLimit: 12,
-		reportDir: taskArtifactsDir,
+		reportDir: defaultReportDir,
 		routes: [],
 		routeSettleMs: 750,
 		restoreRoute: true,
@@ -1270,6 +1267,8 @@ async function main(): Promise<void> {
 	const markdown = renderMarkdown(report);
 
 	mkdirSync(reportDir, { recursive: true });
+	mkdirSync(dirname(markdownPath), { recursive: true });
+	mkdirSync(dirname(jsonPath), { recursive: true });
 	writeFileSync(markdownPath, markdown);
 	writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
 

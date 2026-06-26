@@ -1,6 +1,14 @@
 import { describe, expect, mock, spyOn, test } from "bun:test";
 import { PullRequestRuntimeManager } from "../src/runtime/pull-requests/pull-requests";
 
+function markRuntimeStarted(manager: PullRequestRuntimeManager) {
+	(
+		manager as unknown as {
+			started: boolean;
+		}
+	).started = true;
+}
+
 describe("PullRequestRuntimeManager branch sync", () => {
 	test("persists unborn branches even when HEAD has no commit", async () => {
 		const workspace = {
@@ -56,6 +64,7 @@ describe("PullRequestRuntimeManager branch sync", () => {
 		(
 			manager as unknown as { refreshProject: typeof refreshProjectMock }
 		).refreshProject = refreshProjectMock;
+		markRuntimeStarted(manager);
 
 		// The sweep now routes through enqueueWorkspaceSync → syncOneWorkspace,
 		// which re-reads each workspace via `select().from().where().get()`.
@@ -135,6 +144,7 @@ describe("PullRequestRuntimeManager branch sync", () => {
 		(
 			manager as unknown as { refreshProject: typeof refreshProjectMock }
 		).refreshProject = refreshProjectMock;
+		markRuntimeStarted(manager);
 
 		// The sweep now routes through enqueueWorkspaceSync → syncOneWorkspace,
 		// which re-reads each workspace via `select().from().where().get()`.

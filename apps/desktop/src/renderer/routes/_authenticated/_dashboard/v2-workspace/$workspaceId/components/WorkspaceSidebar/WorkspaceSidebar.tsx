@@ -3,20 +3,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { BotIcon, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { LuFile, LuGitCompareArrows } from "react-icons/lu";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { LuFile, LuGitCompareArrows, LuMessageSquare } from "react-icons/lu";
 import { useWorkspaceGitStatus } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/providers/WorkspaceGitStatusProvider";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { useSettings } from "renderer/stores/settings";
 import type { CommentPaneData, DiffFocusSide } from "../../types";
-import { FilesTab } from "./components/FilesTab";
-import { ModelsTab } from "./components/ModelsTab";
+import { ChangesSidebarTabActions } from "./components/ChangesSidebarTabActions";
 import { PRActionHeader } from "./components/PRActionHeader";
 import { SidebarHeader } from "./components/SidebarHeader";
-import { useChangesTab } from "./hooks/useChangesTab";
 import { type OpenChatFn, usePRFlowDispatch } from "./hooks/usePRFlowDispatch";
 import { usePRFlowState } from "./hooks/usePRFlowState";
-import { useReviewTab } from "./hooks/useReviewTab";
 import type { SidebarTabDefinition } from "./types";
 import {
 	isSidebarTabId,
@@ -28,6 +25,19 @@ import {
 // exist in v2 yet. The PR status group (link + merge dropdown for an open PR)
 // always renders so users can see PR state and merge once a PR exists.
 const CREATE_PR_BUTTON_ENABLED = false;
+
+const LazyChangesSidebarTab = lazy(async () => ({
+	default: (await import("./components/ChangesSidebarTab")).ChangesSidebarTab,
+}));
+const LazyFilesTab = lazy(async () => ({
+	default: (await import("./components/FilesTab")).FilesTab,
+}));
+const LazyModelsTab = lazy(async () => ({
+	default: (await import("./components/ModelsTab")).ModelsTab,
+}));
+const LazyReviewSidebarTab = lazy(async () => ({
+	default: (await import("./components/ReviewSidebarTab")).ReviewSidebarTab,
+}));
 
 export interface PendingReveal {
 	path: string;
@@ -73,6 +83,17 @@ function IconButton({
 			</TooltipTrigger>
 			<TooltipContent side="bottom">{tooltip}</TooltipContent>
 		</Tooltip>
+	);
+}
+
+function SidebarTabFallback() {
+	return (
+		<div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
+			<div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
+			<div className="h-4 w-full animate-pulse rounded bg-muted/70" />
+			<div className="h-4 w-5/6 animate-pulse rounded bg-muted/70" />
+			<div className="h-4 w-3/4 animate-pulse rounded bg-muted/70" />
+		</div>
 	);
 }
 
@@ -123,30 +144,26 @@ export function WorkspaceSidebar({
 		return () => ro.disconnect();
 	}, []);
 
-	const changesTabDef = useChangesTab({
-		workspaceId,
-		selectedFilePath,
-		onSelectFile: onSelectDiffFile,
-		onOpenFile: onSelectFile,
-	});
+	const gitChangeCount = gitStatus.data ? getGitChangeCount(gitStatus.data) : 0;
 	const changesTab: SidebarTabDefinition = {
-		...changesTabDef,
+		id: "changes",
+		label: "Changes",
 		icon: LuGitCompareArrows,
+		badge: gitChangeCount > 0 ? gitChangeCount : undefined,
+		actions: <ChangesSidebarTabActions workspaceId={workspaceId} />,
+		content: (
+			<LazyChangesSidebarTab
+				workspaceId={workspaceId}
+				selectedFilePath={selectedFilePath}
+				onSelectFile={onSelectDiffFile}
+				onOpenFile={onSelectFile}
+			/>
+		),
 	};
 
-	const reviewTab = useReviewTab({
-		workspaceId,
-		onOpenComment,
-		onOpenInDiff: onSelectDiffFile
-			? (path, line, openInNewTab, side) => {
-					// Force annotations on so the user lands on the comment, not an empty line.
-					useSettings.getState().update("showDiffComments", true);
-					onSelectDiffFile(path, openInNewTab ?? false, line, side);
-				}
-			: undefined,
+	const { flowState, onRetry } = usePRFlowState(workspaceId, {
+		enabled: activeTab === "review",
 	});
-
-	const { flowState, onRetry } = usePRFlowState(workspaceId);
 	const dispatch = usePRFlowDispatch({
 		onOpenChat: onOpenChat ?? (() => {}),
 	});
@@ -157,7 +174,7 @@ export function WorkspaceSidebar({
 		icon: LuFile,
 		actions: <IconButton icon={Search} tooltip="Search" onClick={onSearch} />,
 		content: (
-			<FilesTab
+			<LazyFilesTab
 				onSelectFile={onSelectFile}
 				selectedFilePath={selectedFilePath}
 				pendingReveal={pendingReveal}
@@ -171,7 +188,28 @@ export function WorkspaceSidebar({
 		id: "models",
 		label: "Models",
 		icon: BotIcon,
-		content: <ModelsTab workspaceId={workspaceId} />,
+		content: <LazyModelsTab workspaceId={workspaceId} />,
+	};
+
+	const reviewTab: SidebarTabDefinition = {
+		id: "review",
+		label: "Review",
+		icon: LuMessageSquare,
+		content: (
+			<LazyReviewSidebarTab
+				workspaceId={workspaceId}
+				onOpenComment={onOpenComment}
+				onOpenInDiff={
+					onSelectDiffFile
+						? (path, line, openInNewTab, side) => {
+								// Force annotations on so the user lands on the comment, not an empty line.
+								useSettings.getState().update("showDiffComments", true);
+								onSelectDiffFile(path, openInNewTab ?? false, line, side);
+							}
+						: undefined
+				}
+			/>
+		),
 	};
 
 	const tabs: SidebarTabDefinition[] = [
@@ -201,8 +239,22 @@ export function WorkspaceSidebar({
 				compact={compact}
 			/>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-				{activeTabDef?.content}
+				<Suspense fallback={<SidebarTabFallback />}>
+					{activeTabDef?.content}
+				</Suspense>
 			</div>
 		</div>
 	);
+}
+
+type GitStatusData = NonNullable<
+	ReturnType<typeof useWorkspaceGitStatus>["data"]
+>;
+
+function getGitChangeCount(status: GitStatusData): number {
+	const changedPaths = new Set<string>();
+	for (const file of status.unstaged) changedPaths.add(file.path);
+	for (const file of status.staged) changedPaths.add(file.path);
+	for (const file of status.againstBase) changedPaths.add(file.path);
+	return changedPaths.size;
 }

@@ -132,7 +132,7 @@ terminalInputQueueRef.current = terminalInputQueueRef.current
 - The daemon runs under Node 20+ via Electron's bundled Node. Bun is the build/test tool, not the production daemon runtime.
 - The Unix socket file mode `0600` is the auth boundary; do not add ad hoc in-band tokens to the pty-daemon protocol.
 - Protocol version negotiation happens with `hello` and `hello-ack` in `packages/pty-daemon/src/protocol/messages.ts`.
-- Upgrade handoff preserves live sessions by passing PTY master fds to a successor process. Preserve tests in `packages/pty-daemon/test/handoff.test.ts` and `packages/host-service/src/terminal/terminal.adoption.node-test.ts` when changing adoption.
+- Upgrade handoff preserves live sessions by passing PTY master fds to a successor process. Preserve tests in `packages/pty-daemon/test/handoff.node-test.ts` and `packages/host-service/src/terminal/terminal.adoption.node-test.ts` when changing adoption.
 - In desktop development, Electron spawns host-service children per organization and terminates them on app quit. PTY survival across host-service restarts comes from `packages/pty-daemon` adoption and replay, not from host-service itself. Treat "Electron closed but background work continues indefinitely" as a separate product/runtime requirement unless a task explicitly implements durable background supervision.
 
 ### Scenario: Workspace Terminal Session Discovery

@@ -1,10 +1,17 @@
 import { Checkbox } from "@superset/ui/checkbox";
 import { cn } from "@superset/ui/utils";
 import { useQuery } from "@tanstack/react-query";
+import { TRELLIS_RUNTIME_PACK_ID } from "lib/pack-system/pack-ids";
 import { AlertCircle, CheckCircle2, Loader2, Workflow } from "lucide-react";
 import { useEffect } from "react";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
+import {
+	PackErrorState,
+	PackLoadingState,
+	usePackStatus,
+} from "renderer/lib/pack-system";
+import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 
 interface TrellisSetupRowProps {
 	projectId: string | null;
@@ -32,6 +39,8 @@ function statusCopy(
 		| "missing"
 		| "partial"
 		| "unavailable"
+		| "runtime-preparing"
+		| "runtime-error"
 		| "project-not-setup"
 		| "project-checking"
 		| undefined,
@@ -68,6 +77,16 @@ function statusCopy(
 				title: "Workflow check unavailable",
 				description: "Update selected device or continue without setup.",
 			};
+		case "runtime-preparing":
+			return {
+				title: "Preparing guided workflow runtime",
+				description: "Downloading and verifying the workflow runtime.",
+			};
+		case "runtime-error":
+			return {
+				title: "Runtime download failed",
+				description: "Workspace creation will use the bundled fallback.",
+			};
 		default:
 			return {
 				title: "Checking workflow setup",
@@ -86,6 +105,11 @@ export function TrellisSetupRow({
 	onInitializeChange,
 }: TrellisSetupRowProps) {
 	const hostUrl = useHostUrl(hostId);
+	const { machineId } = useLocalHostService();
+	const shouldTrackRuntimePack = initialize && !!hostId && hostId === machineId;
+	const runtimePack = usePackStatus(TRELLIS_RUNTIME_PACK_ID, {
+		enabled: shouldTrackRuntimePack,
+	});
 	const canCheckWorkflow =
 		projectSetupState !== "checking" &&
 		(projectSetupState !== "not-setup" || allowProjectPreparation);
@@ -119,8 +143,26 @@ export function TrellisSetupRow({
 	const state =
 		setupBlockedState ??
 		(canPrepareProject ? "missing" : error ? "unavailable" : data?.state);
-	const copy = statusCopy(state);
+	const runtimeState =
+		shouldTrackRuntimePack &&
+		runtimePack.status?.status !== "not_configured" &&
+		(runtimePack.status?.status === "downloading" ||
+			runtimePack.status?.status === "verifying")
+			? "runtime-preparing"
+			: shouldTrackRuntimePack && runtimePack.status?.status === "error"
+				? "runtime-error"
+				: null;
+	const effectiveState = runtimeState ?? state;
+	const copy = statusCopy(effectiveState);
 	const canInitialize = state === "missing" && !disabled;
+	const runtimePercent =
+		runtimePack.status?.progress && runtimePack.status.progress.totalBytes > 0
+			? Math.round(
+					(runtimePack.status.progress.bytesDownloaded /
+						runtimePack.status.progress.totalBytes) *
+						100,
+				)
+			: null;
 
 	useEffect(() => {
 		if (canInitialize || !initialize) return;
@@ -146,7 +188,7 @@ export function TrellisSetupRow({
 				/>
 			) : (
 				<div className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-muted-foreground">
-					{isFetching && !data ? (
+					{runtimeState === "runtime-preparing" || (isFetching && !data) ? (
 						<Loader2 className="size-3 animate-spin" />
 					) : state === "ready" ? (
 						<CheckCircle2 className="size-3 text-emerald-500" />
@@ -161,14 +203,31 @@ export function TrellisSetupRow({
 					)}
 				</div>
 			)}
-			<div className="min-w-0 flex-1">
-				<div className="truncate text-xs font-medium text-foreground">
-					{copy.title}
+			{runtimeState === "runtime-preparing" ? (
+				<PackLoadingState
+					title={copy.title}
+					description={copy.description}
+					progressPercent={runtimePercent}
+				/>
+			) : runtimeState === "runtime-error" ? (
+				<PackErrorState
+					title={copy.title}
+					description={copy.description}
+					isRetrying={runtimePack.isResolving}
+					onRetry={() => {
+						void runtimePack.resolve();
+					}}
+				/>
+			) : (
+				<div className="min-w-0 flex-1">
+					<div className="truncate text-xs font-medium text-foreground">
+						{copy.title}
+					</div>
+					<div className="truncate text-[11px] text-muted-foreground">
+						{copy.description}
+					</div>
 				</div>
-				<div className="truncate text-[11px] text-muted-foreground">
-					{copy.description}
-				</div>
-			</div>
+			)}
 		</div>
 	);
 }

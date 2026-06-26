@@ -56,7 +56,7 @@ async function main(): Promise<void> {
 	// build time and constant-fold the comparison — bracket notation
 	// `process.env["KEY"]` doesn't help; both bundlers see through it.
 	// `process.argv` is fully dynamic, can't be statically analyzed, and
-	// survives every bundler we run (handoff.test.ts, dev electron-vite,
+	// survives every bundler we run (handoff.node-test.ts, dev electron-vite,
 	// prod desktop bundle). See plans note about bundler DCE.
 	if (process.argv.includes("--handoff")) {
 		await runHandoffReceiver();

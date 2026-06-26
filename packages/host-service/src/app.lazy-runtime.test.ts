@@ -7,6 +7,42 @@ function readSource(relativePath: string): string {
 }
 
 describe("host-service startup dependency boundaries", () => {
+	test("createApp defers workspace watchers and PR timers until a consumer appears", () => {
+		const source = readSource("app.ts");
+
+		const gitWatcherStartCalls = [
+			...source.matchAll(/gitWatcher\.start\(\);/g),
+		];
+		expect(gitWatcherStartCalls).toHaveLength(1);
+		expect(
+			source.slice(
+				Math.max(0, (gitWatcherStartCalls[0]?.index ?? 0) - 160),
+				gitWatcherStartCalls[0]?.index,
+			),
+		).toContain("const ensureGitWatcherStarted");
+
+		const pullRequestStartCalls = [
+			...source.matchAll(/pullRequestRuntime\.start\(\);/g),
+		];
+		expect(pullRequestStartCalls).toHaveLength(1);
+		expect(
+			source.slice(
+				Math.max(0, (pullRequestStartCalls[0]?.index ?? 0) - 180),
+				pullRequestStartCalls[0]?.index,
+			),
+		).toContain("const ensurePullRequestRuntimeStarted");
+
+		const eventBusStartCalls = [...source.matchAll(/eventBus\.start\(\);/g)];
+		expect(eventBusStartCalls).toHaveLength(1);
+		expect(
+			source.slice(
+				Math.max(0, (eventBusStartCalls[0]?.index ?? 0) - 160),
+				eventBusStartCalls[0]?.index,
+			),
+		).toContain("const ensureEventBusStarted");
+		expect(source).toContain("onClientOpen: ensureEventBusStarted");
+	});
+
 	test("createApp keeps chat and model gateway modules off the static startup path", () => {
 		const source = readSource("app.ts");
 
@@ -20,7 +56,10 @@ describe("host-service startup dependency boundaries", () => {
 			/import\s+\{\s*handleModelGatewayRequest\s*\}\s+from\s+["']\.\/model-gateway["']/,
 		);
 
-		expect(source).toContain('await import("@superset/chat/server/desktop")');
+		expect(source).toContain('"@superset/chat/server/desktop/chat-service"');
+		expect(source).not.toContain(
+			'await import("@superset/chat/server/desktop")',
+		);
 		expect(source).toContain('import("./runtime/chat")');
 		expect(source).toContain('await import("./model-gateway")');
 	});

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import type {
@@ -43,6 +43,7 @@ export function UserMessage({
 	const draft = getUserMessageDraft(message);
 	const fullText = draft.text;
 	const [copied, setCopied] = useState(false);
+	const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const isPersistedMessage =
 		!message.id.startsWith("optimistic-") &&
 		!message.id.startsWith("immediate-user-message-");
@@ -64,11 +65,25 @@ export function UserMessage({
 		[addFileViewerPane, workspaceId],
 	);
 	const { copyToClipboard } = useCopyToClipboard();
+	useEffect(() => {
+		return () => {
+			if (copyResetTimerRef.current) {
+				clearTimeout(copyResetTimerRef.current);
+			}
+		};
+	}, []);
+
 	const handleCopy = useCallback(() => {
 		if (!fullText) return;
 		copyToClipboard(fullText);
 		setCopied(true);
-		setTimeout(() => setCopied(false), 1500);
+		if (copyResetTimerRef.current) {
+			clearTimeout(copyResetTimerRef.current);
+		}
+		copyResetTimerRef.current = setTimeout(() => {
+			setCopied(false);
+			copyResetTimerRef.current = null;
+		}, 1500);
 	}, [fullText, copyToClipboard]);
 	const handleResend = useCallback(() => {
 		const resendPayload: UserMessageActionPayload = {

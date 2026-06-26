@@ -30,6 +30,10 @@ import {
 	type StartupPerformanceRendererMarkPayload,
 } from "shared/startup-performance";
 import { setupAgentHooks } from "./lib/agent-setup";
+import {
+	getStartupTotalMs,
+	trackDesktopPerformanceTelemetry,
+} from "./lib/analytics/performance-telemetry";
 import { initAppState } from "./lib/app-state";
 import { requestAppleEventsAccess } from "./lib/apple-events-permission";
 import { isUpdateReadyToInstall, setupAutoUpdater } from "./lib/auto-updater";
@@ -45,6 +49,12 @@ import {
 	shutdownTanstackDbPersistence,
 } from "./lib/persistence/persistence";
 import { ensureProjectIconsDir, getProjectIconPath } from "./lib/project-icons";
+import {
+	captureProcessSnapshot,
+	enrichWithPhysFootprint,
+	getSubtreePids,
+	getSubtreeResources,
+} from "./lib/resource-metrics/process-tree";
 import { initSentry } from "./lib/sentry";
 import {
 	getStartupPerformanceReport,
@@ -64,6 +74,7 @@ import { MainWindow } from "./windows/main";
 
 console.log("[main] Local database ready:", !!localDb);
 const IS_DEV = process.env.NODE_ENV === "development";
+const STARTUP_PERFORMANCE_TELEMETRY_DELAY_MS = 30_000;
 markStartup("main:index-module-ready");
 
 ipcMain.handle(STARTUP_PERFORMANCE_GET_CHANNEL, () =>
@@ -287,6 +298,97 @@ async function teardownTerminalHost(): Promise<void> {
 	disposeTerminalHostClient();
 }
 
+function runAfterFirstWindowShow(
+	window: BrowserWindow,
+	callback: () => void,
+): void {
+	const run = () => {
+		setTimeout(callback, 0);
+	};
+
+	if (window.isDestroyed()) return;
+	if (window.isVisible()) {
+		run();
+		return;
+	}
+	window.once("show", run);
+}
+
+function runDeferredStartupTasks(): void {
+	void (async () => {
+		markStartup("main:deferred-startup-start");
+
+		try {
+			markStartup("main:network-logger-start");
+			await startNetworkLogger();
+			markStartup("main:network-logger-end");
+		} catch (error) {
+			console.error("[main] Failed to start network logger:", error);
+		}
+
+		try {
+			markStartup("main:webview-extension-start");
+			await loadWebviewBrowserExtension();
+			markStartup("main:webview-extension-end");
+		} catch (error) {
+			console.error("[main] Failed to load webview extension:", error);
+		}
+
+		markStartup("main:terminal-prewarm-start");
+		prewarmTerminalRuntime();
+		markStartup("main:terminal-prewarm-end");
+
+		try {
+			markStartup("main:agent-hooks-start");
+			setupAgentHooks();
+			markStartup("main:agent-hooks-end");
+		} catch (error) {
+			console.error("[main] Failed to set up agent hooks:", error);
+		}
+
+		try {
+			markStartup("main:bundled-cli-shim-start");
+			installBundledCliShim();
+			markStartup("main:bundled-cli-shim-end");
+		} catch (error) {
+			console.error("[main] Failed to install bundled CLI shim:", error);
+		}
+
+		markStartup("main:deferred-startup-end");
+	})();
+}
+
+function scheduleStartupPerformanceTelemetry(): void {
+	if (IS_DEV) return;
+
+	const timer = setTimeout(() => {
+		void (async () => {
+			const processSnapshot = await captureProcessSnapshot();
+			const desktopPids = getSubtreePids(processSnapshot, process.pid);
+			enrichWithPhysFootprint(processSnapshot, desktopPids);
+			const desktopResources = getSubtreeResources(
+				processSnapshot,
+				process.pid,
+			);
+
+			trackDesktopPerformanceTelemetry({
+				source: "startup",
+				startupTotalMs: getStartupTotalMs(getStartupPerformanceReport()),
+				peakMemoryBytes: desktopResources.memory,
+				idleMemoryBytes: desktopResources.memory,
+				childProcessCount: Math.max(0, desktopResources.pids.length - 1),
+			});
+		})().catch((error) => {
+			console.warn(
+				"[main] Failed to capture startup performance telemetry:",
+				error,
+			);
+		});
+	}, STARTUP_PERFORMANCE_TELEMETRY_DELAY_MS);
+
+	timer.unref?.();
+}
+
 process.on("uncaughtException", (error) => {
 	if (isQuitting) return;
 	console.error("[main] Uncaught exception:", error);
@@ -433,36 +535,10 @@ if (!gotTheLock) {
 		initTanstackDbPersistence();
 		markStartup("main:tanstack-persistence-end");
 
-		try {
-			markStartup("main:network-logger-start");
-			await startNetworkLogger();
-			markStartup("main:network-logger-end");
-		} catch (error) {
-			console.error("[main] Failed to start network logger:", error);
-		}
-
-		markStartup("main:webview-extension-start");
-		await loadWebviewBrowserExtension();
-		markStartup("main:webview-extension-end");
-
 		// Must happen before renderer restore runs
 		markStartup("main:terminal-reconcile-start");
 		await reconcileDaemonSessions();
 		markStartup("main:terminal-reconcile-end");
-		markStartup("main:terminal-prewarm-start");
-		prewarmTerminalRuntime();
-		markStartup("main:terminal-prewarm-end");
-
-		try {
-			setupAgentHooks();
-		} catch (error) {
-			console.error("[main] Failed to set up agent hooks:", error);
-		}
-		try {
-			installBundledCliShim();
-		} catch (error) {
-			console.error("[main] Failed to install bundled CLI shim:", error);
-		}
 
 		if (IS_DEV) {
 			getHostServiceCoordinator().enableDevReload(async () => {
@@ -473,8 +549,10 @@ if (!gotTheLock) {
 		}
 
 		markStartup("main:window-setup-start");
-		await makeAppSetup(() => MainWindow());
+		const mainWindow = await makeAppSetup(() => MainWindow());
 		markStartup("main:window-setup-end");
+		runAfterFirstWindowShow(mainWindow, runDeferredStartupTasks);
+		runAfterFirstWindowShow(mainWindow, scheduleStartupPerformanceTelemetry);
 		setupAutoUpdater();
 		initTray();
 

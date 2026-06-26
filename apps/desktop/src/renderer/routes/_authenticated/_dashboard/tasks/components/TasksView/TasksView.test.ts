@@ -144,9 +144,11 @@ describe("Run in Workspace selection wiring (#2641)", () => {
 		]) {
 			expect(source).toContain("TrellisSetupRow");
 			expect(source).toContain("useState(true)");
-			expect(source).toContain(
-				"trellisSetup: trellisInitialize ? { initialize: true } : undefined",
-			);
+			expect(source).toContain("useTrellisRuntimePack");
+			expect(source).toContain("prepareTrellisSetup");
+			expect(source).toContain("useLocalPack: hostId === machineId");
+			expect(source).toContain("trellisSetup,");
+			expect(source).toContain("trellisRuntimePack.isResolving");
 			expect(source).toContain("allowProjectPreparation");
 			expect(source).not.toContain("Project not set up on this host");
 			expect(source).not.toContain("Checking host…");

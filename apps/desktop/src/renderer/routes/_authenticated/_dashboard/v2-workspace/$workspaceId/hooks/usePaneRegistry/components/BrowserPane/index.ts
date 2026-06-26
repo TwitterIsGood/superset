@@ -1,6 +1,3 @@
-export {
-	BrowserPane,
-	BrowserPaneToolbar,
-	renderBrowserTabIcon,
-} from "./BrowserPane";
+export { BrowserPane, BrowserPaneToolbar } from "./BrowserPane";
 export { browserRuntimeRegistry } from "./browserRuntimeRegistry";
+export { renderBrowserTabIcon } from "./browserTabIcon";

@@ -32,6 +32,10 @@ export function BehaviorSettings({ visibleItems }: BehaviorSettingsProps) {
 		SETTING_ITEM_ID.BEHAVIOR_RESOURCE_MONITOR,
 		visibleItems,
 	);
+	const showTelemetry = isItemVisible(
+		SETTING_ITEM_ID.BEHAVIOR_TELEMETRY,
+		visibleItems,
+	);
 	const showOpenLinksInApp = isItemVisible(
 		SETTING_ITEM_ID.BEHAVIOR_OPEN_LINKS_IN_APP,
 		visibleItems,
@@ -125,6 +129,29 @@ export function BehaviorSettings({ visibleItems }: BehaviorSettingsProps) {
 		},
 	);
 
+	const { data: telemetryEnabled, isLoading: isTelemetryLoading } =
+		electronTrpc.settings.getTelemetryEnabled.useQuery();
+	const setTelemetryEnabled =
+		electronTrpc.settings.setTelemetryEnabled.useMutation({
+			onMutate: async ({ enabled }) => {
+				await utils.settings.getTelemetryEnabled.cancel();
+				const previous = utils.settings.getTelemetryEnabled.getData();
+				utils.settings.getTelemetryEnabled.setData(undefined, enabled);
+				return { previous };
+			},
+			onError: (_err, _vars, context) => {
+				if (context?.previous !== undefined) {
+					utils.settings.getTelemetryEnabled.setData(
+						undefined,
+						context.previous,
+					);
+				}
+			},
+			onSettled: () => {
+				utils.settings.getTelemetryEnabled.invalidate();
+			},
+		});
+
 	return (
 		<div className="p-6 max-w-4xl w-full">
 			<div className="mb-8">
@@ -199,6 +226,28 @@ export function BehaviorSettings({ visibleItems }: BehaviorSettingsProps) {
 							disabled={
 								isResourceMonitorLoading || setShowResourceMonitor.isPending
 							}
+						/>
+					</div>
+				)}
+
+				{showTelemetry && (
+					<div className="flex items-center justify-between">
+						<div className="space-y-0.5">
+							<Label htmlFor="telemetry" className="text-sm font-medium">
+								Usage and performance analytics
+							</Label>
+							<p className="text-xs text-muted-foreground">
+								Send aggregate app usage, startup, memory, and process metrics.
+								User content and file paths are not included.
+							</p>
+						</div>
+						<Switch
+							id="telemetry"
+							checked={telemetryEnabled ?? true}
+							onCheckedChange={(enabled) =>
+								setTelemetryEnabled.mutate({ enabled })
+							}
+							disabled={isTelemetryLoading || setTelemetryEnabled.isPending}
 						/>
 					</div>
 				)}

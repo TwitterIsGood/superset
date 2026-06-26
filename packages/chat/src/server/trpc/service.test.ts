@@ -1,4 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { RuntimeSession } from "./utils/runtime";
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
@@ -19,6 +21,20 @@ mock.module("mastracode", () => ({
 }));
 
 const { ChatRuntimeService } = await import("./service");
+
+function readServiceSource(): string {
+	return readFileSync(join(import.meta.dirname, "service.ts"), "utf8");
+}
+
+function staticImportSpecifiers(source: string): string[] {
+	const importDeclarations =
+		source.match(/import(?:[\s\S]*?)from\s+["'][^"']+["'];/g) ?? [];
+	return importDeclarations.flatMap((declaration) => {
+		if (declaration.startsWith("import type")) return [];
+		const match = declaration.match(/from\s+["']([^"']+)["'];/);
+		return match?.[1] ? [match[1]] : [];
+	});
+}
 
 function createRuntime(options?: {
 	respondToQuestion?: RuntimeSession["harness"]["respondToQuestion"];
@@ -89,6 +105,41 @@ function createServiceHarness(options?: Parameters<typeof createRuntime>[0]) {
 }
 
 describe("ChatRuntimeService control mutations", () => {
+	it("keeps heavyweight runtime modules out of top-level value imports", () => {
+		expect(staticImportSpecifiers(readServiceSource())).not.toEqual(
+			expect.arrayContaining([
+				"@mastra/memory",
+				"mastracode",
+				"./standalone-runtime",
+				"./utils/file-search",
+				"./utils/runtime",
+				"./utils/runtime/superset-mcp",
+			]),
+		);
+	});
+
+	it("wires standalone Claude runtime resolution into the lazy provider", () => {
+		const source = readServiceSource();
+
+		expect(source).toContain("resolveClaudeAgentRuntime");
+		expect(source).toContain("new ClaudeStandaloneChatProvider");
+		expect(source).toContain(
+			"resolveRuntimePaths: this.opts.resolveClaudeAgentRuntime",
+		);
+	});
+
+	it("supports injecting MastraCode runtime imports from a resource pack", () => {
+		const source = readServiceSource();
+
+		expect(source).toContain("resolveMastracodeRuntime");
+		expect(source).toContain("mastracodeImportPath");
+		expect(source).toContain("memoryImportPath");
+		expect(source).toContain("pathToFileURL");
+		expect(source).toContain("loadMastracodeRuntimeModules");
+		expect(source).toContain('?? "mastracode"');
+		expect(source).toContain('?? "@mastra/memory"');
+	});
+
 	it("passes cwd through stop and abort mutations", async () => {
 		const {
 			caller,

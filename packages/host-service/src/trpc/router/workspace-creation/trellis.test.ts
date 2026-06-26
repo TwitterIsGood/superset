@@ -18,6 +18,8 @@ import {
 	getTrellisStatusAtPath,
 	installSupersetTaskSyncHook,
 	mergeTrellisHookConfig,
+	resolveTrellisBinPath,
+	resolveTrellisBinPathFromPack,
 	resolveTrellisPlatformsFromAgents,
 	resolveUnpackedAsarPath,
 	type TrellisCommandArgs,
@@ -94,6 +96,72 @@ describe("applyTrellisSetup", () => {
 			),
 		).toBe(unpackedPath);
 		expect(resolveUnpackedAsarPath(asarPath, () => false)).toBe(asarPath);
+	});
+
+	test("resolves Trellis bin from an on-demand runtime pack", () => {
+		const packPath = "/Users/test/.superset/packs/trellis-runtime/1.2.0";
+		const trellisBinPath = join(
+			packPath,
+			"node_modules",
+			"@mindfoldhq",
+			"trellis",
+			"bin",
+			"trellis.js",
+		);
+
+		expect(
+			resolveTrellisBinPathFromPack(packPath, (candidate) => {
+				return candidate === trellisBinPath;
+			}),
+		).toBe(trellisBinPath);
+		expect(
+			resolveTrellisBinPath({
+				runtimePackPath: packPath,
+				exists: (candidate) => candidate === trellisBinPath,
+			}),
+		).toBe(trellisBinPath);
+	});
+
+	test("keeps explicit Trellis bin override ahead of runtime pack path", () => {
+		const previous = process.env.SUPERSET_TRELLIS_BIN_PATH;
+		process.env.SUPERSET_TRELLIS_BIN_PATH = "/tmp/override-trellis.js";
+		try {
+			expect(
+				resolveTrellisBinPath({
+					runtimePackPath: "/Users/test/.superset/packs/trellis-runtime/1.2.0",
+					exists: () => true,
+				}),
+			).toBe("/tmp/override-trellis.js");
+		} finally {
+			if (previous === undefined) {
+				delete process.env.SUPERSET_TRELLIS_BIN_PATH;
+			} else {
+				process.env.SUPERSET_TRELLIS_BIN_PATH = previous;
+			}
+		}
+	});
+
+	test("rejects bundled Trellis fallback outside explicit dev/test mode", () => {
+		const previousNodeEnv = process.env.NODE_ENV;
+		const previousAllow = process.env.SUPERSET_ALLOW_BUNDLED_TRELLIS_RUNTIME;
+		delete process.env.SUPERSET_ALLOW_BUNDLED_TRELLIS_RUNTIME;
+		process.env.NODE_ENV = "production";
+		try {
+			expect(() => resolveTrellisBinPath({ exists: () => false })).toThrow(
+				"Guided workflow runtime pack is not installed",
+			);
+		} finally {
+			if (previousNodeEnv === undefined) {
+				delete process.env.NODE_ENV;
+			} else {
+				process.env.NODE_ENV = previousNodeEnv;
+			}
+			if (previousAllow === undefined) {
+				delete process.env.SUPERSET_ALLOW_BUNDLED_TRELLIS_RUNTIME;
+			} else {
+				process.env.SUPERSET_ALLOW_BUNDLED_TRELLIS_RUNTIME = previousAllow;
+			}
+		}
 	});
 
 	test("maps selected task agents to matching Trellis platform adapters only", () => {

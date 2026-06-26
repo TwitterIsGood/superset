@@ -20,6 +20,7 @@ import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { useV2AgentChoices } from "renderer/hooks/useV2AgentChoices";
 import { authClient } from "renderer/lib/auth-client";
 import { showHostServiceUnavailableToast } from "renderer/lib/host-service-unavailable";
+import { useTrellisRuntimePack } from "renderer/lib/pack-system";
 import { DevicePicker } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker";
 import { useWorkspaceHostOptions } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker/hooks/useWorkspaceHostOptions";
 import {
@@ -70,6 +71,7 @@ export function RunInWorkspacePopoverV2({
 		: (session?.session?.activeOrganizationId ?? null);
 	const { otherHosts } = useWorkspaceHostOptions();
 	const { submit } = useWorkspaceCreates();
+	const trellisRuntimePack = useTrellisRuntimePack();
 
 	const lastHostId = useV2WorkspaceCreateDefaultsStore(
 		(state) => state.lastHostId,
@@ -211,7 +213,7 @@ export function RunInWorkspacePopoverV2({
 		activeHostUrl,
 	]);
 
-	const handleRun = () => {
+	const handleRun = async () => {
 		if (!selectedProjectId || !hostId) return;
 		if (submitBlocker) {
 			if (hostId === machineId && !activeHostUrl) {
@@ -224,6 +226,10 @@ export function RunInWorkspacePopoverV2({
 			return;
 		}
 
+		const trellisSetup = await trellisRuntimePack.prepareTrellisSetup({
+			initialize: trellisInitialize,
+			useLocalPack: hostId === machineId,
+		});
 		const handles = tasks.map((task) =>
 			submit({
 				hostId,
@@ -242,7 +248,7 @@ export function RunInWorkspacePopoverV2({
 										prompt: synthesizeTaskPrompt(task),
 									},
 								],
-					trellisSetup: trellisInitialize ? { initialize: true } : undefined,
+					trellisSetup,
 				},
 			}),
 		);
@@ -392,8 +398,8 @@ export function RunInWorkspacePopoverV2({
 					<Button
 						size="sm"
 						className="w-full h-8"
-						disabled={!!submitBlocker}
-						onClick={handleRun}
+						disabled={!!submitBlocker || trellisRuntimePack.isResolving}
+						onClick={() => void handleRun()}
 					>
 						Run {tasks.length} Workspace{tasks.length === 1 ? "" : "s"}
 					</Button>

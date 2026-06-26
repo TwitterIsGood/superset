@@ -150,6 +150,9 @@ describe("selectActionButton", () => {
 	test("loading → hidden", () => {
 		expect(selectActionButton({ kind: "loading" })).toEqual({ kind: "hidden" });
 	});
+	test("idle → hidden", () => {
+		expect(selectActionButton({ kind: "idle" })).toEqual({ kind: "hidden" });
+	});
 	test("pr-exists → hidden (post-PR actions land later)", () => {
 		expect(
 			selectActionButton({ kind: "pr-exists", pr: pr(), sync: sync() }),
@@ -163,6 +166,9 @@ describe("selectActionButton", () => {
 });
 
 describe("selectPRLink", () => {
+	test("none when idle", () => {
+		expect(selectPRLink({ kind: "idle" })).toEqual({ kind: "none" });
+	});
 	test("none when no PR", () => {
 		expect(selectPRLink({ kind: "no-pr", sync: sync() })).toEqual({
 			kind: "none",
@@ -208,6 +214,9 @@ describe("selectPRLink", () => {
 });
 
 describe("selectStatusBadge (no-pr variants)", () => {
+	test("no badge when idle", () => {
+		expect(selectStatusBadge({ kind: "idle" })).toBeNull();
+	});
 	test("'Not published' when no upstream", () => {
 		expect(
 			selectStatusBadge({

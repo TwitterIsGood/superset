@@ -49,4 +49,24 @@ describe("v2 workspace collection create persistence", () => {
 			"withSyncedRowUpsertFor<SelectV2Workspace>()",
 		);
 	});
+
+	test("preloads organization collections by forcing immediate sync first", () => {
+		const preloadSetBlock = source.slice(
+			source.indexOf("async function preloadCollectionSet"),
+			source.indexOf("/**\n * Get collections for an organization"),
+		);
+
+		expect(preloadSetBlock).toContain("startSyncImmediate?.()");
+		expect(preloadSetBlock).toContain("return collection.preload();");
+		expect(source).toContain("type SyncableCollection");
+	});
+
+	test("recovers partial v2 workspace graph caches by clearing stale Electric resume metadata", () => {
+		expect(source).toContain("getV2WorkspaceGraphHealth");
+		expect(source).toContain("recoverPartialV2WorkspaceGraphCache");
+		expect(source).toContain('"electric:resume"');
+		expect(source).toContain("truncate: true");
+		expect(source).toContain("v2Workspaces has");
+		expect(source).toContain("window.__supersetCollectionsDebug");
+	});
 });

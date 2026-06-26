@@ -133,6 +133,48 @@ type SyncedRowCollection<T extends object> = Collection<
 	SyncedRowUpsertUtils<T>
 >;
 
+type SyncableCollection = Collection<object> & {
+	startSyncImmediate?: () => void;
+};
+
+type CollectionStatusSnapshot = {
+	id: string;
+	rowCount: number;
+	status: string;
+};
+
+const PERSISTED_ELECTRIC_SCHEMA_VERSION = 1;
+const V2_WORKSPACE_GRAPH_KEYS = [
+	"v2Workspaces",
+	"v2Projects",
+	"v2Hosts",
+	"v2UsersHosts",
+] as const satisfies readonly (keyof OrgCollections)[];
+const V2_WORKSPACE_GRAPH_DEPENDENCY_KEYS = [
+	"v2Projects",
+	"v2Hosts",
+	"v2UsersHosts",
+] as const satisfies readonly (keyof OrgCollections)[];
+
+type V2WorkspaceGraphKey = (typeof V2_WORKSPACE_GRAPH_KEYS)[number];
+type V2WorkspaceGraphDependencyKey =
+	(typeof V2_WORKSPACE_GRAPH_DEPENDENCY_KEYS)[number];
+
+export interface V2WorkspaceGraphHealthReport {
+	organizationId: string;
+	collections: Record<V2WorkspaceGraphKey, CollectionStatusSnapshot>;
+	isPartial: boolean;
+	resetKeys: V2WorkspaceGraphDependencyKey[];
+	reason?: string;
+}
+
+export interface V2WorkspaceGraphRecoveryReport
+	extends V2WorkspaceGraphHealthReport {
+	recovered: boolean;
+	before: V2WorkspaceGraphHealthReport;
+	after?: V2WorkspaceGraphHealthReport;
+}
+
 function withSyncedRowUpsertFor<T extends object>() {
 	return <
 		TConfig extends {
@@ -1010,6 +1052,149 @@ function createOrgCollections(organizationId: string): OrgCollections {
 	};
 }
 
+function getCollectionStatusSnapshot(
+	collection: Collection<object>,
+): CollectionStatusSnapshot {
+	return {
+		id: collection.id,
+		rowCount: collection.size,
+		status: collection.status,
+	};
+}
+
+export function getV2WorkspaceGraphHealth(
+	organizationId: string,
+): V2WorkspaceGraphHealthReport {
+	const collections = getCollections(organizationId);
+	const snapshots = Object.fromEntries(
+		V2_WORKSPACE_GRAPH_KEYS.map((key) => [
+			key,
+			getCollectionStatusSnapshot(collections[key] as Collection<object>),
+		]),
+	) as Record<V2WorkspaceGraphKey, CollectionStatusSnapshot>;
+	const workspaceCount = snapshots.v2Workspaces.rowCount;
+	const resetKeys = V2_WORKSPACE_GRAPH_DEPENDENCY_KEYS.filter((key) => {
+		const snapshot = snapshots[key];
+		return (
+			workspaceCount > 0 &&
+			snapshot.rowCount === 0 &&
+			snapshot.status === "ready"
+		);
+	});
+	const isPartial = resetKeys.length > 0;
+
+	return {
+		organizationId,
+		collections: snapshots,
+		isPartial,
+		resetKeys,
+		...(isPartial
+			? {
+					reason: `v2Workspaces has ${workspaceCount} row(s), but ${resetKeys.join(
+						", ",
+					)} finished with 0 row(s).`,
+				}
+			: {}),
+	};
+}
+
+function createRecoveryTx(collectionId: string) {
+	const now = Date.now();
+	return {
+		txId: `desktop-electric-cache-recovery:${collectionId}:${now}:${Math.random()
+			.toString(36)
+			.slice(2)}`,
+		term: now,
+		seq: Math.floor(Math.random() * 1_000_000_000),
+		rowVersion: 0,
+		truncate: true,
+		mutations: [],
+		collectionMetadataMutations: [
+			{ type: "delete" as const, key: "electric:resume" },
+		],
+	};
+}
+
+async function resetPersistedElectricCollection(
+	collection: Collection<object>,
+): Promise<void> {
+	const resolvedPersistence =
+		persistence.resolvePersistenceForCollection?.({
+			collectionId: collection.id,
+			mode: "sync-present",
+			schemaVersion: PERSISTED_ELECTRIC_SCHEMA_VERSION,
+		}) ??
+		persistence.resolvePersistenceForMode?.("sync-present") ??
+		persistence;
+
+	await collection.cleanup();
+	await resolvedPersistence.adapter.applyCommittedTx(
+		collection.id,
+		createRecoveryTx(collection.id),
+	);
+}
+
+export async function recoverPartialV2WorkspaceGraphCache(
+	organizationId: string,
+): Promise<V2WorkspaceGraphRecoveryReport> {
+	const before = getV2WorkspaceGraphHealth(organizationId);
+	if (!before.isPartial) {
+		return {
+			...before,
+			recovered: false,
+			before,
+		};
+	}
+
+	const collections = getCollections(organizationId);
+	await Promise.all(
+		before.resetKeys.map((key) =>
+			resetPersistedElectricCollection(collections[key] as Collection<object>),
+		),
+	);
+
+	const after = getV2WorkspaceGraphHealth(organizationId);
+	return {
+		...after,
+		recovered: true,
+		before,
+		after,
+	};
+}
+
+function getV2WorkspaceGraphRecoveryReloadKey(organizationId: string) {
+	return `superset:v2-workspace-graph-cache-recovered:${organizationId}`;
+}
+
+async function reloadOnceAfterV2WorkspaceGraphRecovery(
+	organizationId: string,
+): Promise<void> {
+	const report = await recoverPartialV2WorkspaceGraphCache(organizationId);
+	if (!report.recovered) return;
+
+	console.warn(
+		"[collections] Recovered partial v2 workspace collection cache; reloading renderer.",
+		report.before,
+	);
+
+	const reloadKey = getV2WorkspaceGraphRecoveryReloadKey(organizationId);
+	if (globalThis.sessionStorage?.getItem(reloadKey)) return;
+	globalThis.sessionStorage?.setItem(reloadKey, new Date().toISOString());
+	globalThis.location?.reload();
+}
+
+async function preloadCollectionSet(
+	collectionsToPreload: Collection<object>[],
+): Promise<void> {
+	await Promise.allSettled(
+		collectionsToPreload.map((collection) => {
+			const syncableCollection = collection as SyncableCollection;
+			syncableCollection.startSyncImmediate?.();
+			return collection.preload();
+		}),
+	);
+}
+
 /**
  * Preload collections for an organization by starting Electric sync.
  * Collections are lazy — they don't fetch data until subscribed or preloaded.
@@ -1023,9 +1208,8 @@ export async function preloadCollections(
 		.filter(([name]) => name !== "organizations")
 		.map(([, collection]) => collection as Collection<object>);
 
-	await Promise.allSettled(
-		collectionsToPreload.map((c) => (c as Collection<object>).preload()),
-	);
+	await preloadCollectionSet(collectionsToPreload);
+	await reloadOnceAfterV2WorkspaceGraphRecovery(organizationId);
 }
 
 /**
@@ -1053,3 +1237,40 @@ export function getCollections(organizationId: string) {
 }
 
 export type AppCollections = ReturnType<typeof getCollections>;
+
+declare global {
+	interface Window {
+		__supersetCollectionsDebug?: {
+			getV2WorkspaceGraphHealth: (
+				organizationId?: string,
+			) => V2WorkspaceGraphHealthReport | { error: string };
+			recoverPartialV2WorkspaceGraphCache: (
+				organizationId?: string,
+			) => Promise<V2WorkspaceGraphRecoveryReport | { error: string }>;
+		};
+	}
+}
+
+function getDebugOrganizationId(organizationId?: string): string | null {
+	if (organizationId) return organizationId;
+	return globalThis.localStorage?.getItem("active_organization_id") ?? null;
+}
+
+if (typeof window !== "undefined" && env.NODE_ENV === "development") {
+	window.__supersetCollectionsDebug = {
+		getV2WorkspaceGraphHealth: (organizationId?: string) => {
+			const resolvedOrganizationId = getDebugOrganizationId(organizationId);
+			if (!resolvedOrganizationId) {
+				return { error: "No active organization id is available." };
+			}
+			return getV2WorkspaceGraphHealth(resolvedOrganizationId);
+		},
+		recoverPartialV2WorkspaceGraphCache: async (organizationId?: string) => {
+			const resolvedOrganizationId = getDebugOrganizationId(organizationId);
+			if (!resolvedOrganizationId) {
+				return { error: "No active organization id is available." };
+			}
+			return recoverPartialV2WorkspaceGraphCache(resolvedOrganizationId);
+		},
+	};
+}

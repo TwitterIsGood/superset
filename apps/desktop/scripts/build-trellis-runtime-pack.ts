@@ -1,0 +1,342 @@
+import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
+import {
+	chmod,
+	cp,
+	mkdir,
+	readFile,
+	rm,
+	stat,
+	writeFile,
+} from "node:fs/promises";
+import { createRequire } from "node:module";
+import { dirname, join, relative, resolve } from "node:path";
+import fg from "fast-glob";
+import { TRELLIS_RUNTIME_PACK_ID } from "../src/lib/pack-system/pack-ids";
+import {
+	type PackFileManifest,
+	packManifestIndexSchema,
+	packManifestSchema,
+} from "../src/main/lib/pack-system/types";
+import { trellisRuntimePackResourceCopies } from "./trellis-runtime-pack-dependencies";
+
+const require = createRequire(import.meta.url);
+const appDir = resolve(import.meta.dirname, "..");
+const workspaceRoot = resolve(appDir, "..", "..");
+const defaultOutDir = join(appDir, "dist", "resource-packs");
+const RESOURCE_PACK_BASE_URL_ENV = "SUPERSET_RESOURCE_PACK_BASE_URL";
+
+interface BuildArgs {
+	appIndexOut?: string;
+	downloadUrl?: string;
+	minAppVersion?: string;
+	outDir: string;
+	version?: string;
+}
+
+function fail(message: string): never {
+	console.error(`[build:trellis-pack] ${message}`);
+	process.exit(1);
+}
+
+function parseArgs(): BuildArgs {
+	const parsed: BuildArgs = { outDir: defaultOutDir };
+	const args = process.argv.slice(2);
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		const [flag, inlineValue] = arg.split("=", 2);
+		const readValue = () => {
+			if (inlineValue) return inlineValue;
+			const value = args[index + 1];
+			if (!value) fail(`${flag} requires a value`);
+			index += 1;
+			return value;
+		};
+
+		switch (flag) {
+			case "--app-index-out":
+				parsed.appIndexOut = resolve(readValue());
+				break;
+			case "--download-url":
+				parsed.downloadUrl = readValue();
+				break;
+			case "--min-app-version":
+				parsed.minAppVersion = readValue();
+				break;
+			case "--out-dir":
+				parsed.outDir = resolve(readValue());
+				break;
+			case "--version":
+				parsed.version = readValue();
+				break;
+			default:
+				fail(`Unknown argument: ${arg}`);
+		}
+	}
+	return parsed;
+}
+
+function readPackageJson(packageRoot: string): {
+	name?: string;
+	version?: string;
+} {
+	return JSON.parse(
+		readFileSync(join(packageRoot, "package.json"), "utf8"),
+	) as {
+		name?: string;
+		version?: string;
+	};
+}
+
+function readFileSync(path: string): string {
+	return require("node:fs").readFileSync(path, "utf8") as string;
+}
+
+function packageNameFromNodeModulesPath(path: string): string {
+	const segments = path.split("/");
+	const nodeModulesIndex = segments.lastIndexOf("node_modules");
+	if (nodeModulesIndex < 0 || nodeModulesIndex === segments.length - 1) {
+		fail(`Cannot infer package name from ${path}`);
+	}
+	const first = segments[nodeModulesIndex + 1];
+	if (!first) fail(`Cannot infer package name from ${path}`);
+	if (first.startsWith("@")) {
+		const second = segments[nodeModulesIndex + 2];
+		if (!second) fail(`Cannot infer scoped package name from ${path}`);
+		return `${first}/${second}`;
+	}
+	return first;
+}
+
+function packageNamesInNodeModulesPath(path: string): string[] {
+	const names: string[] = [];
+	const segments = path.split("/");
+	for (let index = 0; index < segments.length; index += 1) {
+		if (segments[index] !== "node_modules") continue;
+		const first = segments[index + 1];
+		if (!first) continue;
+		if (first.startsWith("@")) {
+			const second = segments[index + 2];
+			if (second) names.push(`${first}/${second}`);
+			index += 2;
+		} else {
+			names.push(first);
+			index += 1;
+		}
+	}
+	return names;
+}
+
+function findPackageRootFromEntry(
+	packageName: string,
+	entryPath: string,
+): string | null {
+	let dir = dirname(entryPath);
+	while (dir !== dirname(dir)) {
+		const packageJsonPath = join(dir, "package.json");
+		if (existsSync(packageJsonPath)) {
+			const packageJson = readPackageJson(dir);
+			if (packageJson.name === packageName) return dir;
+		}
+		dir = dirname(dir);
+	}
+	return null;
+}
+
+function resolvePackageRoot(packageName: string, paths: string[]): string {
+	try {
+		const packageJsonPath = require.resolve(`${packageName}/package.json`, {
+			paths,
+		});
+		return dirname(packageJsonPath);
+	} catch {
+		const entryPath = require.resolve(packageName, { paths });
+		const root = findPackageRootFromEntry(packageName, entryPath);
+		if (root) return root;
+		throw new Error(`Could not find package root for ${packageName}`);
+	}
+}
+
+function resolveCopySource(from: string, trellisRoot: string): string {
+	const names = packageNamesInNodeModulesPath(from);
+	const packageName = packageNameFromNodeModulesPath(from);
+	const parentPackageName = names.length > 1 ? names.at(-2) : null;
+	const searchPaths = [trellisRoot, appDir, workspaceRoot];
+
+	if (parentPackageName) {
+		const parentRoot = resolvePackageRoot(parentPackageName, searchPaths);
+		return resolvePackageRoot(packageName, [parentRoot, ...searchPaths]);
+	}
+
+	return resolvePackageRoot(packageName, searchPaths);
+}
+
+async function sha256File(path: string): Promise<string> {
+	const hash = createHash("sha256");
+	hash.update(await readFile(path));
+	return hash.digest("hex");
+}
+
+async function copyRuntimeModule(args: {
+	from: string;
+	to: string;
+	trellisRoot: string;
+	versionRoot: string;
+}): Promise<void> {
+	const source = resolveCopySource(args.from, args.trellisRoot);
+	const target = join(args.versionRoot, args.to);
+	await rm(target, { recursive: true, force: true });
+	await mkdir(dirname(target), { recursive: true });
+	await cp(source, target, {
+		recursive: true,
+		dereference: true,
+		filter: (sourcePath) =>
+			!sourcePath.includes(`${join("node_modules", ".cache")}`),
+	});
+}
+
+function ensureTrailingSlash(value: string): string {
+	return value.endsWith("/") ? value : `${value}/`;
+}
+
+function defaultDownloadUrl(version: string): string {
+	const baseUrl =
+		process.env[RESOURCE_PACK_BASE_URL_ENV]?.trim() ||
+		"https://cdn.superset.sh/packs";
+	return new URL(
+		`${TRELLIS_RUNTIME_PACK_ID}/${version}/`,
+		ensureTrailingSlash(baseUrl),
+	).href;
+}
+
+async function buildManifest(args: {
+	downloadUrl: string;
+	minAppVersion?: string;
+	version: string;
+	versionRoot: string;
+}) {
+	const filePaths = await fg("**/*", {
+		cwd: args.versionRoot,
+		dot: true,
+		onlyFiles: true,
+		ignore: ["manifest.json"],
+	});
+	const files: PackFileManifest[] = [];
+	for (const path of filePaths.sort()) {
+		const absolutePath = join(args.versionRoot, path);
+		const entry = await stat(absolutePath);
+		files.push({
+			path,
+			size: entry.size,
+			sha256: await sha256File(absolutePath),
+			...(entry.mode & 0o111 ? { executable: true } : {}),
+		});
+	}
+
+	return packManifestSchema.parse({
+		schemaVersion: 1,
+		packId: TRELLIS_RUNTIME_PACK_ID,
+		version: args.version,
+		minAppVersion: args.minAppVersion,
+		downloadUrl: args.downloadUrl,
+		files,
+		executeHint: {
+			runtime: "node",
+			entry: "node_modules/@mindfoldhq/trellis/bin/trellis.js",
+		},
+	});
+}
+
+async function main() {
+	const args = parseArgs();
+	const trellisRoot = resolvePackageRoot("@mindfoldhq/trellis", [
+		appDir,
+		workspaceRoot,
+	]);
+	const trellisPackage = readPackageJson(trellisRoot);
+	const version = args.version ?? trellisPackage.version;
+	if (!version) fail("Could not determine Trellis runtime pack version");
+
+	const packRoot = join(args.outDir, TRELLIS_RUNTIME_PACK_ID);
+	const versionRoot = join(packRoot, version);
+	await rm(versionRoot, { recursive: true, force: true });
+	await mkdir(versionRoot, { recursive: true });
+
+	for (const copySpec of trellisRuntimePackResourceCopies) {
+		await copyRuntimeModule({
+			from: copySpec.from,
+			to: copySpec.to,
+			trellisRoot,
+			versionRoot,
+		});
+	}
+
+	const manifest = await buildManifest({
+		version,
+		versionRoot,
+		minAppVersion: args.minAppVersion,
+		downloadUrl: args.downloadUrl ?? defaultDownloadUrl(version),
+	});
+	await writeFile(
+		join(versionRoot, "manifest.json"),
+		`${JSON.stringify(manifest, null, 2)}\n`,
+	);
+
+	const generatedAt = new Date().toISOString();
+	await writeFile(
+		join(packRoot, "manifest.json"),
+		`${JSON.stringify(
+			{
+				schemaVersion: 1,
+				packId: TRELLIS_RUNTIME_PACK_ID,
+				latest: version,
+				versions: [version],
+				generatedAt,
+			},
+			null,
+			2,
+		)}\n`,
+	);
+
+	const appIndex = packManifestIndexSchema.parse({
+		schemaVersion: 1,
+		generatedAt,
+		packs: {
+			[TRELLIS_RUNTIME_PACK_ID]: [manifest],
+		},
+	});
+	const appIndexJson = `${JSON.stringify(appIndex, null, 2)}\n`;
+	const packAppIndexPath = join(args.outDir, "pack-manifest-index.json");
+	await writeFile(packAppIndexPath, appIndexJson);
+	if (args.appIndexOut) {
+		await mkdir(dirname(args.appIndexOut), { recursive: true });
+		await writeFile(args.appIndexOut, appIndexJson);
+	}
+
+	const trellisBin = join(
+		versionRoot,
+		"node_modules",
+		"@mindfoldhq",
+		"trellis",
+		"bin",
+		"trellis.js",
+	);
+	if (existsSync(trellisBin)) {
+		await chmod(trellisBin, 0o755);
+	}
+
+	console.log("# Trellis Runtime Pack");
+	console.log(`- Version: ${version}`);
+	console.log(`- Files: ${manifest.files.length}`);
+	console.log(`- Output: ${relative(process.cwd(), versionRoot)}`);
+	console.log(`- App index: ${relative(process.cwd(), packAppIndexPath)}`);
+	if (args.appIndexOut) {
+		console.log(
+			`- Embedded index: ${relative(process.cwd(), args.appIndexOut)}`,
+		);
+	}
+}
+
+void main().catch((error) => {
+	fail(error instanceof Error ? error.message : String(error));
+});

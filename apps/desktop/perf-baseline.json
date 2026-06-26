@@ -1,0 +1,15 @@
+{
+	"$schema": "./scripts/perf-baseline.schema.json",
+	"startup": {
+		"notes": "Phase 0 placeholder until a measured canary baseline is recorded. Keep maxMs in perf-budget.json as the hard gate; this file drives regression math once replaced with real measurements.",
+		"measured": false,
+		"marks": {
+			"main-window:first-show": {
+				"elapsedMs": 3000
+			},
+			"main-window:renderer-did-finish-load": {
+				"elapsedMs": 2600
+			}
+		}
+	}
+}

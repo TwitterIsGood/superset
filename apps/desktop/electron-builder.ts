@@ -10,8 +10,12 @@ import pkg from "./package.json";
 import {
 	packagedAsarUnpackGlobs,
 	packagedNodeModuleCopies,
-	packagedTrellisRuntimeResourceCopies,
+	packOnlyNodeModuleFileExcludes,
 } from "./runtime-dependencies";
+import {
+	normalizeBuilderArch,
+	prunePackagedNativePayloads,
+} from "./scripts/prune-packaged-native-payloads";
 
 const currentYear = new Date().getFullYear();
 const author = pkg.author?.name ?? pkg.author;
@@ -62,10 +66,6 @@ const config: Configuration = {
 
 	// Extra resources placed outside asar archive (accessible via process.resourcesPath)
 	extraResources: [
-		// Plugin runtimes must be real files, not files hidden inside app.asar.
-		// Trellis is executed by Bun from host-service when a task/workspace asks
-		// for guided workflow initialization.
-		...packagedTrellisRuntimeResourceCopies,
 		// Database migrations - must be outside asar for drizzle-orm to read
 		{
 			from: "dist/resources/migrations",
@@ -82,10 +82,17 @@ const config: Configuration = {
 			to: "resources/bin",
 			filter: ["**/*"],
 		},
+		{
+			from: "dist/resources/pack-system",
+			to: "resources/pack-system",
+			filter: ["pack-manifest-index.json"],
+		},
 	],
 
 	files: [
 		"dist/**/*",
+		"!dist/resource-packs/**/*",
+		"!dist/resource-packs-test/**/*",
 		"package.json",
 		{
 			from: pkg.resources,
@@ -97,6 +104,9 @@ const config: Configuration = {
 		// The copy:native-modules script replaces symlinks with real files
 		// before building (required for Bun 1.3+ isolated installs).
 		...packagedNodeModuleCopies,
+		// Heavy feature runtimes are delivered as resource packs. Electron-builder's
+		// dependency traversal can still discover them through workspace package deps.
+		...packOnlyNodeModuleFileExcludes,
 		"!**/.DS_Store",
 		"!**/*.map",
 		"!**/*.test.*",
@@ -105,6 +115,14 @@ const config: Configuration = {
 
 	// Rebuild native modules for Electron's Node.js version
 	npmRebuild: true,
+
+	afterPack: async (context) => {
+		await prunePackagedNativePayloads({
+			appOutDir: context.appOutDir,
+			targetArch: normalizeBuilderArch(context.arch),
+			targetPlatform: context.electronPlatformName,
+		});
+	},
 
 	// macOS DMG installer
 	dmg: {

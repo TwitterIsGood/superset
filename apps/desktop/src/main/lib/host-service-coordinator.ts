@@ -7,6 +7,11 @@ import { settings } from "@superset/local-db";
 import { getHostId, getHostName } from "@superset/shared/host-info";
 import { app } from "electron";
 import log from "electron-log/main";
+import { MASTRACODE_RUNTIME_PACK_ID } from "lib/pack-system/pack-ids";
+import {
+	MASTRA_MEMORY_RUNTIME_ENTRY,
+	MASTRACODE_RUNTIME_ENTRY,
+} from "lib/pack-system/runtime-pack-entries";
 import { DEFAULT_EXPOSE_HOST_SERVICE_VIA_RELAY } from "shared/constants";
 import { env as sharedEnv } from "shared/env.shared";
 import { getProcessEnvWithShellPath } from "../../lib/trpc/routers/workspaces/utils/shell-env";
@@ -26,6 +31,7 @@ import {
 	pollHealthCheck,
 } from "./host-service-utils";
 import { localDb } from "./local-db";
+import { getPackManager } from "./pack-system";
 import { getRelayUrl } from "./relay-url";
 import { HOOK_PROTOCOL_VERSION } from "./terminal/env";
 
@@ -55,6 +61,11 @@ interface HostServiceProcess {
 	status: HostServiceStatus;
 }
 
+interface MastracodeRuntimeEnv {
+	mastracodeImportPath: string;
+	memoryImportPath: string;
+}
+
 // High, uncommon user-space range: above usual web/dev server ports and below
 // macOS's default ephemeral range, while still falling back if occupied.
 const STABLE_PORT_BASE = 48_000;
@@ -76,6 +87,13 @@ function isValidPort(port: number | null | undefined): port is number {
 		port > 0 &&
 		port <= 65_535
 	);
+}
+
+function removeManifestForPid(organizationId: string, pid: number): void {
+	const manifest = readManifest(organizationId);
+	if (!manifest || manifest.pid === pid) {
+		removeManifest(organizationId);
+	}
 }
 
 /**
@@ -424,10 +442,32 @@ export class HostServiceCoordinator extends EventEmitter {
 		const endpoint = `http://127.0.0.1:${port}`;
 		const healthy = await pollHealthCheck(endpoint, secret);
 		if (!healthy) {
-			child.kill("SIGTERM");
+			try {
+				child.kill("SIGTERM");
+			} catch {
+				// Best-effort: startup is already failed.
+			}
 			this.instances.delete(organizationId);
+			removeManifestForPid(organizationId, childPid);
 			throw new Error(
 				`Host service failed to start within ${HEALTH_POLL_TIMEOUT_MS}ms`,
+			);
+		}
+
+		const current = this.instances.get(organizationId);
+		if (
+			current !== instance ||
+			current.pid !== childPid ||
+			current.status === "stopped"
+		) {
+			try {
+				child.kill("SIGTERM");
+			} catch {
+				// Best-effort: stop/reset already won ownership of this org.
+			}
+			removeManifestForPid(organizationId, childPid);
+			throw new Error(
+				`Host service start for organization ${organizationId} was canceled`,
 			);
 		}
 
@@ -448,6 +488,7 @@ export class HostServiceCoordinator extends EventEmitter {
 		const row = localDb.select().from(settings).get();
 		const exposeViaRelay =
 			row?.exposeHostServiceViaRelay ?? DEFAULT_EXPOSE_HOST_SERVICE_VIA_RELAY;
+		const mastracodeRuntimeEnv = this.getMastracodeRuntimeEnv();
 
 		const childEnv = await this.resolveChildEnv({
 			...(process.env as Record<string, string>),
@@ -470,12 +511,10 @@ export class HostServiceCoordinator extends EventEmitter {
 			SUPERSET_LEGACY_WORKTREE_BASE_DIR: row?.worktreeBaseDir ?? "",
 			SUPERSET_AGENT_HOOK_PORT: String(sharedEnv.DESKTOP_NOTIFICATIONS_PORT),
 			SUPERSET_AGENT_HOOK_VERSION: HOOK_PROTOCOL_VERSION,
-			SUPERSET_TRELLIS_BIN_PATH: app.isPackaged
-				? path.join(
-						process.resourcesPath,
-						"node_modules/@mindfoldhq/trellis/bin/trellis.js",
-					)
-				: "",
+			SUPERSET_TRELLIS_BIN_PATH: process.env.SUPERSET_TRELLIS_BIN_PATH ?? "",
+			SUPERSET_MASTRACODE_RUNTIME_IMPORT_PATH:
+				mastracodeRuntimeEnv.mastracodeImportPath,
+			SUPERSET_MASTRA_MEMORY_IMPORT_PATH: mastracodeRuntimeEnv.memoryImportPath,
 			AUTH_TOKEN: config.authToken,
 			SUPERSET_AUTH_CONFIG_PATH: path.join(SUPERSET_HOME_DIR, "config.json"),
 			SUPERSET_API_URL: config.cloudApiUrl,
@@ -498,6 +537,35 @@ export class HostServiceCoordinator extends EventEmitter {
 		}
 
 		return childEnv;
+	}
+
+	private getMastracodeRuntimeEnv(): MastracodeRuntimeEnv {
+		const explicitMastracodePath =
+			process.env.SUPERSET_MASTRACODE_RUNTIME_IMPORT_PATH?.trim();
+		const explicitMemoryPath =
+			process.env.SUPERSET_MASTRA_MEMORY_IMPORT_PATH?.trim();
+		if (explicitMastracodePath || explicitMemoryPath) {
+			return {
+				mastracodeImportPath: explicitMastracodePath ?? "",
+				memoryImportPath: explicitMemoryPath ?? "",
+			};
+		}
+
+		try {
+			const packRoot = getPackManager().getPackPath(MASTRACODE_RUNTIME_PACK_ID);
+			if (!packRoot) {
+				return { mastracodeImportPath: "", memoryImportPath: "" };
+			}
+			return {
+				mastracodeImportPath: path.join(packRoot, MASTRACODE_RUNTIME_ENTRY),
+				memoryImportPath: path.join(packRoot, MASTRA_MEMORY_RUNTIME_ENTRY),
+			};
+		} catch (error) {
+			log.warn("[host-service] Failed to read MastraCode runtime pack path", {
+				error,
+			});
+			return { mastracodeImportPath: "", memoryImportPath: "" };
+		}
 	}
 
 	// ── Events ────────────────────────────────────────────────────────

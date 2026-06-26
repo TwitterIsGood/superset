@@ -1,24 +1,21 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { Memory } from "@mastra/memory";
+import { isAbsolute, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
 	getSlashCommands as getSlashCommandsFromCwd,
 	resolveSlashCommand as resolveSlashCommandFromCwd,
-} from "@superset/chat/server/desktop";
+} from "@superset/chat/server/desktop/slash-commands";
 import { eq } from "drizzle-orm";
-import { createMastraCode } from "mastracode";
 import type { HostDb } from "../../db";
 import { workspaces } from "../../db/schema";
 import type { ModelProviderRuntimeResolver } from "../../providers/model-providers";
 
-type RuntimeHarness = Awaited<ReturnType<typeof createMastraCode>>["harness"];
-type RuntimeMcpManager = Awaited<
-	ReturnType<typeof createMastraCode>
->["mcpManager"];
-type RuntimeHookManager = Awaited<
-	ReturnType<typeof createMastraCode>
->["hookManager"];
+type CreateMastraCode = typeof import("mastracode").createMastraCode;
+type MastraMemoryConstructor = typeof import("@mastra/memory").Memory;
+type RuntimeHarness = Awaited<ReturnType<CreateMastraCode>>["harness"];
+type RuntimeMcpManager = Awaited<ReturnType<CreateMastraCode>>["mcpManager"];
+type RuntimeHookManager = Awaited<ReturnType<CreateMastraCode>>["hookManager"];
 type RuntimeDisplayState = ReturnType<RuntimeHarness["getDisplayState"]>;
 type RuntimeMessages = Awaited<ReturnType<RuntimeHarness["listMessages"]>>;
 type RuntimeSendMessageResult = Awaited<
@@ -34,6 +31,55 @@ type RuntimePlanResult = Awaited<
 	ReturnType<RuntimeHarness["respondToPlanApproval"]>
 >;
 type ChatThinkingLevel = "off" | "low" | "medium" | "high" | "xhigh";
+type MastracodeRuntimeModule = { createMastraCode: CreateMastraCode };
+type MastraMemoryModule = { Memory: MastraMemoryConstructor };
+type MastracodeRuntimeModules = MastracodeRuntimeModule & MastraMemoryModule;
+
+const MASTRACODE_IMPORT_PATH_ENV = "SUPERSET_MASTRACODE_RUNTIME_IMPORT_PATH";
+const MASTRA_MEMORY_IMPORT_PATH_ENV = "SUPERSET_MASTRA_MEMORY_IMPORT_PATH";
+const mastracodeRuntimeModulePromises = new Map<
+	string,
+	Promise<MastracodeRuntimeModules>
+>();
+
+function toDynamicImportSpecifier(pathOrSpecifier: string): string {
+	if (pathOrSpecifier.startsWith("file:")) return pathOrSpecifier;
+	if (isAbsolute(pathOrSpecifier)) {
+		return pathToFileURL(pathOrSpecifier).href;
+	}
+	return pathOrSpecifier;
+}
+
+function getRuntimeImportSpecifiers(): {
+	mastracodeSpecifier: string;
+	memorySpecifier: string;
+} {
+	return {
+		mastracodeSpecifier: toDynamicImportSpecifier(
+			process.env[MASTRACODE_IMPORT_PATH_ENV]?.trim() || "mastracode",
+		),
+		memorySpecifier: toDynamicImportSpecifier(
+			process.env[MASTRA_MEMORY_IMPORT_PATH_ENV]?.trim() || "@mastra/memory",
+		),
+	};
+}
+
+function loadMastracodeRuntimeModules(): Promise<MastracodeRuntimeModules> {
+	const { mastracodeSpecifier, memorySpecifier } = getRuntimeImportSpecifiers();
+	const cacheKey = `${mastracodeSpecifier}\0${memorySpecifier}`;
+	let modulePromise = mastracodeRuntimeModulePromises.get(cacheKey);
+	if (!modulePromise) {
+		modulePromise = Promise.all([
+			import(mastracodeSpecifier) as Promise<MastracodeRuntimeModule>,
+			import(memorySpecifier) as Promise<MastraMemoryModule>,
+		]).then(([mastracodeModule, memoryModule]) => ({
+			createMastraCode: mastracodeModule.createMastraCode,
+			Memory: memoryModule.Memory,
+		}));
+		mastracodeRuntimeModulePromises.set(cacheKey, modulePromise);
+	}
+	return modulePromise;
+}
 
 interface ChatSendMessageInput {
 	sessionId: string;
@@ -589,6 +635,7 @@ When you need to ask the user ANY question — including simple yes/no, confirma
 
 		await this.runtimeResolver.prepareRuntimeEnv();
 
+		const { Memory, createMastraCode } = await loadMastracodeRuntimeModules();
 		const createRuntime = () =>
 			createMastraCode({
 				cwd,

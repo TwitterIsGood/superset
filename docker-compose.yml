@@ -91,6 +91,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-superset}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-superset-local-artifacts}
       SUPERSET_OBJECT_STORAGE_BUCKET: ${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}
+      NO_PROXY: localhost,127.0.0.1,minio
+      no_proxy: localhost,127.0.0.1,minio
     entrypoint:
       - /bin/sh
       - -c
@@ -100,6 +102,7 @@ services:
         done
         mc mb --ignore-existing "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}"
         mc anonymous set none "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}"
+        mc anonymous set download "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}/packs"
 
 volumes:
   superset_db_data:

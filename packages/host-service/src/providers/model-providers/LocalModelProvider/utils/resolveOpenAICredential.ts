@@ -1,4 +1,4 @@
-import { createAuthStorage } from "mastracode";
+import { createSupersetAuthStorage } from "@superset/chat/server/desktop/auth-storage";
 import type { LocalResolvedCredential } from "./credentials";
 import { isExpiredOauth, isObjectRecord } from "./credentials";
 
@@ -6,7 +6,7 @@ const OPENAI_PROVIDER_IDS = ["openai-codex", "openai"] as const;
 
 export function resolveOpenAICredential(): LocalResolvedCredential | null {
 	try {
-		const authStorage = createAuthStorage();
+		const authStorage = createSupersetAuthStorage();
 		authStorage.reload();
 		const credentials: LocalResolvedCredential[] = [];
 

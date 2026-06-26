@@ -149,8 +149,9 @@ export function V2WorkspaceRow({
 	);
 
 	return (
-		<li
+		<div
 			aria-current={isCurrentRoute ? "page" : undefined}
+			data-v2-workspace-row={workspace.id}
 			className="border-b border-border/50 last:border-b-0"
 		>
 			{/* biome-ignore lint/a11y/useSemanticElements: interactive row needs nested buttons, so the outer element is a div with role/tabIndex */}
@@ -293,7 +294,7 @@ export function V2WorkspaceRow({
 					onDeleted={handleDeleted}
 				/>
 			) : null}
-		</li>
+		</div>
 	);
 }
 

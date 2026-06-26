@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { useQuickOpenStore } from "renderer/commandPalette/ui/QuickOpen/quickOpenStore";
 import { useV2UserPreferences } from "renderer/hooks/useV2UserPreferences";
 import { useHotkey } from "renderer/hotkeys";
+import { terminalRuntimeRegistry } from "renderer/lib/terminal/terminal-runtime-registry";
 import { CommandPalette } from "renderer/screens/main/components/CommandPalette";
 import { ResizablePanel } from "renderer/screens/main/components/ResizablePanel";
 import { getV2NotificationSourcesForTab } from "renderer/stores/v2-notifications";
@@ -27,7 +28,8 @@ import { useDefaultContextMenuActions } from "./hooks/useDefaultContextMenuActio
 import { useDefaultPaneActions } from "./hooks/useDefaultPaneActions";
 import { useDirtyTabCloseGuard } from "./hooks/useDirtyTabCloseGuard";
 import { usePaneRegistry } from "./hooks/usePaneRegistry";
-import { renderBrowserTabIcon } from "./hooks/usePaneRegistry/components/BrowserPane";
+import { browserRuntimeRegistry } from "./hooks/usePaneRegistry/components/BrowserPane/browserRuntimeRegistry";
+import { renderBrowserTabIcon } from "./hooks/usePaneRegistry/components/BrowserPane/browserTabIcon";
 import { useV2PresetExecution } from "./hooks/useV2PresetExecution";
 import { useV2TerminalLauncher } from "./hooks/useV2TerminalLauncher";
 import { useV2WorkspacePaneLayout } from "./hooks/useV2WorkspacePaneLayout";
@@ -37,7 +39,7 @@ import { useWorkspaceHotkeys } from "./hooks/useWorkspaceHotkeys";
 import { useWorkspacePaneOpeners } from "./hooks/useWorkspacePaneOpeners";
 import { WorkspaceGitStatusProvider } from "./providers/WorkspaceGitStatusProvider";
 import { FileDocumentStoreProvider } from "./state/fileDocumentStore";
-import type { PaneViewerData } from "./types";
+import type { PaneViewerData, TerminalPaneData } from "./types";
 import type { V2WorkspaceUrlOpenTarget } from "./utils/openUrlInV2Workspace";
 
 interface WorkspaceSearch {
@@ -124,6 +126,21 @@ function V2WorkspaceContent() {
 	const showPresetsBar = v2UserPreferences.showPresetsBar;
 	const sidebarOpen = v2UserPreferences.rightSidebarOpen;
 	const { store, isPaneLayoutReady } = useV2WorkspacePaneLayout();
+	useEffect(() => {
+		return () => {
+			const state = store.getState();
+			for (const tab of state.tabs) {
+				for (const pane of Object.values(tab.panes)) {
+					if (pane.kind === "terminal") {
+						const { terminalId } = pane.data as TerminalPaneData;
+						terminalRuntimeRegistry.release(terminalId, pane.id);
+					} else if (pane.kind === "browser") {
+						browserRuntimeRegistry.destroy(pane.id);
+					}
+				}
+			}
+		};
+	}, [store]);
 	useClearActivePaneAttention({ store });
 	useAutoAttachBackgroundTerminal({
 		store,
@@ -332,6 +349,7 @@ function V2WorkspaceContent() {
 								<BackgroundTerminalsButton
 									workspaceId={workspaceId}
 									store={store}
+									sidebarOpen={sidebarOpen}
 								/>
 							)}
 							renderEmptyState={() => (

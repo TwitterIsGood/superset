@@ -75,11 +75,10 @@ PLATFORM.IS_WINDOWS &&
 app.commandLine.appendSwitch("force-color-profile", "srgb");
 
 const cdpPort =
-	env.NODE_ENV === "development"
-		? (process.env.DESKTOP_AUTOMATION_PORT ??
-			process.env.RENDERER_REMOTE_DEBUG_PORT ??
-			"9322")
-		: undefined;
+	process.env.DESKTOP_AUTOMATION_PORT ??
+	(env.NODE_ENV === "development"
+		? (process.env.RENDERER_REMOTE_DEBUG_PORT ?? "9322")
+		: undefined);
 
 if (cdpPort) {
 	app.commandLine.appendSwitch("remote-debugging-port", cdpPort);

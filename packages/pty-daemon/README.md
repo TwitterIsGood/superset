@@ -58,11 +58,11 @@ src/
 test/
 ├── helpers/
 │   └── client.ts               # reusable test client: connect, send, waitFor, collect
-├── integration.test.ts         # smoke / happy-path
-├── control-plane.test.ts       # exhaustive control-plane coverage
-├── byte-fidelity.test.ts       # daemon → host byte-perfectness canary
-├── handoff.test.ts             # Phase 2 fd-handoff end-to-end
-├── signal-recovery.test.ts     # SIGKILL-during-handoff teardown
+├── integration.node-test.ts    # smoke / happy-path, Node runner
+├── control-plane.node-test.ts  # exhaustive control-plane coverage, Node runner
+├── byte-fidelity.node-test.ts  # daemon -> host byte-perfectness canary, Node runner
+├── handoff.node-test.ts        # Phase 2 fd-handoff end-to-end, Node runner
+├── signal-recovery.node-test.ts # SIGKILL-during-handoff teardown, Node runner
 └── no-encoding-hops.test.ts    # source-level grep: no base64 / per-chunk utf8 in the data path
 
 build.ts                        # Bun bundler → dist/pty-daemon.js (target: node)
@@ -86,21 +86,23 @@ build.ts                        # Bun bundler → dist/pty-daemon.js (target: no
 
 ```sh
 bun test                     # unit tests (protocol framing, handlers, SessionStore, Pty validation, byte-fidelity canary)
-bun run test:integration     # integration tests under `node --test`: control-plane, handoff, signal-recovery, byte-fidelity-runtime
+bun run test:integration     # integration tests under Node's test runner via `tsx --test`: control-plane, handoff, signal-recovery, byte-fidelity-runtime
 bun run typecheck            # tsc --noEmit
 bun run build:daemon         # bundle src/main.ts → dist/pty-daemon.js (target: node)
 ```
 
 What the integration suites prove:
 
-- **`control-plane.test.ts`**: handshake/version negotiation; session lifecycle (invalid dims, duplicate ids, ENOENT, instant-exit, hung-shell SIGKILL); I/O (resize, burst, multi-byte UTF-8); multi-subscriber fan-out; detach + reattach (replay); concurrency; hostile input; framing across split chunks.
-- **`handoff.test.ts`**: Phase 2 — sessions survive a daemon-binary swap with the same shell PIDs.
-- **`byte-fidelity.test.ts`**: random bytes (including non-UTF-8) flow daemon → host byte-perfect on live and replay.
-- **`signal-recovery.test.ts`**: SIGKILL of the daemon mid-flight; clients see a clean close.
+- **`control-plane.node-test.ts`**: handshake/version negotiation; session lifecycle (invalid dims, duplicate ids, ENOENT, instant-exit, hung-shell SIGKILL); I/O (resize, burst, multi-byte UTF-8); multi-subscriber fan-out; detach + reattach (replay); concurrency; hostile input; framing across split chunks.
+- **`handoff.node-test.ts`**: Phase 2 - sessions survive a daemon-binary swap with the same shell PIDs.
+- **`byte-fidelity.node-test.ts`**: random bytes (including non-UTF-8) flow daemon -> host byte-perfect on live and replay.
+- **`signal-recovery.node-test.ts`**: SIGKILL of the daemon mid-flight; clients see a clean close.
 - **`no-encoding-hops.test.ts`** (bun): source-level guard — fails the moment anyone reintroduces a base64 hop or per-chunk `chunk.toString("utf8")` on the data path.
 
 Why two runners? `bun test` is fast for pure-JS work. node-pty doesn't work
-under Bun, so anything that spawns a real PTY runs under Node.
+under Bun, so anything that spawns a real PTY runs under Node's test runner via
+`tsx --test`. The real-PTY suites use `.node-test.ts` filenames so a naked
+`bun test` does not discover and run them with the wrong runner.
 
 ## Running locally
 
