@@ -81,6 +81,7 @@ describe("Trellis runtime pack packaging", () => {
 		expect(packageJson.scripts).toHaveProperty("build:trellis-pack");
 		expect(packageJson.scripts).toHaveProperty("build:claude-agent-pack");
 		expect(packageJson.scripts).toHaveProperty("build:mastracode-pack");
+		expect(packageJson.scripts).toHaveProperty("build:cli-pack");
 		expect(packageJson.scripts).toHaveProperty("validate:trellis-runtime");
 
 		const workflow = readFileSync(
@@ -98,6 +99,10 @@ describe("Trellis runtime pack packaging", () => {
 		expect(workflow).toContain("Verify resource pack runtimes are pack-only");
 		expect(workflow).toContain("bun run build:claude-agent-pack");
 		expect(workflow).toContain("bun run build:mastracode-pack");
+		expect(workflow).toContain("bun run build:cli-pack");
+		expect(workflow).toContain(
+			'if [[ "$BUNDLE_CLI" != "true" && "$UPLOAD_RESOURCE_PACK_ARTIFACTS" == "true" ]]',
+		);
 		expect(workflow).toContain("bun run validate:trellis-runtime");
 		expect(workflow).toContain("Cache Electron packaging downloads");
 	});
@@ -227,6 +232,28 @@ describe("Trellis runtime pack packaging", () => {
 		expect(shouldIncludeMastracodeRuntimeDependency("@mastra/duckdb")).toBe(
 			true,
 		);
+	});
+
+	test("defines a Superset CLI runtime pack for no-CLI desktop releases", () => {
+		const packIdsSource = readFileSync(
+			join(import.meta.dirname, "src", "lib", "pack-system", "pack-ids.ts"),
+			"utf8",
+		);
+		const packBuilder = readFileSync(
+			join(
+				import.meta.dirname,
+				"scripts",
+				"build-superset-cli-runtime-pack.ts",
+			),
+			"utf8",
+		);
+
+		expect(packIdsSource).toContain("SUPERSET_CLI_RUNTIME_PACK_ID");
+		expect(packIdsSource).toContain("superset-cli-runtime");
+		expect(packBuilder).toContain("SUPERSET_CLI_RUNTIME_PACK_ID");
+		expect(packBuilder).toContain('runtime: "binary"');
+		expect(packBuilder).toContain("targetPlatform");
+		expect(packBuilder).toContain("targetArch");
 	});
 
 	test("keeps MastraCode and DuckDB runtime modules pack-only", () => {

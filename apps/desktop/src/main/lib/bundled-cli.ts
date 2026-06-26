@@ -22,6 +22,7 @@ interface InstallBundledCliShimOptions {
 	binDir?: string;
 	bundledCliPath?: string | null;
 	devCliPackageDir?: string | null;
+	runtimePackPath?: string | null;
 	platform?: NodeJS.Platform;
 }
 
@@ -68,13 +69,27 @@ exec bun run --cwd ${quoteShellLiteral(cliPackageDir)} dev "$@"
 `;
 }
 
+export function resolveCliRuntimePackBinaryPath(
+	runtimePackPath: string | null | undefined,
+	platform: NodeJS.Platform = process.platform,
+): string | null {
+	const packPath = runtimePackPath?.trim();
+	if (!packPath) return null;
+	return path.join(packPath, "bin", getBundledCliBinaryName(platform));
+}
+
 function getBundledCliCandidates(platform: NodeJS.Platform): string[] {
 	const app = require("electron").app as Electron.App;
 	const binaryName = getBundledCliBinaryName(platform);
+	const cliRuntimePackBinaryPath = resolveCliRuntimePackBinaryPath(
+		process.env.SUPERSET_CLI_RUNTIME_PACK_PATH,
+		platform,
+	);
 	const candidates = [
 		app.isPackaged
 			? path.join(process.resourcesPath, "resources/bin", binaryName)
 			: null,
+		cliRuntimePackBinaryPath,
 		path.join(__dirname, "../resources/bin", binaryName),
 		path.join(app.getAppPath(), "dist/resources/bin", binaryName),
 		path.resolve(app.getAppPath(), "../../packages/cli/dist", binaryName),
@@ -134,7 +149,9 @@ export function installBundledCliShim(
 ): BundledCliInstallStatus {
 	const platform = options.platform ?? process.platform;
 	const bundledCliPath =
-		options.bundledCliPath ?? resolveBundledCliPath(platform);
+		options.bundledCliPath ??
+		resolveCliRuntimePackBinaryPath(options.runtimePackPath, platform) ??
+		resolveBundledCliPath(platform);
 	const hasBundledCli = !!bundledCliPath && existsSync(bundledCliPath);
 	const devCliPackageDir = hasBundledCli
 		? null

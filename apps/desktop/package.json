@@ -30,6 +30,7 @@
 		"build:trellis-pack": "bun run scripts/build-trellis-runtime-pack.ts",
 		"build:claude-agent-pack": "bun run scripts/build-claude-agent-runtime-pack.ts",
 		"build:mastracode-pack": "bun run scripts/build-mastracode-runtime-pack.ts",
+		"build:cli-pack": "bun run scripts/build-superset-cli-runtime-pack.ts",
 		"upload:resource-packs": "bun run scripts/upload-resource-packs.ts",
 		"report:size": "bun run scripts/report-package-size.ts",
 		"report:runtime": "bun run scripts/report-runtime-performance.ts",
