@@ -58,6 +58,15 @@ jobs:
           pattern: desktop-*
           merge-multiple: true
 
+      - name: Remove resource-pack CI payloads from release assets
+        run: |
+          rm -rf \
+            release-artifacts/trellis-runtime \
+            release-artifacts/claude-agent-runtime \
+            release-artifacts/mastracode-runtime \
+            release-artifacts/superset-cli-runtime \
+            release-artifacts/pack-manifest-index.json
+
       - name: Merge macOS auto-update manifests
         uses: ./.github/actions/merge-mac-manifests
         with:

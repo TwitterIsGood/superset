@@ -30,6 +30,8 @@ const workspaceRoot = resolve(appDir, "..", "..");
 const defaultOutDir = join(appDir, "dist", "resource-packs");
 const RESOURCE_PACK_BASE_URL_ENV = "SUPERSET_RESOURCE_PACK_BASE_URL";
 const CLAUDE_AGENT_SDK_PACKAGE_NAME = "@anthropic-ai/claude-agent-sdk";
+const targetPlatform = process.env.TARGET_PLATFORM ?? process.platform;
+const targetArch = process.env.TARGET_ARCH ?? process.arch;
 
 interface BuildArgs {
 	appIndexOut?: string;
@@ -219,8 +221,10 @@ async function main() {
 		workspaceRoot,
 	]);
 	const sdkPackage = readPackageJson(sdkRoot);
-	const version = args.version ?? sdkPackage.version;
-	if (!version) fail("Could not determine Claude Agent runtime pack version");
+	const baseVersion = args.version ?? sdkPackage.version;
+	if (!baseVersion)
+		fail("Could not determine Claude Agent runtime pack version");
+	const version = `${baseVersion}-${targetPlatform}-${targetArch}`;
 
 	const platformPackageName = getClaudeAgentSdkPlatformPackageName();
 	const packRoot = join(args.outDir, CLAUDE_AGENT_RUNTIME_PACK_ID);
@@ -292,7 +296,8 @@ async function main() {
 	}
 
 	console.log("# Claude Agent Runtime Pack");
-	console.log(`- SDK Version: ${version}`);
+	console.log(`- SDK Version: ${baseVersion}`);
+	console.log(`- Pack Version: ${version}`);
 	console.log(
 		`- Claude Code Version: ${sdkPackage.claudeCodeVersion ?? "unknown"}`,
 	);

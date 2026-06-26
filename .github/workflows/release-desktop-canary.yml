@@ -130,7 +130,7 @@ jobs:
           else
             echo "macos_artifact_mode=full" >> $GITHUB_OUTPUT
             echo "upload_resource_pack_artifacts=true" >> $GITHUB_OUTPUT
-            echo "bundle_cli=true" >> $GITHUB_OUTPUT
+            echo "bundle_cli=false" >> $GITHUB_OUTPUT
             echo "upload_sourcemaps=true" >> $GITHUB_OUTPUT
           fi
 
@@ -230,6 +230,15 @@ jobs:
           path: release-artifacts
           pattern: desktop-canary-*
           merge-multiple: true
+
+      - name: Remove resource-pack CI payloads from release assets
+        run: |
+          rm -rf \
+            release-artifacts/trellis-runtime \
+            release-artifacts/claude-agent-runtime \
+            release-artifacts/mastracode-runtime \
+            release-artifacts/superset-cli-runtime \
+            release-artifacts/pack-manifest-index.json
 
       - name: Merge macOS auto-update manifests
         uses: ./.github/actions/merge-mac-manifests

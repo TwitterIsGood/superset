@@ -196,7 +196,7 @@ jobs:
           bun run validate:trellis-runtime -- --node-modules dist/resource-packs/trellis-runtime/*/node_modules
 
       - name: Upload desktop resource pack artifact
-        if: inputs.upload_resource_pack_artifacts && matrix.arch == 'arm64'
+        if: inputs.upload_resource_pack_artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.artifact_prefix }}-mac-${{ matrix.arch }}-resource-packs
@@ -205,7 +205,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload desktop resource packs to object storage
-        if: inputs.upload_resource_pack_artifacts && matrix.arch == 'arm64'
+        if: inputs.upload_resource_pack_artifacts
         working-directory: apps/desktop
         env:
           SUPERSET_OBJECT_STORAGE_ENDPOINT: ${{ secrets.SUPERSET_OBJECT_STORAGE_ENDPOINT }}
@@ -392,9 +392,11 @@ jobs:
           NODE
           test -f dist/resources/pack-system/pack-manifest-index.json
 
-      - name: Verify macOS auto-update metadata and bundled CLI
+      - name: Verify macOS auto-update metadata and CLI delivery
         if: inputs.macos_artifact_mode == 'full'
         working-directory: apps/desktop
+        env:
+          BUNDLE_CLI: ${{ inputs.bundle_cli }}
         run: |
           # electron-builder uses mac-arm64/ for arm64 and mac/ for x64 (when host is arm64)
           APP_DIR=$(find release -maxdepth 2 -name "*.app" -type d | head -1)
@@ -409,11 +411,25 @@ jobs:
             exit 1
           }
           CLI_BIN="$APP_DIR/Contents/Resources/resources/bin/superset"
-          test -x "$CLI_BIN" || {
-            echo "::error::Bundled Superset CLI missing or not executable at $CLI_BIN"
-            exit 1
-          }
-          "$CLI_BIN" --version
+          if [[ "$BUNDLE_CLI" == "true" ]]; then
+            test -x "$CLI_BIN" || {
+              echo "::error::Bundled Superset CLI missing or not executable at $CLI_BIN"
+              exit 1
+            }
+            "$CLI_BIN" --version
+          else
+            if [[ -e "$CLI_BIN" ]]; then
+              echo "::error::Bundled Superset CLI should not exist when bundle_cli=false: $CLI_BIN"
+              exit 1
+            fi
+            CLI_PACK_BIN=$(find dist/resource-packs/superset-cli-runtime -path "*/bin/superset" -type f -perm -111 | head -1)
+            if [[ -z "$CLI_PACK_BIN" ]]; then
+              echo "::error::Superset CLI runtime pack binary missing while bundle_cli=false"
+              find dist/resource-packs/superset-cli-runtime -maxdepth 4 -type f 2>/dev/null || true
+              exit 1
+            fi
+            "$CLI_PACK_BIN" --version
+          fi
 
       - name: Verify macOS code signing status
         working-directory: apps/desktop
@@ -588,6 +604,23 @@ jobs:
           retention-days: ${{ inputs.artifact_retention_days }}
           if-no-files-found: error
 
+      - name: Upload desktop resource packs to object storage
+        if: inputs.upload_resource_pack_artifacts
+        working-directory: apps/desktop
+        env:
+          SUPERSET_OBJECT_STORAGE_ENDPOINT: ${{ secrets.SUPERSET_OBJECT_STORAGE_ENDPOINT }}
+          SUPERSET_OBJECT_STORAGE_BUCKET: ${{ secrets.SUPERSET_OBJECT_STORAGE_BUCKET }}
+          SUPERSET_OBJECT_STORAGE_REGION: ${{ secrets.SUPERSET_OBJECT_STORAGE_REGION }}
+          SUPERSET_OBJECT_STORAGE_ACCESS_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_ACCESS_KEY }}
+          SUPERSET_OBJECT_STORAGE_SECRET_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_SECRET_KEY }}
+          SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE: ${{ secrets.SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE }}
+        run: |
+          if [[ -z "${SUPERSET_OBJECT_STORAGE_ENDPOINT:-}" || -z "${SUPERSET_OBJECT_STORAGE_BUCKET:-}" || -z "${SUPERSET_OBJECT_STORAGE_ACCESS_KEY:-}" || -z "${SUPERSET_OBJECT_STORAGE_SECRET_KEY:-}" ]]; then
+            echo "::warning::Skipping desktop resource pack object-storage upload because SUPERSET_OBJECT_STORAGE_* secrets are incomplete."
+            exit 0
+          fi
+          bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs
+
       - name: Prepare native runtime modules
         working-directory: apps/desktop
         env:
@@ -649,8 +682,10 @@ jobs:
           NODE
           test -f dist/resources/pack-system/pack-manifest-index.json
 
-      - name: Verify Linux AppImage + update manifest exist
+      - name: Verify Linux AppImage, update manifest, and CLI delivery
         working-directory: apps/desktop
+        env:
+          BUNDLE_CLI: ${{ inputs.bundle_cli }}
         run: |
           ls -la release
           test -n "$(ls -1 release/*.AppImage 2>/dev/null)" || {
@@ -662,11 +697,25 @@ jobs:
             exit 1
           }
           CLI_BIN=$(find release -path "*/resources/resources/bin/superset" -type f -perm -111 | head -1)
-          if [ -z "$CLI_BIN" ]; then
-            echo "::error::Bundled Superset CLI missing or not executable in packaged Linux output"
-            exit 1
+          if [[ "$BUNDLE_CLI" == "true" ]]; then
+            if [ -z "$CLI_BIN" ]; then
+              echo "::error::Bundled Superset CLI missing or not executable in packaged Linux output"
+              exit 1
+            fi
+            "$CLI_BIN" --version
+          else
+            if [[ -n "$CLI_BIN" ]]; then
+              echo "::error::Bundled Superset CLI should not exist when bundle_cli=false: $CLI_BIN"
+              exit 1
+            fi
+            CLI_PACK_BIN=$(find dist/resource-packs/superset-cli-runtime -path "*/bin/superset" -type f -perm -111 | head -1)
+            if [[ -z "$CLI_PACK_BIN" ]]; then
+              echo "::error::Superset CLI runtime pack binary missing while bundle_cli=false"
+              find dist/resource-packs/superset-cli-runtime -maxdepth 4 -type f 2>/dev/null || true
+              exit 1
+            fi
+            "$CLI_PACK_BIN" --version
           fi
-          "$CLI_BIN" --version
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

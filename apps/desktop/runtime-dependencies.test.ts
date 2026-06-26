@@ -130,13 +130,24 @@ describe("Trellis runtime pack packaging", () => {
 			),
 			"utf8",
 		);
+		const stableReleaseWorkflow = readFileSync(
+			join(
+				import.meta.dirname,
+				"..",
+				"..",
+				".github",
+				"workflows",
+				"release-desktop.yml",
+			),
+			"utf8",
+		);
 
 		expect(buildWorkflow).toContain("macos_artifact_mode");
 		expect(buildWorkflow).toContain("zip_only");
 		expect(buildWorkflow).toContain('PACKAGE_TARGET_ARGS=("--mac" "zip"');
 		expect(buildWorkflow).toContain("if: inputs.macos_artifact_mode == 'full'");
 		expect(buildWorkflow).toContain(
-			"Verify macOS auto-update metadata and bundled CLI",
+			"Verify macOS auto-update metadata and CLI delivery",
 		);
 		expect(buildWorkflow).toContain(
 			"Upload auto-update manifest\n        if: inputs.macos_artifact_mode == 'full'",
@@ -150,7 +161,11 @@ describe("Trellis runtime pack packaging", () => {
 				"{{ inputs.upload_sourcemaps && secrets.SENTRY_AUTH_TOKEN || '' }}",
 		);
 		expect(buildWorkflow).toContain(
-			"if: inputs.upload_resource_pack_artifacts && matrix.arch == 'arm64'",
+			"if: inputs.upload_resource_pack_artifacts",
+		);
+		expect(buildWorkflow).toContain("Superset CLI runtime pack binary missing");
+		expect(buildWorkflow).toContain(
+			"Bundled Superset CLI should not exist when bundle_cli=false",
 		);
 		expect(buildWorkflow).toContain('ELECTRON_BUILDER_NPM_REBUILD: "false"');
 		expect(buildWorkflow).toContain(
@@ -175,6 +190,13 @@ describe("Trellis runtime pack packaging", () => {
 		expect(canaryWorkflow).toContain("upload_resource_pack_artifacts=false");
 		expect(canaryWorkflow).toContain("bundle_cli=false");
 		expect(canaryWorkflow).toContain("upload_sourcemaps=false");
+		expect(canaryWorkflow).not.toContain("bundle_cli=true");
+		expect(canaryWorkflow).toContain(
+			"Remove resource-pack CI payloads from release assets",
+		);
+		expect(stableReleaseWorkflow).toContain(
+			"Remove resource-pack CI payloads from release assets",
+		);
 	});
 
 	test("defines a MastraCode runtime pack for the DuckDB-backed agent runtime", () => {
@@ -258,8 +280,32 @@ describe("Trellis runtime pack packaging", () => {
 		expect(packIdsSource).toContain("superset-cli-runtime");
 		expect(packBuilder).toContain("SUPERSET_CLI_RUNTIME_PACK_ID");
 		expect(packBuilder).toContain('runtime: "binary"');
+		expect(packBuilder).toContain("const version = `");
+		expect(packBuilder).toContain("baseVersion");
 		expect(packBuilder).toContain("targetPlatform");
 		expect(packBuilder).toContain("targetArch");
+	});
+
+	test("uses platform-specific versions for native resource packs", () => {
+		const claudePackBuilder = readFileSync(
+			join(
+				import.meta.dirname,
+				"scripts",
+				"build-claude-agent-runtime-pack.ts",
+			),
+			"utf8",
+		);
+		const mastracodePackBuilder = readFileSync(
+			join(import.meta.dirname, "scripts", "build-mastracode-runtime-pack.ts"),
+			"utf8",
+		);
+
+		for (const source of [claudePackBuilder, mastracodePackBuilder]) {
+			expect(source).toContain("const version = `");
+			expect(source).toContain("baseVersion");
+			expect(source).toContain("targetPlatform");
+			expect(source).toContain("targetArch");
+		}
 	});
 
 	test("keeps MastraCode and DuckDB runtime modules pack-only", () => {

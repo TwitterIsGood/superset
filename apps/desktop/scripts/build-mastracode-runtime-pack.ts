@@ -473,8 +473,11 @@ async function main() {
 		workspaceRoot,
 	]);
 	const mastracodePackage = readPackageJson(mastracodeRoot);
-	const version = args.version ?? mastracodePackage.version;
-	if (!version) fail("Could not determine MastraCode runtime pack version");
+	const baseVersion = args.version ?? mastracodePackage.version;
+	if (!baseVersion) fail("Could not determine MastraCode runtime pack version");
+	const targetPlatform = process.env.TARGET_PLATFORM ?? process.platform;
+	const targetArch = process.env.TARGET_ARCH ?? process.arch;
+	const version = `${baseVersion}-${targetPlatform}-${targetArch}`;
 
 	const packRoot = join(args.outDir, MASTRACODE_RUNTIME_PACK_ID);
 	const versionRoot = join(packRoot, version);
@@ -533,7 +536,8 @@ async function main() {
 
 	const totalBytes = manifest.files.reduce((sum, file) => sum + file.size, 0);
 	console.log("# MastraCode Runtime Pack");
-	console.log(`- Version: ${version}`);
+	console.log(`- Base Version: ${baseVersion}`);
+	console.log(`- Pack Version: ${version}`);
 	console.log(`- Packages: ${runtimePackages.length}`);
 	console.log(`- Files: ${manifest.files.length}`);
 	console.log(`- Bytes: ${totalBytes}`);
