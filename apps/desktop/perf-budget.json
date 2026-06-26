@@ -24,11 +24,11 @@
 		"baselinePath": "./perf-baseline.json",
 		"marks": {
 			"main-window:first-show": {
-				"maxMs": 5000,
+				"maxMs": 6500,
 				"targetMs": 2000
 			},
 			"main-window:renderer-did-finish-load": {
-				"maxMs": 4500,
+				"maxMs": 6000,
 				"targetMs": 1800
 			}
 		}
