@@ -278,6 +278,49 @@ describe("evaluateCanaryBuildDuration", () => {
 			expect.stringContaining("resourcePackBuildUploadVerify"),
 		]);
 	});
+
+	test("does not double count overlapping phase work from parallel jobs", () => {
+		const result = evaluateCanaryBuildDuration({
+			budget: {
+				maxSeconds: 300,
+				criticalPathMaxSeconds: {
+					dependencyCache: 60,
+					install: 60,
+				},
+			},
+			lane: "quick",
+			jobs: [
+				{
+					completed_at: "2026-06-27T00:01:30Z",
+					name: "Compile - macOS ZIP dist (arm64)",
+					started_at: "2026-06-27T00:00:00Z",
+					steps: [
+						step("Restore dependencies cache", 0, 25),
+						step("Install desktop dependency graph", 25, 30),
+					],
+				},
+				{
+					completed_at: "2026-06-27T00:02:00Z",
+					name: "Build - macOS (arm64)",
+					started_at: "2026-06-27T00:00:00Z",
+					steps: [
+						step("Restore dependencies cache", 0, 52),
+						step("Cache Electron packaging downloads", 52, 54),
+						step("Install dependencies", 54, 58),
+					],
+				},
+			],
+		});
+
+		expect(result.failures).toEqual([]);
+		expect(
+			result.phases.find((phase) => phase.name === "dependencyCache")
+				?.durationSeconds,
+		).toBe(54);
+		expect(
+			result.phases.find((phase) => phase.name === "install")?.durationSeconds,
+		).toBe(9);
+	});
 });
 
 function step(name: string, startSeconds: number, endSeconds: number) {

@@ -60,6 +60,11 @@ interface PhaseSummary {
 	stepNames: string[];
 }
 
+interface PhaseAccumulator extends PhaseSummary {
+	fallbackDurationSeconds: number;
+	intervals: Array<{ endMs: number; startMs: number }>;
+}
+
 interface BuildDurationFinding {
 	message: string;
 	phase?: string;
@@ -335,7 +340,11 @@ function phaseForStep(jobName: string, stepName: string): string | undefined {
 	const text = `${jobName} ${stepName}`.toLowerCase();
 	if (text.includes("post cache")) return "postCache";
 	if (text.includes("cache")) return "dependencyCache";
-	if (text.includes("install dependencies")) return "install";
+	if (
+		text.includes("install dependencies") ||
+		text.includes("install desktop dependency graph")
+	)
+		return "install";
 	if (
 		text.includes("install desktop native") ||
 		text.includes("install target platform")
@@ -368,25 +377,73 @@ function phaseForJob(jobName: string): string | undefined {
 	return undefined;
 }
 
+function timestampInterval(
+	startedAt: string | null | undefined,
+	completedAt: string | null | undefined,
+): { endMs: number; startMs: number } | undefined {
+	const startMs = parseTimestamp(startedAt);
+	const endMs = parseTimestamp(completedAt) ?? Date.now();
+	if (startMs === undefined) return undefined;
+	return {
+		endMs: Math.max(startMs, endMs),
+		startMs,
+	};
+}
+
+function unionIntervalSeconds(
+	intervals: Array<{ endMs: number; startMs: number }>,
+): number {
+	if (intervals.length === 0) return 0;
+	const sorted = [...intervals].sort(
+		(left, right) => left.startMs - right.startMs,
+	);
+	let totalMs = 0;
+	let currentStartMs = sorted[0]?.startMs ?? 0;
+	let currentEndMs = sorted[0]?.endMs ?? currentStartMs;
+
+	for (const interval of sorted.slice(1)) {
+		if (interval.startMs <= currentEndMs) {
+			currentEndMs = Math.max(currentEndMs, interval.endMs);
+			continue;
+		}
+		totalMs += currentEndMs - currentStartMs;
+		currentStartMs = interval.startMs;
+		currentEndMs = interval.endMs;
+	}
+
+	totalMs += currentEndMs - currentStartMs;
+	return totalMs / 1000;
+}
+
 function createPhaseMap(jobs: GitHubJob[]): Map<string, PhaseSummary> {
-	const phases = new Map<string, PhaseSummary>();
+	const phases = new Map<string, PhaseAccumulator>();
 	const add = (
 		phaseName: string,
 		jobName: string,
 		stepName: string,
 		durationSeconds: number,
+		interval?: { endMs: number; startMs: number },
 	) => {
 		const existing = phases.get(phaseName);
 		if (!existing) {
 			phases.set(phaseName, {
 				durationSeconds,
+				fallbackDurationSeconds: interval ? 0 : durationSeconds,
+				intervals: interval ? [interval] : [],
 				jobNames: [jobName],
 				name: phaseName,
 				stepNames: [stepName],
 			});
 			return;
 		}
-		existing.durationSeconds += durationSeconds;
+		if (interval) {
+			existing.intervals.push(interval);
+		} else {
+			existing.fallbackDurationSeconds += durationSeconds;
+		}
+		existing.durationSeconds =
+			unionIntervalSeconds(existing.intervals) +
+			existing.fallbackDurationSeconds;
 		if (!existing.jobNames.includes(jobName)) existing.jobNames.push(jobName);
 		if (!existing.stepNames.includes(stepName))
 			existing.stepNames.push(stepName);
@@ -397,7 +454,13 @@ function createPhaseMap(jobs: GitHubJob[]): Map<string, PhaseSummary> {
 		const jobPhase = phaseForJob(jobName);
 		const jobDuration = secondsBetween(jobStartedAt(job), jobCompletedAt(job));
 		if (jobPhase && jobDuration !== undefined) {
-			add(jobPhase, jobName, "(whole job)", jobDuration);
+			add(
+				jobPhase,
+				jobName,
+				"(whole job)",
+				jobDuration,
+				timestampInterval(jobStartedAt(job), jobCompletedAt(job)),
+			);
 		}
 		for (const step of job.steps ?? []) {
 			const stepName = step.name ?? `step-${step.number ?? "unknown"}`;
@@ -408,11 +471,28 @@ function createPhaseMap(jobs: GitHubJob[]): Map<string, PhaseSummary> {
 				stepCompletedAt(step),
 			);
 			if (duration === undefined) continue;
-			add(phase, jobName, stepName, duration);
+			add(
+				phase,
+				jobName,
+				stepName,
+				duration,
+				timestampInterval(stepStartedAt(step), stepCompletedAt(step)),
+			);
 		}
 	}
 
-	return phases;
+	return new Map(
+		Array.from(phases.entries()).map(([name, phase]) => [
+			name,
+			{
+				durationSeconds:
+					unionIntervalSeconds(phase.intervals) + phase.fallbackDurationSeconds,
+				jobNames: phase.jobNames,
+				name: phase.name,
+				stepNames: phase.stepNames,
+			},
+		]),
+	);
 }
 
 function criticalPathSeconds(jobs: GitHubJob[]): number {
