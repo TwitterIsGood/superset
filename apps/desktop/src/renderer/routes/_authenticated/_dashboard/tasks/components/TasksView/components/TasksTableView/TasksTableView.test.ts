@@ -27,4 +27,16 @@ describe("Tasks table delete wiring", () => {
 		expect(source).not.toContain('console.log("Delete task:');
 		expect(source).toContain("<TaskContextMenu task={row.original}>");
 	});
+
+	test("TasksTableView keeps task context menu runtime off the initial table module graph", () => {
+		const source = readComponent("TasksTableView.tsx");
+
+		expect(source).not.toContain(
+			'import { TaskContextMenu } from "./components/TaskContextMenu"',
+		);
+		expect(source).not.toContain('from "@superset/ui/context-menu"');
+		expect(source).not.toContain("useOptimisticCollectionActions");
+		expect(source).toContain('import("./components/TaskContextMenu")');
+		expect(source).toContain("<Suspense fallback={rowContent}>");
+	});
 });

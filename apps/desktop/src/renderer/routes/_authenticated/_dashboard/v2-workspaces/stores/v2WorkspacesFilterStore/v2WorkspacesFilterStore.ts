@@ -22,14 +22,32 @@ export const useV2WorkspacesFilterStore = create<V2WorkspacesFilterState>()(
 		searchQuery: "",
 		deviceFilter: DEVICE_FILTER_ALL,
 		projectFilter: PROJECT_FILTER_ALL,
-		setSearchQuery: (searchQuery) => set({ searchQuery }),
-		setDeviceFilter: (deviceFilter) => set({ deviceFilter }),
-		setProjectFilter: (projectFilter) => set({ projectFilter }),
+		setSearchQuery: (searchQuery) =>
+			set((state) =>
+				state.searchQuery === searchQuery ? state : { searchQuery },
+			),
+		setDeviceFilter: (deviceFilter) =>
+			set((state) =>
+				state.deviceFilter === deviceFilter ? state : { deviceFilter },
+			),
+		setProjectFilter: (projectFilter) =>
+			set((state) =>
+				state.projectFilter === projectFilter ? state : { projectFilter },
+			),
 		reset: () =>
-			set({
-				searchQuery: "",
-				deviceFilter: DEVICE_FILTER_ALL,
-				projectFilter: PROJECT_FILTER_ALL,
+			set((state) => {
+				if (
+					state.searchQuery === "" &&
+					state.deviceFilter === DEVICE_FILTER_ALL &&
+					state.projectFilter === PROJECT_FILTER_ALL
+				) {
+					return state;
+				}
+				return {
+					searchQuery: "",
+					deviceFilter: DEVICE_FILTER_ALL,
+					projectFilter: PROJECT_FILTER_ALL,
+				};
 			}),
 	}),
 );

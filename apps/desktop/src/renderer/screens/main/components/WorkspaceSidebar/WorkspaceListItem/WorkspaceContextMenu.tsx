@@ -14,21 +14,21 @@ import {
 	HoverCardContent,
 	HoverCardTrigger,
 } from "@superset/ui/hover-card";
-import { useMemo, useRef, useState } from "react";
 import {
-	LuArrowRightLeft,
-	LuBellOff,
-	LuCopy,
-	LuExternalLink,
-	LuEye,
-	LuEyeOff,
-	LuFolderOpen,
-	LuFolderPlus,
-	LuGitBranch,
-	LuMinus,
-	LuPencil,
-	LuX,
-} from "react-icons/lu";
+	ArrowRightLeft,
+	BellOff,
+	Copy,
+	ExternalLink,
+	Eye,
+	EyeOff,
+	FolderOpen,
+	FolderPlus,
+	GitBranch,
+	Minus,
+	Pencil,
+	X,
+} from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import {
 	useCreateSectionFromWorkspaces,
@@ -137,12 +137,12 @@ export function WorkspaceContextMenu({
 		<ContextMenuItem onSelect={() => onSetUnread(!isUnread)}>
 			{isUnread ? (
 				<>
-					<LuEye className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+					<Eye className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 					Mark as Read
 				</>
 			) : (
 				<>
-					<LuEyeOff className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+					<EyeOff className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 					Mark as Unread
 				</>
 			)}
@@ -152,38 +152,35 @@ export function WorkspaceContextMenu({
 	const commonContextMenuItems = (
 		<>
 			<ContextMenuItem onSelect={onOpenInFinder}>
-				<LuFolderOpen className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+				<FolderOpen className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 				Open in Finder
 			</ContextMenuItem>
 			<ContextMenuItem onSelect={onOpenInEditor}>
-				<LuExternalLink className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+				<ExternalLink className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 				Open in Editor
 			</ContextMenuItem>
 			<ContextMenuItem onSelect={onCopyPath}>
-				<LuCopy className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+				<Copy className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 				Copy Path
 			</ContextMenuItem>
 			<ContextMenuItem onSelect={onCopyBranchName}>
-				<LuGitBranch className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+				<GitBranch className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 				Copy Branch Name
 			</ContextMenuItem>
 			<ContextMenuSeparator />
 			<ContextMenuSub>
 				<ContextMenuSubTrigger>
-					<LuArrowRightLeft
-						className="size-4 mr-2"
-						strokeWidth={STROKE_WIDTH}
-					/>
+					<ArrowRightLeft className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 					Move to Section
 				</ContextMenuSubTrigger>
 				<ContextMenuSubContent>
 					<ContextMenuItem onSelect={handleCreateSectionFromSelection}>
-						<LuFolderPlus className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+						<FolderPlus className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 						New Section
 					</ContextMenuItem>
 					<ContextMenuSeparator />
 					<ContextMenuItem onSelect={() => handleMoveToSection(null)}>
-						<LuMinus className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+						<Minus className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 						Ungrouped
 					</ContextMenuItem>
 					{sections.length > 0 && <ContextMenuSeparator />}
@@ -201,7 +198,7 @@ export function WorkspaceContextMenu({
 			{unreadMenuItem}
 			{workspaceStatus && (
 				<ContextMenuItem onSelect={onResetStatus}>
-					<LuBellOff className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+					<BellOff className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 					Clear Status
 				</ContextMenuItem>
 			)}
@@ -211,7 +208,7 @@ export function WorkspaceContextMenu({
 					deleteDialogCoordinator.requestOpenDeleteDialog();
 				}}
 			>
-				<LuX className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+				<X className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 				{isBranchWorkspace ? "Close Workspace" : "Close Worktree"}
 				{showDeleteShortcut && (
 					<ContextMenuShortcut>{deleteHotkeyText}</ContextMenuShortcut>
@@ -251,7 +248,7 @@ export function WorkspaceContextMenu({
 					}}
 				>
 					<ContextMenuItem onSelect={onRename}>
-						<LuPencil className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+						<Pencil className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 						Rename
 					</ContextMenuItem>
 					<ContextMenuSeparator />

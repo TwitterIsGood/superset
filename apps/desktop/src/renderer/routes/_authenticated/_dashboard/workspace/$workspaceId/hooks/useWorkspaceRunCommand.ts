@@ -1,9 +1,9 @@
-import { toast } from "@superset/ui/sonner";
 import { useCallback, useRef, useState } from "react";
 import {
 	buildTerminalCommand,
 	launchCommandInPane,
 } from "renderer/lib/terminal/launch-command";
+import { toast } from "renderer/lib/toast";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import {

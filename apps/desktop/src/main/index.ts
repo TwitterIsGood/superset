@@ -73,7 +73,7 @@ import { startNetworkLogger, stopNetworkLogger } from "./network-logger";
 import { MainWindow } from "./windows/main";
 
 console.log("[main] Local database ready:", !!localDb);
-const IS_DEV = process.env.NODE_ENV === "development";
+const IS_DEV = !app.isPackaged && process.env.NODE_ENV === "development";
 const STARTUP_PERFORMANCE_TELEMETRY_DELAY_MS = 30_000;
 markStartup("main:index-module-ready");
 
@@ -244,7 +244,7 @@ function getConfirmOnQuitSetting(): boolean {
 app.on("before-quit", async (event) => {
 	if (isQuitting) return;
 
-	const isDev = process.env.NODE_ENV === "development";
+	const isDev = !app.isPackaged && process.env.NODE_ENV === "development";
 	if (!skipQuitConfirmation && !isDev && getConfirmOnQuitSetting()) {
 		event.preventDefault();
 
@@ -400,7 +400,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 // Without these handlers, Electron may not quit when electron-vite sends SIGTERM
-if (process.env.NODE_ENV === "development") {
+if (IS_DEV) {
 	let signalHandled = false;
 	const handleTerminationSignal = (signal: string) => {
 		if (signalHandled) return;

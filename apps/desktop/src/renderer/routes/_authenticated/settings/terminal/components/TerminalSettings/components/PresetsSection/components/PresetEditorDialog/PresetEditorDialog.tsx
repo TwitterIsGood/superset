@@ -18,13 +18,11 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@superset/ui/select";
-import { toast } from "@superset/ui/sonner";
 import { Switch } from "@superset/ui/switch";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ExternalLink, Trash2 } from "lucide-react";
+import { ExternalLink, FolderOpen, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { HiExclamationTriangle, HiOutlineFolderOpen } from "react-icons/hi2";
 import { V2_AGENT_CONFIGS_QUERY_KEY } from "renderer/hooks/useV2AgentConfigs";
 import {
 	findLinkedAgent,
@@ -36,6 +34,7 @@ import {
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { getHostServiceUnavailableMessage } from "renderer/lib/host-service-unavailable";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import type { PresetColumnKey } from "renderer/routes/_authenticated/settings/presets/types";
 import { useSettingsOriginRoute } from "renderer/stores/settings-state";
@@ -339,7 +338,7 @@ export function PresetEditorDialog({
 	const directoryAlert =
 		trimmedCwd && isAbsolutePath && directoryStatus?.exists === false ? (
 			<Alert variant="destructive">
-				<HiExclamationTriangle />
+				<TriangleAlert />
 				<AlertDescription>
 					This directory does not exist. The preset will fall back to the
 					workspace root.
@@ -350,7 +349,7 @@ export function PresetEditorDialog({
 			directoryStatus?.exists &&
 			!directoryStatus.isDirectory ? (
 			<Alert variant="destructive">
-				<HiExclamationTriangle />
+				<TriangleAlert />
 				<AlertDescription>
 					This path exists, but it is not a directory.
 				</AlertDescription>
@@ -503,7 +502,7 @@ export function PresetEditorDialog({
 										disabled={selectDirectory.isPending}
 										aria-label="Browse for directory"
 									>
-										<HiOutlineFolderOpen className="size-4" />
+										<FolderOpen className="size-4" />
 									</Button>
 								</div>
 							</DialogRow>

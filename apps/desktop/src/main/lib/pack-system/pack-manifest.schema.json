@@ -18,6 +18,21 @@
 		"minAppVersion": { "type": "string", "minLength": 1 },
 		"appVersionRange": { "type": "string", "minLength": 1 },
 		"downloadUrl": { "type": "string", "format": "uri" },
+		"archive": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["format", "path", "size", "sha256"],
+			"properties": {
+				"format": { "const": "zip" },
+				"path": { "$ref": "#/$defs/relativePath" },
+				"size": { "type": "integer", "minimum": 1 },
+				"sha256": {
+					"type": "string",
+					"pattern": "^[a-fA-F0-9]{64}$"
+				},
+				"downloadUrl": { "type": "string", "format": "uri" }
+			}
+		},
 		"executeHint": {
 			"type": "object",
 			"additionalProperties": false,

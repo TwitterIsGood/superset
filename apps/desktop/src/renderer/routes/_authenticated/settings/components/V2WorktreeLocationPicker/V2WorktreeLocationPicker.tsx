@@ -1,7 +1,7 @@
 import { Button } from "@superset/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
+import { FolderOpen, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { LuFolderOpen, LuRotateCcw } from "react-icons/lu";
 import { RemotePathPicker } from "renderer/components/RemotePathPicker";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 
@@ -73,7 +73,7 @@ export function V2WorktreeLocationPicker({
 							disabled={isBusy || !hostUrl}
 							aria-label="Change worktree location"
 						>
-							<LuFolderOpen className="size-4" />
+							<FolderOpen className="size-4" />
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>Change location</TooltipContent>
@@ -90,7 +90,7 @@ export function V2WorktreeLocationPicker({
 								disabled={disabled}
 								aria-label="Reset worktree location"
 							>
-								<LuRotateCcw className="size-4" />
+								<RotateCcw className="size-4" />
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent>Reset location</TooltipContent>

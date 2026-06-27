@@ -1,9 +1,9 @@
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef } from "react";
 import { useDrag, useDrop } from "react-dnd";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { useReorderProjects } from "renderer/react-query/projects";
 import { useWorkspaceSidebarStore } from "renderer/stores";
 import { useOpenNewWorkspaceModal } from "renderer/stores/new-workspace-modal";

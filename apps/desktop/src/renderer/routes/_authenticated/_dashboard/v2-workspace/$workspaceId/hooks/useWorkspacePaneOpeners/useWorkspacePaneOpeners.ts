@@ -25,7 +25,7 @@ export function useWorkspacePaneOpeners({
 	executePreset: (
 		preset: V2TerminalPresetRow,
 		options?: { target?: "new-tab" | "active-tab" },
-	) => void | Promise<void>;
+	) => boolean | Promise<boolean>;
 }): {
 	openDiffPane: (
 		filePath: string,
@@ -126,8 +126,14 @@ export function useWorkspacePaneOpeners({
 
 		// New terminal tabs are the trigger point for applyOnNewTab presets.
 		// Each matching preset owns the tab/pane shape it creates.
+		let successfulPresetCount = 0;
 		for (const preset of newTabPresets) {
-			await executePreset(preset, { target: "new-tab" });
+			if (await executePreset(preset, { target: "new-tab" })) {
+				successfulPresetCount += 1;
+			}
+		}
+		if (successfulPresetCount === 0) {
+			await addBlankTerminalTab();
 		}
 	}, [addBlankTerminalTab, executePreset, newTabPresets]);
 

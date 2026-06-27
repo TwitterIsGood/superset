@@ -2,8 +2,8 @@ import { Button } from "@superset/ui/button";
 import { Label } from "@superset/ui/label";
 import { Switch } from "@superset/ui/switch";
 import { cn } from "@superset/ui/utils";
+import { Check, Play, Plus, RefreshCw, StopCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { HiArrowPath, HiCheck, HiPlay, HiPlus, HiStop } from "react-icons/hi2";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import {
@@ -74,7 +74,7 @@ function RingtoneRow({
 				</div>
 			</div>
 			<div className="w-5 flex justify-center shrink-0">
-				{isSelected && <HiCheck className="h-4 w-4 text-primary" />}
+				{isSelected && <Check className="h-4 w-4 text-primary" />}
 			</div>
 			<button
 				type="button"
@@ -93,9 +93,9 @@ function RingtoneRow({
 				)}
 			>
 				{isPlaying ? (
-					<HiStop className="h-3.5 w-3.5" />
+					<StopCircle className="h-3.5 w-3.5" />
 				) : (
-					<HiPlay className="h-3.5 w-3.5 ml-0.5" />
+					<Play className="h-3.5 w-3.5 ml-0.5" />
 				)}
 			</button>
 		</div>
@@ -300,9 +300,9 @@ export function RingtonesSettings({ visibleItems }: RingtonesSettingsProps) {
 								disabled={importCustomRingtone.isPending}
 							>
 								{customRingtone ? (
-									<HiArrowPath className="mr-1.5 h-3.5 w-3.5" />
+									<RefreshCw className="mr-1.5 h-3.5 w-3.5" />
 								) : (
-									<HiPlus className="mr-1.5 h-3.5 w-3.5" />
+									<Plus className="mr-1.5 h-3.5 w-3.5" />
 								)}
 								{customRingtone ? "Replace custom audio" : "Add custom audio"}
 							</Button>

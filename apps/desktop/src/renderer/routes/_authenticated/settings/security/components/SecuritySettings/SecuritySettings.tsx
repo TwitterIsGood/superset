@@ -1,9 +1,9 @@
 import { Label } from "@superset/ui/label";
-import { toast } from "@superset/ui/sonner";
 import { Switch } from "@superset/ui/switch";
 import { useState } from "react";
 import { authClient } from "renderer/lib/auth-client";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import {
 	isItemVisible,
 	SETTING_ITEM_ID,

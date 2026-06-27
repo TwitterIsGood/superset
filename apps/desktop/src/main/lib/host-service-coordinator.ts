@@ -16,6 +16,7 @@ import { DEFAULT_EXPOSE_HOST_SERVICE_VIA_RELAY } from "shared/constants";
 import { env as sharedEnv } from "shared/env.shared";
 import { getProcessEnvWithShellPath } from "../../lib/trpc/routers/workspaces/utils/shell-env";
 import { SUPERSET_HOME_DIR } from "./app-environment";
+import { resolveElectronRunAsNodeExecPath } from "./electron-run-as-node-exec-path";
 import {
 	isProcessAlive,
 	killProcess,
@@ -115,7 +116,12 @@ export class HostServiceCoordinator extends EventEmitter {
 		organizationId: string,
 		config: SpawnConfig,
 	): Promise<Connection> {
-		return this.startWithPreferredPorts(organizationId, config);
+		const connection = await this.startWithPreferredPorts(
+			organizationId,
+			config,
+		);
+		this.stopAllExcept([organizationId]);
+		return connection;
 	}
 
 	private async startWithPreferredPorts(
@@ -192,6 +198,15 @@ export class HostServiceCoordinator extends EventEmitter {
 	stopAll(): void {
 		for (const [id] of this.instances) {
 			this.stop(id);
+		}
+	}
+
+	stopAllExcept(organizationIdsToKeep: Iterable<string>): void {
+		const keep = new Set(organizationIdsToKeep);
+		for (const [id] of this.instances) {
+			if (!keep.has(id)) {
+				this.stop(id);
+			}
 		}
 	}
 
@@ -391,9 +406,12 @@ export class HostServiceCoordinator extends EventEmitter {
 				? ["ignore", logFd, logFd]
 				: ["ignore", "ignore", "ignore"];
 
+		const electronExecPath = resolveElectronRunAsNodeExecPath({
+			isPackaged: app.isPackaged,
+		});
 		let child: ReturnType<typeof childProcess.spawn>;
 		try {
-			child = childProcess.spawn(process.execPath, [this.scriptPath], {
+			child = childProcess.spawn(electronExecPath, [this.scriptPath], {
 				detached: false,
 				stdio,
 				env: childEnv,

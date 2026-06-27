@@ -1,5 +1,5 @@
 import type { GitHubStatus, PullRequestComment } from "@superset/local-db";
-import { LuCheck, LuLoaderCircle, LuMinus, LuX } from "react-icons/lu";
+import { Check, LoaderCircle, Minus, X } from "lucide-react";
 
 export type PullRequestCheck = NonNullable<
 	GitHubStatus["pr"]
@@ -27,27 +27,27 @@ export const reviewDecisionConfig = {
 
 export const checkIconConfig = {
 	success: {
-		icon: LuCheck,
+		icon: Check,
 		className: "text-emerald-600 dark:text-emerald-400",
 		label: "Passed",
 	},
 	failure: {
-		icon: LuX,
+		icon: X,
 		className: "text-red-600 dark:text-red-400",
 		label: "Failed",
 	},
 	pending: {
-		icon: LuLoaderCircle,
+		icon: LoaderCircle,
 		className: "text-amber-600 dark:text-amber-400",
 		label: "Pending",
 	},
 	skipped: {
-		icon: LuMinus,
+		icon: Minus,
 		className: "text-muted-foreground",
 		label: "Skipped",
 	},
 	cancelled: {
-		icon: LuMinus,
+		icon: Minus,
 		className: "text-muted-foreground",
 		label: "Cancelled",
 	},
@@ -58,7 +58,7 @@ export const checkSummaryIconConfig = {
 	failure: checkIconConfig.failure,
 	pending: checkIconConfig.pending,
 	none: {
-		icon: LuMinus,
+		icon: Minus,
 		className: "text-muted-foreground",
 		label: "No checks",
 	},

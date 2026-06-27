@@ -1,3 +1,7 @@
-import PierreDiffsWorker from "@pierre/diffs/worker/worker.js?worker";
+const pierreDiffsWorkerUrl = new URL(
+	"@pierre/diffs/worker/worker.js",
+	import.meta.url,
+);
 
-export const createPierreWorker = (): Worker => new PierreDiffsWorker();
+export const createPierreWorker = (): Worker =>
+	new Worker(pierreDiffsWorkerUrl, { type: "module" });

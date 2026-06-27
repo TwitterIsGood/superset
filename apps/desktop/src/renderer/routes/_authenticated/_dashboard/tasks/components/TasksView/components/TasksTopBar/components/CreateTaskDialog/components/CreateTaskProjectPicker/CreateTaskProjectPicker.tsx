@@ -8,8 +8,8 @@ import {
 	CommandList,
 } from "@superset/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
+import { Check, ChevronDown, Folder } from "lucide-react";
 import { useMemo, useState } from "react";
-import { HiCheck, HiChevronDown, HiOutlineFolder } from "react-icons/hi2";
 import { ProjectThumbnail } from "renderer/routes/_authenticated/components/ProjectThumbnail";
 
 interface CreateTaskProjectPickerProps {
@@ -68,11 +68,11 @@ export function CreateTaskProjectPicker({
 						</>
 					) : (
 						<>
-							<HiOutlineFolder className="size-4 text-muted-foreground" />
+							<Folder className="size-4 text-muted-foreground" />
 							<span className="text-muted-foreground">No project</span>
 						</>
 					)}
-					<HiChevronDown className="size-3.5 text-muted-foreground" />
+					<ChevronDown className="size-3.5 text-muted-foreground" />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent align="start" className="w-64 p-0">
@@ -85,9 +85,9 @@ export function CreateTaskProjectPicker({
 					<CommandList className="max-h-72">
 						<CommandGroup>
 							<CommandItem onSelect={() => handleSelect(null)}>
-								<HiOutlineFolder className="size-4" />
+								<Folder className="size-4" />
 								<span className="flex-1 text-sm">No project</span>
-								{value === null && <HiCheck className="size-3.5" />}
+								{value === null && <Check className="size-3.5" />}
 							</CommandItem>
 						</CommandGroup>
 
@@ -108,7 +108,7 @@ export function CreateTaskProjectPicker({
 										<span className="flex-1 truncate text-sm">
 											{project.name}
 										</span>
-										{project.id === value && <HiCheck className="size-3.5" />}
+										{project.id === value && <Check className="size-3.5" />}
 									</CommandItem>
 								))}
 							</CommandGroup>

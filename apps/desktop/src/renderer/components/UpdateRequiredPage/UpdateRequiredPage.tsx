@@ -1,7 +1,7 @@
 import { COMPANY } from "@superset/shared/constants";
 import { Button } from "@superset/ui/button";
+import { RefreshCw, TriangleAlert } from "lucide-react";
 import { useState } from "react";
-import { HiArrowPath, HiExclamationTriangle } from "react-icons/hi2";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { AppFrame } from "renderer/screens/main/components/AppFrame";
 import { Background } from "renderer/screens/main/components/Background";
@@ -59,7 +59,7 @@ export function UpdateRequiredPage({
 			<AppFrame>
 				<div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-background p-8">
 					<div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10">
-						<HiExclamationTriangle className="h-8 w-8 text-amber-500" />
+						<TriangleAlert className="h-8 w-8 text-amber-500" />
 					</div>
 
 					<div className="flex flex-col items-center gap-2 text-center">
@@ -93,7 +93,7 @@ export function UpdateRequiredPage({
 								className="gap-2"
 							>
 								{installMutation.isPending && (
-									<HiArrowPath className="h-4 w-4 animate-spin" />
+									<RefreshCw className="h-4 w-4 animate-spin" />
 								)}
 								{installMutation.isPending
 									? "Installing..."
@@ -105,7 +105,7 @@ export function UpdateRequiredPage({
 								disabled={isLoading || checkMutation.isPending}
 								className="gap-2"
 							>
-								<HiArrowPath
+								<RefreshCw
 									className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
 								/>
 								{isChecking

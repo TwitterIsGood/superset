@@ -20,9 +20,8 @@ import {
 	type Table,
 	useReactTable,
 } from "@tanstack/react-table";
-import { format } from "date-fns";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right.js";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { HiChevronRight } from "react-icons/hi2";
 import { getSlugColumnWidth } from "renderer/lib/slug-width";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { create } from "zustand";
@@ -32,6 +31,7 @@ import {
 	type StatusType,
 } from "../../components/shared/StatusIcon";
 import type { TabValue } from "../../components/TasksTopBar";
+import { formatTaskShortDate } from "../../utils/formatTaskShortDate";
 import { compareTasks } from "../../utils/sorting";
 import { useHybridSearch } from "../useHybridSearch";
 import { AssigneeCell } from "./components/AssigneeCell";
@@ -206,7 +206,7 @@ export function useTasksTable({
 									className="group w-full justify-start px-4 py-2 h-auto relative rounded-none bg-transparent flex items-center cursor-pointer border-0"
 									onClick={row.getToggleExpandedHandler()}
 								>
-									<HiChevronRight
+									<ChevronRight
 										className={`h-3 w-3 text-muted-foreground transition-transform duration-100 group-hover:text-foreground ${
 											row.getIsExpanded() ? "rotate-90" : ""
 										}`}
@@ -355,7 +355,7 @@ export function useTasksTable({
 					const label = info.row.original.dueDate ? "Due" : "Created";
 					return (
 						<span className="w-20 shrink-0 text-xs text-muted-foreground">
-							{label} {format(new Date(date), "MMM d")}
+							{label} {formatTaskShortDate(date)}
 						</span>
 					);
 				},

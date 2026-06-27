@@ -32,6 +32,7 @@ import {
 } from "@superset/pty-daemon/process-tree";
 import { app } from "electron";
 import { SUPERSET_DIR_NAME } from "shared/constants";
+import { resolveElectronRunAsNodeExecPath } from "../electron-run-as-node-exec-path";
 import { throwIfAborted } from "../terminal/abort";
 import { TerminalAttachCanceledError } from "../terminal/errors";
 import {
@@ -1209,9 +1210,12 @@ export class TerminalHostClient extends EventEmitter {
 				throw new Error(`Daemon script not found: ${daemonScript}`);
 			}
 
+			const electronExecPath = resolveElectronRunAsNodeExecPath({
+				isPackaged: app.isPackaged,
+			});
 			if (DEBUG_CLIENT) {
 				console.log(
-					`[TerminalHostClient] Spawning daemon with execPath: ${process.execPath}`,
+					`[TerminalHostClient] Spawning daemon with execPath: ${electronExecPath}`,
 				);
 			}
 
@@ -1248,7 +1252,7 @@ export class TerminalHostClient extends EventEmitter {
 			const isDev = !app.isPackaged;
 			let child: ReturnType<typeof spawn> | null = null;
 			try {
-				child = spawn(process.execPath, [daemonScript], {
+				child = spawn(electronExecPath, [daemonScript], {
 					detached: !isDev,
 					stdio: logFd >= 0 ? ["ignore", logFd, logFd] : "ignore",
 					env: {

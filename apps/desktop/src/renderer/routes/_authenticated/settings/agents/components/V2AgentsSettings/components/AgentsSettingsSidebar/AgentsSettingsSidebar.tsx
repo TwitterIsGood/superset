@@ -25,9 +25,8 @@ import {
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
 import { cn } from "@superset/ui/utils";
-import { Plus } from "lucide-react";
+import { GripVertical, Plus } from "lucide-react";
 import { useMemo } from "react";
-import { LuGripVertical } from "react-icons/lu";
 import {
 	getPresetIcon,
 	useIsDarkTheme,
@@ -214,7 +213,7 @@ function AgentSidebarRow({
 				)}
 				aria-label="Drag to reorder"
 			>
-				<LuGripVertical className="size-3.5" />
+				<GripVertical className="size-3.5" />
 			</button>
 		</div>
 	);

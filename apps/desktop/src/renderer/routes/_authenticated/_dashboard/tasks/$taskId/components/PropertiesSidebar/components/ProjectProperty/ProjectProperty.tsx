@@ -9,8 +9,8 @@ import {
 } from "@superset/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
 import { useLiveQuery } from "@tanstack/react-db";
+import { Check, ChevronDown, Folder } from "lucide-react";
 import { useMemo, useState } from "react";
-import { HiCheck, HiChevronDown, HiOutlineFolder } from "react-icons/hi2";
 import { ProjectThumbnail } from "renderer/routes/_authenticated/components/ProjectThumbnail";
 import { useOptimisticCollectionActions } from "renderer/routes/_authenticated/hooks/useOptimisticCollectionActions";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
@@ -81,12 +81,12 @@ export function ProjectProperty({ task }: ProjectPropertyProps) {
 								className="size-4 rounded-[3px]"
 							/>
 						) : (
-							<HiOutlineFolder className="size-4 text-muted-foreground" />
+							<Folder className="size-4 text-muted-foreground" />
 						)}
 						<span className="min-w-0 flex-1 truncate text-sm">
 							{currentProject?.name ?? "No project"}
 						</span>
-						<HiChevronDown className="size-3.5 text-muted-foreground" />
+						<ChevronDown className="size-3.5 text-muted-foreground" />
 					</button>
 				</PopoverTrigger>
 				<PopoverContent align="start" className="w-60 p-0">
@@ -99,11 +99,9 @@ export function ProjectProperty({ task }: ProjectPropertyProps) {
 						<CommandList className="max-h-72">
 							<CommandGroup>
 								<CommandItem onSelect={() => handleSelectProject(null)}>
-									<HiOutlineFolder className="size-4" />
+									<Folder className="size-4" />
 									<span className="flex-1 text-sm">No project</span>
-									{task.v2ProjectId === null && (
-										<HiCheck className="size-3.5" />
-									)}
+									{task.v2ProjectId === null && <Check className="size-3.5" />}
 								</CommandItem>
 							</CommandGroup>
 
@@ -125,7 +123,7 @@ export function ProjectProperty({ task }: ProjectPropertyProps) {
 												{project.name}
 											</span>
 											{project.id === task.v2ProjectId && (
-												<HiCheck className="size-3.5" />
+												<Check className="size-3.5" />
 											)}
 										</CommandItem>
 									))}

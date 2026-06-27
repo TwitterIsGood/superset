@@ -1,8 +1,11 @@
+import {
+	Globe,
+	type LucideIcon,
+	MessageCirclePlus,
+	Search,
+	SquareTerminal,
+} from "lucide-react";
 import { useMemo } from "react";
-import type { IconType } from "react-icons";
-import { BsTerminalPlus } from "react-icons/bs";
-import { LuSearch } from "react-icons/lu";
-import { TbMessageCirclePlus, TbWorld } from "react-icons/tb";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import supersetEmptyStateWordmark from "renderer/screens/main/components/WorkspaceView/ContentView/TabsContent/assets/superset-empty-state-wordmark.svg";
 import { EmptyTabActionButton } from "renderer/screens/main/components/WorkspaceView/ContentView/TabsContent/components/EmptyTabActionButton";
@@ -17,7 +20,7 @@ interface WorkspaceEmptyStateProps {
 
 interface WorkspaceEmptyStateAction {
 	display: string[];
-	icon: IconType;
+	icon: LucideIcon;
 	id: string;
 	label: string;
 	onClick: () => void;
@@ -41,28 +44,28 @@ export function WorkspaceEmptyState({
 				id: "terminal",
 				label: "Open Terminal",
 				display: newGroupDisplay,
-				icon: BsTerminalPlus,
+				icon: SquareTerminal,
 				onClick: onOpenTerminal,
 			},
 			{
 				id: "chat",
 				label: "Open Chat",
 				display: newChatDisplay,
-				icon: TbMessageCirclePlus,
+				icon: MessageCirclePlus,
 				onClick: onOpenChat,
 			},
 			{
 				id: "browser",
 				label: "Open Browser",
 				display: newBrowserDisplay,
-				icon: TbWorld,
+				icon: Globe,
 				onClick: onOpenBrowser,
 			},
 			{
 				id: "search-files",
 				label: "Search Files",
 				display: quickOpenDisplay,
-				icon: LuSearch,
+				icon: Search,
 				onClick: onOpenQuickOpen,
 			},
 		],

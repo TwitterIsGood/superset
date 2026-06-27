@@ -1,5 +1,5 @@
 import { cn } from "@superset/ui/utils";
-import { LuCheck, LuLoaderCircle, LuX } from "react-icons/lu";
+import { Check, LoaderCircle, X } from "lucide-react";
 import type {
 	V2WorkspacePrChecksStatus,
 	V2WorkspacePrSummary,
@@ -19,9 +19,9 @@ export function ChecksSummary({ checks, status }: ChecksSummaryProps) {
 	).length;
 
 	const config = {
-		success: { Icon: LuCheck, className: "text-emerald-500" },
-		failure: { Icon: LuX, className: "text-destructive-foreground" },
-		pending: { Icon: LuLoaderCircle, className: "text-amber-500" },
+		success: { Icon: Check, className: "text-emerald-500" },
+		failure: { Icon: X, className: "text-destructive-foreground" },
+		pending: { Icon: LoaderCircle, className: "text-amber-500" },
 	} as const;
 
 	const { Icon, className } = config[status];

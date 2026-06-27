@@ -1,6 +1,6 @@
 import { cn } from "@superset/ui/utils";
+import { Loader } from "lucide-react";
 import { useState } from "react";
-import { LuLoader } from "react-icons/lu";
 import type { ProjectTemplate } from "../../templates";
 
 interface TemplateCardProps {
@@ -51,7 +51,7 @@ export function TemplateCard({
 				)}
 				{cloning && (
 					<div className="absolute inset-0 flex items-center justify-center bg-black/40">
-						<LuLoader className="size-6 animate-spin text-white" />
+						<Loader className="size-6 animate-spin text-white" />
 					</div>
 				)}
 			</div>

@@ -1,6 +1,5 @@
 import { Button } from "@superset/ui/button";
-import { HiArrowLeft } from "react-icons/hi2";
-import { LuExternalLink } from "react-icons/lu";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import type { TaskWithStatus } from "../../../components/TasksView/hooks/useTasksTable";
 import { TaskActionMenu } from "../TaskActionMenu";
 
@@ -24,7 +23,7 @@ export function TaskDetailHeader({
 				onClick={onBack}
 				aria-label="Back to tasks"
 			>
-				<HiArrowLeft className="w-4 h-4" />
+				<ArrowLeft className="w-4 h-4" />
 			</Button>
 			<span className="text-sm text-muted-foreground">{task.slug}</span>
 			<div className="ml-auto flex items-center gap-1">
@@ -36,7 +35,7 @@ export function TaskDetailHeader({
 						className="text-muted-foreground hover:text-foreground transition-colors p-2"
 						title="Open in Linear"
 					>
-						<LuExternalLink className="w-4 h-4" />
+						<ExternalLink className="w-4 h-4" />
 					</a>
 				)}
 				<TaskActionMenu task={task} onDelete={onDelete} />

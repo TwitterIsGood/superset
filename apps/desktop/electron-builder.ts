@@ -14,6 +14,8 @@ import {
 } from "./runtime-dependencies";
 import {
 	normalizeBuilderArch,
+	prunePackagedElectronLocales,
+	prunePackagedElectronSoftwareRenderer,
 	prunePackagedNativePayloads,
 } from "./scripts/prune-packaged-native-payloads";
 
@@ -106,6 +108,9 @@ const config: Configuration = {
 
 	files: [
 		"dist/**/*",
+		// Built-in sounds are copied from src/resources into app.asar.unpacked/resources/sounds.
+		// Exclude the electron-vite preview copy to avoid packaging the same MP3s twice.
+		"!dist/resources/sounds/**/*",
 		"!dist/resource-packs/**/*",
 		"!dist/resource-packs-test/**/*",
 		"package.json",
@@ -116,7 +121,14 @@ const config: Configuration = {
 		{
 			from: pkg.resources,
 			to: "resources",
-			filter: ["**/*"],
+			filter: [
+				"**/*",
+				"!build/installer/**/*",
+				"!build/icons/*.png",
+				"!build/*.plist",
+				"!build/icons/*.icns",
+				"!build/icons/*.ico",
+			],
 		},
 		// Runtime modules that stay external to the main bundle.
 		// bun creates symlinks for direct deps in workspace node_modules.
@@ -144,6 +156,14 @@ const config: Configuration = {
 			targetArch: normalizeBuilderArch(context.arch),
 			targetPlatform: context.electronPlatformName,
 		});
+		if (context.electronPlatformName === "darwin") {
+			await prunePackagedElectronLocales({
+				appOutDir: context.appOutDir,
+			});
+			await prunePackagedElectronSoftwareRenderer({
+				appOutDir: context.appOutDir,
+			});
+		}
 	},
 
 	// macOS DMG installer

@@ -34,6 +34,30 @@
 				}
 			}
 		},
+		"build": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"notes": {
+					"type": "string"
+				},
+				"canary": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"quick": {
+							"$ref": "#/$defs/buildDurationBudget"
+						},
+						"publishedQuick": {
+							"$ref": "#/$defs/buildDurationBudget"
+						},
+						"full": {
+							"$ref": "#/$defs/buildDurationBudget"
+						}
+					}
+				}
+			}
+		},
 		"startup": {
 			"type": "object",
 			"additionalProperties": false,
@@ -103,6 +127,13 @@
 					"type": "object",
 					"additionalProperties": false,
 					"properties": {
+						"requiredRoutes": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"pattern": "^/"
+							}
+						},
 						"openDuration": {
 							"$ref": "#/$defs/millisecondBudget"
 						}
@@ -154,6 +185,28 @@
 				"target": {
 					"type": "number",
 					"minimum": 0
+				}
+			}
+		},
+		"buildDurationBudget": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["maxSeconds"],
+			"properties": {
+				"maxSeconds": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				},
+				"targetSeconds": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				},
+				"criticalPathMaxSeconds": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "number",
+						"exclusiveMinimum": 0
+					}
 				}
 			}
 		}

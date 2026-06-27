@@ -417,6 +417,27 @@ function seedLocalHostFixture(args: {
 	}
 }
 
+function countLocalHostFixtureWorkspaces(args: {
+	organizationId: string;
+	workspaceIds: string[];
+}): number {
+	if (args.workspaceIds.length === 0) return 0;
+	const dbPath = getHostDbPath(args.organizationId);
+	if (!existsSync(dbPath)) return 0;
+	const db = new Database(dbPath, { readonly: true });
+	try {
+		const placeholders = args.workspaceIds.map(() => "?").join(",");
+		const row = db
+			.prepare(
+				`select count(*) as count from workspaces where id in (${placeholders})`,
+			)
+			.get(...args.workspaceIds) as { count?: number } | undefined;
+		return Number(row?.count ?? 0);
+	} finally {
+		db.close();
+	}
+}
+
 async function ensureTaskStatuses(organizationId: string) {
 	const { db, eq, taskStatuses } = await getDbDeps();
 	const definitions = [
@@ -532,6 +553,11 @@ async function getFixtureStats(options: Record<string, string | boolean>) {
 		18,
 	);
 	const expectedTaskCount = positiveIntegerOption(options, "tasks", 240);
+	const expectedHostBackedWorkspaces = nonNegativeIntegerOption(
+		options,
+		"host-backed-workspaces",
+		0,
+	);
 	const { organizationId, userId } = await resolveOrganizationId(email);
 	const { and, db, eq, inArray, like, tasks, v2Projects, v2Workspaces } =
 		await getDbDeps();
@@ -550,6 +576,8 @@ async function getFixtureStats(options: Record<string, string | boolean>) {
 	let workspaceCount = 0;
 	let taskCount = 0;
 	let hostBackedWorkspaceCount = 0;
+	let localHostBackedWorkspaceCount = 0;
+	let hostBackedWorkspaceIds: string[] = [];
 	if (projectIds.length > 0) {
 		const workspaceRows = await db
 			.select({ id: v2Workspaces.id })
@@ -567,6 +595,13 @@ async function getFixtureStats(options: Record<string, string | boolean>) {
 				),
 			);
 		hostBackedWorkspaceCount = hostBackedWorkspaceRows.length;
+		hostBackedWorkspaceIds = hostBackedWorkspaceRows.map(
+			(workspace) => workspace.id,
+		);
+		localHostBackedWorkspaceCount = countLocalHostFixtureWorkspaces({
+			organizationId,
+			workspaceIds: hostBackedWorkspaceIds,
+		});
 
 		const taskRows = await db
 			.select({ id: tasks.id })
@@ -595,16 +630,21 @@ async function getFixtureStats(options: Record<string, string | boolean>) {
 		taskCount,
 		localHostId: getHostId(),
 		hostBackedWorkspaceCount,
+		localHostBackedWorkspaceCount,
+		hostBackedWorkspaceIds,
 		expected: {
 			projectCount: expectedProjectCount,
 			workspacesPerProject: expectedWorkspacesPerProject,
 			workspaceCount: expectedWorkspaceCount,
 			taskCount: expectedTaskCount,
+			hostBackedWorkspaceCount: expectedHostBackedWorkspaces,
 		},
 		isLoaded:
 			projects.length >= expectedProjectCount &&
 			workspaceCount >= expectedWorkspaceCount &&
-			taskCount >= expectedTaskCount,
+			taskCount >= expectedTaskCount &&
+			hostBackedWorkspaceCount >= expectedHostBackedWorkspaces &&
+			localHostBackedWorkspaceCount >= expectedHostBackedWorkspaces,
 	};
 }
 
@@ -770,6 +810,7 @@ async function seedFixture(options: Record<string, string | boolean>) {
 		projectCount: projects.length,
 		workspaceCount: workspaces.length,
 		hostBackedWorkspaceCount: localHostSeed.workspaceCount,
+		hostBackedWorkspaceIds: [...hostBackedWorkspaceIds],
 		hostDbPath: localHostSeed.dbPath,
 		taskCount: insertedTasks.length,
 	};

@@ -5,8 +5,8 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { HiChevronDown } from "react-icons/hi2";
 import { PriorityIcon } from "renderer/routes/_authenticated/_dashboard/tasks/components/TasksView/components/shared/PriorityIcon";
 import { PriorityMenuItems } from "renderer/routes/_authenticated/_dashboard/tasks/components/TasksView/components/shared/PriorityMenuItems";
 
@@ -40,7 +40,7 @@ export function CreateTaskPriorityPicker({
 				>
 					<PriorityIcon priority={value} statusType={statusType} />
 					<span>{PRIORITY_LABELS[value]}</span>
-					<HiChevronDown className="size-3.5 text-muted-foreground" />
+					<ChevronDown className="size-3.5 text-muted-foreground" />
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="w-52 p-1">

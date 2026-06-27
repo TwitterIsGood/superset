@@ -7,15 +7,15 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@superset/ui/dialog";
-import { toast } from "@superset/ui/sonner";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuX } from "react-icons/lu";
 import { EmojiTextInput } from "renderer/components/EmojiTextInput";
 import { MarkdownEditor } from "renderer/components/MarkdownEditor";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { useV2AgentChoices } from "renderer/hooks/useV2AgentChoices";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
+import { toast } from "renderer/lib/toast";
 import { DevicePicker } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker";
 import { useWorkspaceHostOptions } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker/hooks/useWorkspaceHostOptions/useWorkspaceHostOptions";
 import { hideAll as hideAllTippy } from "tippy.js";
@@ -337,7 +337,7 @@ export function CreateAutomationDialog({
 								</Button>
 								<DialogClose asChild>
 									<Button variant="ghost" size="icon-sm" aria-label="Close">
-										<LuX className="size-4" />
+										<X className="size-4" />
 									</Button>
 								</DialogClose>
 							</DialogHeader>

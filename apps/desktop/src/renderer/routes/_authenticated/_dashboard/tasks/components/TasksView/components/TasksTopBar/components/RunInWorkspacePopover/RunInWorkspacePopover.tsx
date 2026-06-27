@@ -15,17 +15,15 @@ import {
 } from "@superset/ui/dropdown-menu";
 import { Label } from "@superset/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
-import { toast } from "@superset/ui/sonner";
 import { Spinner } from "@superset/ui/spinner";
 import { Switch } from "@superset/ui/switch";
-import { ChevronDownIcon } from "lucide-react";
+import { Check, ChevronDownIcon, Circle, Play, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { HiCheck, HiMiniPlay, HiXMark } from "react-icons/hi2";
-import { LuCircle } from "react-icons/lu";
 import { AgentSelect } from "renderer/components/AgentSelect";
 import { useAgentLaunchPreferences } from "renderer/hooks/useAgentLaunchPreferences";
 import { launchAgentSession } from "renderer/lib/agent-session-orchestrator";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { useCreateWorkspace } from "renderer/react-query/workspaces";
 import { ProjectThumbnail } from "renderer/screens/main/components/WorkspaceSidebar/ProjectSection/ProjectThumbnail";
 import { deriveBranchName } from "../../../../../../$taskId/utils/deriveBranchName";
@@ -37,13 +35,13 @@ type TaskLaunchAgent = AgentDefinitionId | "none";
 function BatchStatusIcon({ status }: { status: TaskStatus }) {
 	switch (status) {
 		case "pending":
-			return <LuCircle className="size-3 text-muted-foreground" />;
+			return <Circle className="size-3 text-muted-foreground" />;
 		case "creating":
 			return <Spinner className="size-3" />;
 		case "done":
-			return <HiCheck className="size-3 text-green-500" />;
+			return <Check className="size-3 text-green-500" />;
 		case "failed":
-			return <HiXMark className="size-3 text-destructive" />;
+			return <X className="size-3 text-destructive" />;
 	}
 }
 
@@ -249,7 +247,7 @@ export function RunInWorkspacePopover({
 					size="sm"
 					className="h-7 text-xs gap-1.5 bg-muted/50"
 				>
-					<HiMiniPlay className="size-3" />
+					<Play className="size-3" />
 					Run in Workspace
 				</Button>
 			</PopoverTrigger>

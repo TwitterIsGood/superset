@@ -4,9 +4,9 @@ import {
 	CommandList,
 	CommandItem as RawCommandItem,
 } from "@superset/ui/command";
-import { toast } from "@superset/ui/sonner";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useDeferredValue, useMemo } from "react";
+import { toast } from "renderer/lib/toast";
 import {
 	StatusIcon,
 	type StatusType,

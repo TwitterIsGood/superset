@@ -9,7 +9,7 @@ RUN_DIR="${SUPERSET_WORKTREE_DEV_RUN_DIR:-$ROOT_DIR/.tmp/worktree-dev}"
 LOG_DIR="$RUN_DIR/logs"
 PROFILE_MARKER_PATH="$RUN_DIR/active-profile"
 TMUX_SOCKET_PATH="${SUPERSET_WORKTREE_DEV_TMUX_SOCKET:-$RUN_DIR/tmux.sock}"
-WORKTREE_DEV_PROFILE="${WORKTREE_DEV_PROFILE:-full}"
+WORKTREE_DEV_PROFILE="${WORKTREE_DEV_PROFILE:-desktop-online-lite}"
 ALL_APP_SESSIONS=("api" "relay" "electric-proxy" "desktop")
 SESSIONS=()
 WORKTREE_DEV_REQUIRES_LOCAL_API=1
@@ -541,9 +541,12 @@ run_service() {
       if [ -n "${SUPERSET_DESKTOP_DEV_NODE_OPTIONS:-}" ]; then
         export NODE_OPTIONS="${SUPERSET_DESKTOP_DEV_NODE_OPTIONS}${NODE_OPTIONS:+ $NODE_OPTIONS}"
       elif [ -z "${NODE_OPTIONS:-}" ]; then
-        export NODE_OPTIONS="--max-old-space-size=2048"
+        export NODE_OPTIONS="--max-old-space-size=1536"
       fi
-      exec ./node_modules/.bin/electron-vite dev --watch
+      if [ "${SUPERSET_DESKTOP_DEV_MAIN_WATCH:-0}" = "1" ]; then
+        exec ./node_modules/.bin/electron-vite dev --watch
+      fi
+      exec ./node_modules/.bin/electron-vite dev
       ;;
     *)
       error "unknown service: $service"
@@ -714,6 +717,51 @@ worktree_docker_memory_kib() {
   printf "%d" "$total"
 }
 
+other_superset_app_memory_kib() {
+  ps -axo rss=,args= | awk -v root="$ROOT_DIR" '
+    index($0, root) == 0 &&
+    $0 !~ /worktree-dev\.sh status/ &&
+    $0 !~ /ps -axo rss=,args=/ &&
+    $0 !~ /awk -v root=/ {
+      is_superset = 0
+      if ($0 ~ /Superset \(/) is_superset = 1
+      if ($0 ~ /electron-vite dev/) is_superset = 1
+      if ($0 ~ /apps\/desktop/) is_superset = 1
+      if ($0 ~ /apps\/api/) is_superset = 1
+      if ($0 ~ /apps\/relay/) is_superset = 1
+      if ($0 ~ /apps\/electric-proxy/) is_superset = 1
+      if (!is_superset) {
+        next
+      }
+      total += $1
+    }
+    END { printf "%d", total }
+  '
+}
+
+other_superset_docker_memory_kib() {
+  if ! docker info >/dev/null 2>&1; then
+    printf "0"
+    return
+  fi
+
+  local total=0
+  local line name usage value kib
+  while IFS=$'\t' read -r name usage; do
+    case "$name" in
+      "$LOCAL_DB_PROJECT"-*)
+        ;;
+      superset-*)
+        value="${usage%% / *}"
+        kib="$(docker_mem_to_kib "$value")"
+        total=$((total + kib))
+        ;;
+    esac
+  done < <(docker stats --no-stream --format '{{.Name}}\t{{.MemUsage}}' 2>/dev/null || true)
+
+  printf "%d" "$total"
+}
+
 print_worktree_top_process_memory() {
   ps -axo rss=,pid=,comm=,args= | awk -v root="$ROOT_DIR" '
     index($0, root) > 0 &&
@@ -739,11 +787,58 @@ print_worktree_top_process_memory() {
   '
 }
 
+print_other_superset_top_process_memory() {
+  ps -axo rss=,pid=,comm=,args= | awk -v root="$ROOT_DIR" '
+    index($0, root) == 0 &&
+    $0 !~ /worktree-dev\.sh status/ &&
+    $0 !~ /ps -axo rss=,pid=,comm=,args=/ &&
+    $0 !~ /awk -v root=/ {
+      is_superset = 0
+      if ($0 ~ /Superset \(/) is_superset = 1
+      if ($0 ~ /electron-vite dev/) is_superset = 1
+      if ($0 ~ /apps\/desktop/) is_superset = 1
+      if ($0 ~ /apps\/api/) is_superset = 1
+      if ($0 ~ /apps\/relay/) is_superset = 1
+      if ($0 ~ /apps\/electric-proxy/) is_superset = 1
+      if (!is_superset) {
+        next
+      }
+      rss = $1
+      pid = $2
+      comm = $3
+      $1 = ""; $2 = ""; $3 = ""
+      gsub(/^[[:space:]]+/, "", $0)
+      printf "%012d\t%s\t%s\t%s\n", rss, pid, comm, $0
+    }
+  ' | sort -r | head -8 | awk -F '\t' '
+    {
+      rss = $1 + 0
+      command = $4
+      if (length(command) > 110) {
+        command = substr(command, 1, 107) "..."
+      }
+      printf "  %8.1f MiB  pid %-7s %-18s %s\n", rss / 1024, $2, $3, command
+    }
+  '
+}
+
 print_memory_status() {
-  local app_kib docker_kib total_kib
+  if [ -f "$ROOT_DIR/scripts/dev-memory-report.ts" ]; then
+    bun run --silent "$ROOT_DIR/scripts/dev-memory-report.ts" \
+      --root "$ROOT_DIR" \
+      --local-db-project "$LOCAL_DB_PROJECT" \
+      --max-current-mib "${SUPERSET_WORKTREE_MEMORY_BUDGET_MIB:-2048}" \
+      --top 8
+    return
+  fi
+
+  local app_kib docker_kib other_app_kib other_docker_kib total_kib visible_total_kib
   app_kib="$(worktree_app_memory_kib)"
   docker_kib="$(worktree_docker_memory_kib)"
+  other_app_kib="$(other_superset_app_memory_kib)"
+  other_docker_kib="$(other_superset_docker_memory_kib)"
   total_kib=$((app_kib + docker_kib))
+  visible_total_kib=$((total_kib + other_app_kib + other_docker_kib))
 
   echo "memory:"
   printf '  %-24s %s\n' "app processes" "$(format_mib "$app_kib")"
@@ -753,8 +848,30 @@ print_memory_status() {
     printf '  %-24s skipped %s\n' "docker compose" "WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE"
   fi
   printf '  %-24s %s\n' "tracked total" "$(format_mib "$total_kib")"
+  if [ "$other_app_kib" -gt 0 ]; then
+    printf '  %-24s %s\n' "other Superset apps" "$(format_mib "$other_app_kib")"
+  fi
+  if [ "$other_docker_kib" -gt 0 ]; then
+    printf '  %-24s %s\n' "other Superset docker" "$(format_mib "$other_docker_kib")"
+  fi
+  if [ "$other_app_kib" -gt 0 ] || [ "$other_docker_kib" -gt 0 ]; then
+    printf '  %-24s %s\n' "visible Superset total" "$(format_mib "$visible_total_kib")"
+    printf '  ! %-24s %s\n' "memory attribution" "visible total includes other Superset worktrees; stop unused worktrees with their own dev:worktree:stop or dev:worktree:cleanup"
+  fi
   echo "top app processes:"
   print_worktree_top_process_memory || true
+  if [ "$other_app_kib" -gt 0 ]; then
+    echo "top other Superset processes:"
+    print_other_superset_top_process_memory || true
+  fi
+}
+
+cleanup_stale_worktree_pty_helpers() {
+  if [ -f "$ROOT_DIR/scripts/clean-stale-worktree-pty-helpers.ts" ]; then
+    bun run --silent "$ROOT_DIR/scripts/clean-stale-worktree-pty-helpers.ts" \
+      --root "$ROOT_DIR" \
+      --min-age-minutes "${SUPERSET_STALE_PTY_HELPER_MIN_AGE_MINUTES:-30}" || true
+  fi
 }
 
 print_status() {
@@ -949,6 +1066,7 @@ cleanup_all() {
 
   if [ "$dry_run" = "0" ]; then
     stop_data_services
+    cleanup_stale_worktree_pty_helpers
     trap - EXIT
   fi
 }
@@ -957,12 +1075,14 @@ start_all() {
   ensure_local_setup
   apply_profile_target_env
   ensure_prereqs
+  cleanup_stale_worktree_pty_helpers
   if [ "$WORKTREE_DEV_REQUIRES_LOCAL_DATA" = "1" ]; then
     start_data_services
     wait_for_db_query
     run_migrations_and_seed
   else
     warn "local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:loaded"
+    stop_data_services
   fi
   ensure_desktop_perf_fixture_if_requested
   prepare_desktop
@@ -988,7 +1108,8 @@ usage() {
 Usage: $0 <command> [options]
 
 Commands:
-  start                         Start this worktree's Docker, API, Relay, Electric proxy, and Desktop app
+  start                         Start this worktree's default low-memory Desktop app profile
+                                Set WORKTREE_DEV_PROFILE=full to start Docker, API, Relay, Electric proxy, and Desktop
                                 Set WORKTREE_DEV_PROFILE=desktop-lite to skip the local API Next dev server
                                 Set WORKTREE_DEV_PROFILE=desktop-online-lite to run only Desktop against online-like targets
   status                        Print sessions, ports, Docker state, and readiness probes

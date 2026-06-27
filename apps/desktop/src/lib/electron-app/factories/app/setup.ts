@@ -73,6 +73,7 @@ PLATFORM.IS_WINDOWS &&
 	);
 
 app.commandLine.appendSwitch("force-color-profile", "srgb");
+app.commandLine.appendSwitch("disable-software-rasterizer");
 
 const cdpPort =
 	process.env.DESKTOP_AUTOMATION_PORT ??

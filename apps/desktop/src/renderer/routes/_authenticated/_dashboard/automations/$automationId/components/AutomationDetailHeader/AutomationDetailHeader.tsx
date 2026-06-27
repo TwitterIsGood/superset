@@ -8,14 +8,7 @@ import {
 } from "@superset/ui/breadcrumb";
 import { Button } from "@superset/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
-import {
-	LuClock,
-	LuLoaderCircle,
-	LuPause,
-	LuPlay,
-	LuSave,
-	LuTrash2,
-} from "react-icons/lu";
+import { Clock, LoaderCircle, Pause, Play, Save, Trash2 } from "lucide-react";
 
 interface AutomationDetailHeaderProps {
 	name: string;
@@ -87,9 +80,9 @@ export function AutomationDetailHeader({
 							disabled={savePromptDisabled || savePromptPending}
 						>
 							{savePromptPending ? (
-								<LuLoaderCircle className="size-4 animate-spin" />
+								<LoaderCircle className="size-4 animate-spin" />
 							) : (
-								<LuSave className="size-4" />
+								<Save className="size-4" />
 							)}
 							<span>Save</span>
 						</Button>
@@ -104,7 +97,7 @@ export function AutomationDetailHeader({
 									onClick={onOpenHistory}
 									aria-label="Version history"
 								>
-									<LuClock className="size-4" />
+									<Clock className="size-4" />
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent>Version history</TooltipContent>
@@ -119,9 +112,9 @@ export function AutomationDetailHeader({
 									aria-label={enabled ? "Pause" : "Resume"}
 								>
 									{enabled ? (
-										<LuPause className="size-4" />
+										<Pause className="size-4" />
 									) : (
-										<LuPlay className="size-4" />
+										<Play className="size-4" />
 									)}
 								</Button>
 							</TooltipTrigger>
@@ -136,7 +129,7 @@ export function AutomationDetailHeader({
 									disabled={deleteDisabled}
 									aria-label="Delete"
 								>
-									<LuTrash2 className="size-4" />
+									<Trash2 className="size-4" />
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent>Delete</TooltipContent>
@@ -149,7 +142,7 @@ export function AutomationDetailHeader({
 							onClick={onRunNow}
 							disabled={runNowDisabled}
 						>
-							<LuPlay className="size-4" />
+							<Play className="size-4" />
 							<span>Run now</span>
 						</Button>
 					</>

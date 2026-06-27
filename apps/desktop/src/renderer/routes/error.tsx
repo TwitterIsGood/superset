@@ -1,12 +1,8 @@
 import { Button } from "@superset/ui/button";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
+import { Check, Clipboard, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-	HiCheck,
-	HiExclamationTriangle,
-	HiOutlineClipboard,
-} from "react-icons/hi2";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { captureRendererException } from "renderer/lib/sentry";
 
@@ -37,7 +33,7 @@ export function ErrorPage({ error, info }: ErrorComponentProps) {
 			<div className="flex flex-1 items-start justify-center overflow-y-auto pt-[18vh] pb-12">
 				<div className="flex flex-col items-center w-full max-w-2xl px-8 gap-6">
 					<div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-						<HiExclamationTriangle className="h-8 w-8 text-destructive" />
+						<TriangleAlert className="h-8 w-8 text-destructive" />
 					</div>
 
 					<div className="flex flex-col items-center gap-2 text-center">
@@ -75,9 +71,9 @@ export function ErrorPage({ error, info }: ErrorComponentProps) {
 								aria-label="Copy error details"
 							>
 								{copied ? (
-									<HiCheck className="w-3.5 h-3.5 text-green-500" />
+									<Check className="w-3.5 h-3.5 text-green-500" />
 								) : (
-									<HiOutlineClipboard className="w-3.5 h-3.5" />
+									<Clipboard className="w-3.5 h-3.5" />
 								)}
 							</button>
 							<pre className="w-full max-h-80 overflow-auto rounded-md border border-border bg-muted/40 p-3 pr-10 text-left text-xs text-muted-foreground select-text">

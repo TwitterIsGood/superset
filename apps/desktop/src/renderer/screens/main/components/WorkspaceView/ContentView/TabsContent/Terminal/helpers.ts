@@ -1,8 +1,5 @@
-import { toast } from "@superset/ui/sonner";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { FitAddon } from "@xterm/addon-fit";
-import { ImageAddon } from "@xterm/addon-image";
-import { LigaturesAddon } from "@xterm/addon-ligatures";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import type { WebglAddon } from "@xterm/addon-webgl";
@@ -12,6 +9,7 @@ import { applyTerminalFontFamilyCssVariable } from "renderer/lib/terminal/appear
 import { Utf8Base64 } from "renderer/lib/terminal/clipboard-base64";
 import type { DetectedLink } from "renderer/lib/terminal/links";
 import { TerminalLinkManager } from "renderer/lib/terminal/terminal-link-manager";
+import { toast } from "renderer/lib/toast";
 import { electronTrpcClient as trpcClient } from "renderer/lib/trpc-client";
 import { toXtermTheme } from "renderer/stores/theme/utils";
 import {
@@ -108,7 +106,6 @@ export function createTerminalInWrapper(options: CreateTerminalOptions = {}): {
 	// Utf8Base64 replaces the addon's UTF-8-unsafe default codec (#4839).
 	const clipboardAddon = new ClipboardAddon(new Utf8Base64());
 	const unicode11Addon = new Unicode11Addon();
-	const imageAddon = new ImageAddon();
 
 	let disposed = false;
 	let webglAddon: WebglAddon | null = null;
@@ -127,13 +124,6 @@ export function createTerminalInWrapper(options: CreateTerminalOptions = {}): {
 	xterm.loadAddon(searchAddon);
 	xterm.loadAddon(clipboardAddon);
 	xterm.loadAddon(unicode11Addon);
-	xterm.loadAddon(imageAddon);
-
-	try {
-		xterm.loadAddon(new LigaturesAddon());
-	} catch {
-		// Ligatures not supported by current font
-	}
 
 	// Defer WebGL to rAF to avoid racing xterm's post-open viewport sync.
 	const rafId = requestAnimationFrame(() => {

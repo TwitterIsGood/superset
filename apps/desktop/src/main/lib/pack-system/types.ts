@@ -72,6 +72,16 @@ export const packFileManifestSchema = z
 	})
 	.strict();
 
+export const packArchiveManifestSchema = z
+	.object({
+		format: z.literal("zip"),
+		path: packRelativePathSchema,
+		size: z.number().int().positive(),
+		sha256: packSha256Schema,
+		downloadUrl: z.url().optional(),
+	})
+	.strict();
+
 export const packExecuteHintSchema = z
 	.object({
 		runtime: z.string().min(1),
@@ -88,6 +98,7 @@ export const packManifestSchema = z
 		minAppVersion: z.string().min(1).optional(),
 		appVersionRange: z.string().min(1).optional(),
 		downloadUrl: z.url(),
+		archive: packArchiveManifestSchema.optional(),
 		files: z.array(packFileManifestSchema).min(1),
 		executeHint: packExecuteHintSchema.optional(),
 	})
@@ -154,6 +165,7 @@ export const packResolutionSchema = z.discriminatedUnion("ok", [
 ]);
 
 export type PackId = z.infer<typeof packIdSchema>;
+export type PackArchiveManifest = z.infer<typeof packArchiveManifestSchema>;
 export type PackFileManifest = z.infer<typeof packFileManifestSchema>;
 export type PackExecuteHint = z.infer<typeof packExecuteHintSchema>;
 export type PackManifest = z.infer<typeof packManifestSchema>;

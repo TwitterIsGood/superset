@@ -9,8 +9,8 @@ import {
 	CommandList,
 } from "@superset/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
+import { Check, ChevronDown, CircleUserRound } from "lucide-react";
 import { useMemo, useState } from "react";
-import { HiCheck, HiChevronDown, HiOutlineUserCircle } from "react-icons/hi2";
 
 interface CreateTaskAssigneePickerProps {
 	users: SelectUser[];
@@ -74,11 +74,11 @@ export function CreateTaskAssigneePicker({
 						</>
 					) : (
 						<>
-							<HiOutlineUserCircle className="size-4 text-muted-foreground" />
+							<CircleUserRound className="size-4 text-muted-foreground" />
 							<span className="text-muted-foreground">Assignee</span>
 						</>
 					)}
-					<HiChevronDown className="size-3.5 text-muted-foreground" />
+					<ChevronDown className="size-3.5 text-muted-foreground" />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent align="start" className="w-64 p-0">
@@ -91,9 +91,9 @@ export function CreateTaskAssigneePicker({
 					<CommandList className="max-h-72">
 						<CommandGroup>
 							<CommandItem onSelect={() => handleSelect(null)}>
-								<HiOutlineUserCircle className="size-4" />
+								<CircleUserRound className="size-4" />
 								<span className="flex-1 text-sm">No assignee</span>
-								{value === null && <HiCheck className="size-3.5" />}
+								{value === null && <Check className="size-3.5" />}
 							</CommandItem>
 						</CommandGroup>
 
@@ -113,7 +113,7 @@ export function CreateTaskAssigneePicker({
 												{user.email}
 											</span>
 										</div>
-										{user.id === value && <HiCheck className="size-3.5" />}
+										{user.id === value && <Check className="size-3.5" />}
 									</CommandItem>
 								))}
 							</CommandGroup>

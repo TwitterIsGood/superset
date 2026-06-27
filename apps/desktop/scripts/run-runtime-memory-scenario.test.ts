@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	buildLifecycleRoleDeltas,
 	classifyProcessCommand,
 	findScenarioBudgetFailures,
 	isServiceSeedCommand,
@@ -95,6 +96,103 @@ describe("findScenarioBudgetFailures", () => {
 		expect(failures[3]).toContain("Desktop subtree memory growth");
 		expect(failures[4]).toContain("Peak process-tree process count");
 		expect(failures[5]).toContain("Peak desktop subtree process count");
+	});
+});
+
+describe("buildLifecycleRoleDeltas", () => {
+	test("attributes memory and process-count changes by lifecycle step and role", () => {
+		const snapshots: Parameters<typeof buildLifecycleRoleDeltas>[0] = [
+			{
+				label: "start",
+				sampledAt: "2026-06-27T00:00:00.000Z",
+				process: {
+					sampledAt: "2026-06-27T00:00:00.000Z",
+					elapsedMs: 0,
+					desktop: { role: "other", count: 2, cpu: 0, memoryBytes: 300 },
+					services: {
+						role: "other-service",
+						count: 1,
+						cpu: 0,
+						memoryBytes: 50,
+					},
+					all: { role: "other", count: 3, cpu: 0, memoryBytes: 350 },
+					groups: [
+						{
+							role: "electron-renderer",
+							count: 1,
+							cpu: 0,
+							memoryBytes: 100,
+						},
+						{ role: "host-service", count: 1, cpu: 0, memoryBytes: 200 },
+						{ role: "api", count: 1, cpu: 0, memoryBytes: 50 },
+					],
+					processes: [],
+				},
+			},
+			{
+				label: "after-cycle-1",
+				sampledAt: "2026-06-27T00:00:01.000Z",
+				process: {
+					sampledAt: "2026-06-27T00:00:01.000Z",
+					elapsedMs: 1000,
+					desktop: { role: "other", count: 3, cpu: 0, memoryBytes: 460 },
+					services: { role: "other-service", count: 0, cpu: 0, memoryBytes: 0 },
+					all: { role: "other", count: 3, cpu: 0, memoryBytes: 460 },
+					groups: [
+						{
+							role: "electron-renderer",
+							count: 2,
+							cpu: 0,
+							memoryBytes: 250,
+						},
+						{ role: "host-service", count: 1, cpu: 0, memoryBytes: 210 },
+					],
+					processes: [],
+				},
+			},
+		];
+
+		expect(buildLifecycleRoleDeltas(snapshots)).toEqual([
+			{
+				label: "start -> after-cycle-1",
+				fromSnapshot: "start",
+				toSnapshot: "after-cycle-1",
+				elapsedMs: 1000,
+				role: "electron-renderer",
+				startMemoryBytes: 100,
+				endMemoryBytes: 250,
+				memoryDeltaBytes: 150,
+				startProcessCount: 1,
+				endProcessCount: 2,
+				processCountDelta: 1,
+			},
+			{
+				label: "start -> after-cycle-1",
+				fromSnapshot: "start",
+				toSnapshot: "after-cycle-1",
+				elapsedMs: 1000,
+				role: "host-service",
+				startMemoryBytes: 200,
+				endMemoryBytes: 210,
+				memoryDeltaBytes: 10,
+				startProcessCount: 1,
+				endProcessCount: 1,
+				processCountDelta: 0,
+			},
+			{
+				label: "start -> after-cycle-1",
+				fromSnapshot: "start",
+				toSnapshot: "after-cycle-1",
+				elapsedMs: 1000,
+				role: "api",
+				startMemoryBytes: 50,
+				endMemoryBytes: 0,
+				memoryDeltaBytes: -50,
+				startProcessCount: 1,
+				endProcessCount: 0,
+				processCountDelta: -1,
+			},
+		]);
 	});
 });
 

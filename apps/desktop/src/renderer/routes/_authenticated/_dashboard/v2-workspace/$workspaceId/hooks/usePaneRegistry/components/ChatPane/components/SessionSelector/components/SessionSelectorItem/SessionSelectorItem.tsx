@@ -1,7 +1,7 @@
 import { alert } from "@superset/ui/atoms/Alert";
 import { DropdownMenuItem } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
-import { HiMiniTrash } from "react-icons/hi2";
+import { Trash2 } from "lucide-react";
+import { toast } from "renderer/lib/toast";
 
 interface SessionSelectorItemProps {
 	sessionId: string;
@@ -56,7 +56,7 @@ export function SessionSelectorItem({
 						});
 					}}
 				>
-					<HiMiniTrash className="size-3" />
+					<Trash2 className="size-3" />
 				</button>
 			)}
 		</DropdownMenuItem>

@@ -8,11 +8,10 @@ import {
 } from "@superset/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
+import { EyeOff, Pencil, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDrag, useDrop } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
-import { HiMiniXMark } from "react-icons/hi2";
-import { LuEyeOff, LuPencil } from "react-icons/lu";
 import type { MosaicBranch } from "react-mosaic-component";
 import { MosaicDragType } from "react-mosaic-component";
 import { StatusIndicator } from "renderer/screens/main/components/StatusIndicator";
@@ -267,7 +266,7 @@ export function GroupItem({
 											className="cursor-pointer size-6 hover:bg-muted"
 											aria-label="Close pane"
 										>
-											<HiMiniXMark className="size-4" />
+											<X className="size-4" />
 										</Button>
 									</TooltipTrigger>
 									<TooltipContent side="top" showArrow={false}>
@@ -281,17 +280,17 @@ export function GroupItem({
 			</ContextMenuTrigger>
 			<ContextMenuContent>
 				<ContextMenuItem onSelect={startEditing}>
-					<LuPencil className="size-4 mr-2" />
+					<Pencil className="size-4 mr-2" />
 					Rename
 				</ContextMenuItem>
 				<ContextMenuSeparator />
 				<ContextMenuItem onSelect={onMarkAsUnread}>
-					<LuEyeOff className="size-4 mr-2" />
+					<EyeOff className="size-4 mr-2" />
 					Mark as Unread
 				</ContextMenuItem>
 				<ContextMenuSeparator />
 				<ContextMenuItem onSelect={onClose}>
-					<HiMiniXMark className="size-4 mr-2" />
+					<X className="size-4 mr-2" />
 					Close
 				</ContextMenuItem>
 			</ContextMenuContent>

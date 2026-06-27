@@ -1,4 +1,3 @@
-import { toast } from "@superset/ui/sonner";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -13,6 +12,7 @@ import {
 } from "renderer/lib/dev-chat";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { posthog } from "renderer/lib/posthog";
+import { toast } from "renderer/lib/toast";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import type { ChatLaunchConfig } from "shared/tabs-types";

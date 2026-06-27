@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+	hasObjectStorageObject,
 	putObjectStorageObject,
 	readCapabilityArtifactReference,
 	storeCapabilityArtifact,
@@ -84,6 +85,41 @@ describe("capability artifact storage", () => {
 		expect(calls[0]?.headers.get("authorization")).toContain(
 			"AWS4-HMAC-SHA256",
 		);
+	});
+
+	test("checks object-storage object existence with signed S3 HEAD", async () => {
+		configureObjectStorage();
+		const calls: Array<{ url: string; method: string; headers: Headers }> = [];
+		globalThis.fetch = async (input, init) => {
+			calls.push({
+				url: input.toString(),
+				method: init?.method ?? "GET",
+				headers: new Headers(init?.headers),
+			});
+			return new Response(null, { status: 200 });
+		};
+
+		await expect(
+			hasObjectStorageObject("packs/trellis-runtime/1.0.0/manifest.json"),
+		).resolves.toBe(true);
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0]).toMatchObject({
+			method: "HEAD",
+			url: "http://127.0.0.1:9000/superset-artifacts/packs/trellis-runtime/1.0.0/manifest.json",
+		});
+		expect(calls[0]?.headers.get("authorization")).toContain(
+			"AWS4-HMAC-SHA256",
+		);
+	});
+
+	test("treats missing object-storage objects as absent", async () => {
+		configureObjectStorage();
+		globalThis.fetch = async () => new Response(null, { status: 404 });
+
+		await expect(
+			hasObjectStorageObject("packs/trellis-runtime/1.0.0/missing.tgz"),
+		).resolves.toBe(false);
 	});
 
 	test("stores object-storage artifacts behind an internal reference", async () => {

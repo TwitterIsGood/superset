@@ -9,15 +9,15 @@ import {
 	AlertDialogTitle,
 } from "@superset/ui/alert-dialog";
 import { Button } from "@superset/ui/button";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { useNavigate } from "@tanstack/react-router";
+import { FolderOpen } from "lucide-react";
 import { useState } from "react";
-import { LuFolderOpen } from "react-icons/lu";
 import { RemotePathPicker } from "renderer/components/RemotePathPicker";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
-import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";
+import { toast } from "renderer/lib/toast";
+import { useDashboardSidebarCoreState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarCoreState";
 import { ClickablePath } from "../../../../../../components/ClickablePath";
 import { SetupProjectModal } from "../SetupProjectModal";
 
@@ -50,7 +50,7 @@ export function ProjectLocationSection({
 	const selectDirectory = electronTrpc.window.selectDirectory.useMutation();
 	const navigate = useNavigate();
 	const { ensureProjectInSidebar, ensureWorkspaceInSidebar } =
-		useDashboardSidebarState();
+		useDashboardSidebarCoreState();
 
 	const [pendingPath, setPendingPath] = useState<string | null>(null);
 	const [conflict, setConflict] = useState<BackfillConflict | null>(null);
@@ -158,7 +158,7 @@ export function ProjectLocationSection({
 								disabled={selectDirectory.isPending || isSubmitting}
 								aria-label="Change location"
 							>
-								<LuFolderOpen className="size-4" />
+								<FolderOpen className="size-4" />
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent>Change location</TooltipContent>

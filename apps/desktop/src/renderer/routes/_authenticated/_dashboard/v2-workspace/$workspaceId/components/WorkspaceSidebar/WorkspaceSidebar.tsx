@@ -2,9 +2,14 @@ import { Button } from "@superset/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
-import { BotIcon, Search } from "lucide-react";
+import {
+	BotIcon,
+	File,
+	GitCompareArrows,
+	MessageSquare,
+	Search,
+} from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { LuFile, LuGitCompareArrows, LuMessageSquare } from "react-icons/lu";
 import { useWorkspaceGitStatus } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/providers/WorkspaceGitStatusProvider";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { useSettings } from "renderer/stores/settings";
@@ -148,7 +153,7 @@ export function WorkspaceSidebar({
 	const changesTab: SidebarTabDefinition = {
 		id: "changes",
 		label: "Changes",
-		icon: LuGitCompareArrows,
+		icon: GitCompareArrows,
 		badge: gitChangeCount > 0 ? gitChangeCount : undefined,
 		actions: <ChangesSidebarTabActions workspaceId={workspaceId} />,
 		content: (
@@ -171,7 +176,7 @@ export function WorkspaceSidebar({
 	const filesTab: SidebarTabDefinition = {
 		id: "files",
 		label: "Files",
-		icon: LuFile,
+		icon: File,
 		actions: <IconButton icon={Search} tooltip="Search" onClick={onSearch} />,
 		content: (
 			<LazyFilesTab
@@ -194,7 +199,7 @@ export function WorkspaceSidebar({
 	const reviewTab: SidebarTabDefinition = {
 		id: "review",
 		label: "Review",
-		icon: LuMessageSquare,
+		icon: MessageSquare,
 		content: (
 			<LazyReviewSidebarTab
 				workspaceId={workspaceId}

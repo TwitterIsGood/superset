@@ -1,5 +1,3 @@
-export {
-	deleteWithToast,
-	showTeardownLogs,
-	TeardownLogsDialog,
-} from "./TeardownLogsDialog";
+export { deleteWithToast } from "./deleteWithToast";
+export { TeardownLogsDialog } from "./TeardownLogsDialog";
+export { showTeardownLogs } from "./teardownLogsStore";

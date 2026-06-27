@@ -1,8 +1,7 @@
 import type { RendererContext } from "@superset/panes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
-import { GlobeIcon } from "lucide-react";
+import { GlobeIcon, Monitor } from "lucide-react";
 import { useCallback, useSyncExternalStore } from "react";
-import { TbDeviceDesktop } from "react-icons/tb";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import type { PaneViewerData } from "../../../../types";
 
@@ -114,7 +113,7 @@ export function BrowserPaneToolbar({ ctx }: BrowserPaneToolbarProps) {
 							onClick={handleOpenDevTools}
 							className="rounded p-0.5 text-muted-foreground/60 transition-colors hover:text-muted-foreground"
 						>
-							<TbDeviceDesktop className="size-3.5" />
+							<Monitor className="size-3.5" />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="bottom" showArrow={false}>

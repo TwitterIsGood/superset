@@ -9,7 +9,7 @@ import {
 } from "@superset/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff, Settings } from "lucide-react";
+import { Eye, EyeOff, Settings, SquareTerminal } from "lucide-react";
 import {
 	type ReactNode,
 	useCallback,
@@ -17,7 +17,6 @@ import {
 	useMemo,
 	useState,
 } from "react";
-import { HiMiniCommandLine } from "react-icons/hi2";
 import { useIsDarkTheme } from "renderer/assets/app-icons/preset-icons";
 import { HotkeyMenuShortcut } from "renderer/components/HotkeyMenuShortcut";
 import { useV2AgentConfigs } from "renderer/hooks/useV2AgentConfigs";
@@ -30,7 +29,7 @@ import { V2PresetBarItem } from "./components/V2PresetBarItem";
 
 interface V2PresetsBarProps {
 	matchedPresets: V2TerminalPresetRow[];
-	executePreset: (preset: V2TerminalPresetRow) => void | Promise<void>;
+	executePreset: (preset: V2TerminalPresetRow) => boolean | Promise<boolean>;
 	showPresetsBar: boolean;
 	onToggleShowPresetsBar: (enabled: boolean) => void;
 	trailing?: ReactNode;
@@ -243,7 +242,7 @@ export function V2PresetsBar({
 								{icon ? (
 									<img src={icon} alt="" className="size-4 object-contain" />
 								) : (
-									<HiMiniCommandLine className="size-4" />
+									<SquareTerminal className="size-4" />
 								)}
 								<span className="min-w-0 flex-1 truncate">
 									{preset.name || "default"}

@@ -9,17 +9,17 @@ import {
 } from "@superset/ui/dialog";
 import { Input } from "@superset/ui/input";
 import { Label } from "@superset/ui/label";
-import { toast } from "@superset/ui/sonner";
 import {
 	getEventBus,
 	type ProjectCreateProgressPayload,
 } from "@superset/workspace-client";
+import { FolderOpen, LoaderCircle, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { LuFolderOpen, LuLoaderCircle, LuX } from "react-icons/lu";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { getHostServiceWsToken } from "renderer/lib/host-service-auth";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { showHostServiceUnavailableToast } from "renderer/lib/host-service-unavailable";
+import { toast } from "renderer/lib/toast";
 import { useFinalizeProjectSetup } from "renderer/react-query/projects";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 
@@ -402,7 +402,7 @@ export function NewProjectModal({
 								className="shrink-0"
 								aria-label="Browse for directory"
 							>
-								<LuFolderOpen className="size-4" />
+								<FolderOpen className="size-4" />
 							</Button>
 						</div>
 					</div>
@@ -456,9 +456,9 @@ export function NewProjectModal({
 							disabled={stopping || isCloneStopping(progress)}
 						>
 							{stopping || isCloneStopping(progress) ? (
-								<LuLoaderCircle className="size-4 animate-spin" />
+								<LoaderCircle className="size-4 animate-spin" />
 							) : (
-								<LuX className="size-4" />
+								<X className="size-4" />
 							)}
 							{stopping || isCloneStopping(progress) ? "Stopping" : "Stop"}
 						</Button>
@@ -466,7 +466,7 @@ export function NewProjectModal({
 					<Button onClick={() => void createFromClone()} disabled={working}>
 						{working ? (
 							<>
-								<LuLoaderCircle className="size-4 animate-spin" />
+								<LoaderCircle className="size-4 animate-spin" />
 								{stopping || isCloneStopping(progress)
 									? "Stopping…"
 									: formatProgressPercent(progress)

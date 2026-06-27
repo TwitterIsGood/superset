@@ -9,7 +9,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@superset/ui/select";
-import { toast } from "@superset/ui/sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	Loader2Icon,
@@ -31,6 +30,7 @@ import {
 	workspaceModelProvidersQueryKey,
 } from "renderer/lib/model-provider-query-keys";
 import { syncCloudModelProvidersToHost } from "renderer/lib/sync-cloud-model-providers";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import {
 	isItemVisible,

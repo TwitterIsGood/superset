@@ -6,15 +6,15 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import {
-	VscChevronDown,
-	VscGitMerge,
-	VscGitPullRequest,
-	VscLoading,
-} from "react-icons/vsc";
+	ChevronDown,
+	GitMerge,
+	GitPullRequest,
+	LoaderCircle,
+} from "lucide-react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { PRIcon } from "renderer/screens/main/components/PRIcon";
 import { useCreateOrOpenPR } from "renderer/screens/main/hooks";
 
@@ -65,7 +65,7 @@ export function PRButton({
 
 	if (isLoading) {
 		return (
-			<VscLoading className="w-4 h-4 animate-spin text-muted-foreground" />
+			<LoaderCircle className="w-4 h-4 animate-spin text-muted-foreground" />
 		);
 	}
 
@@ -75,7 +75,7 @@ export function PRButton({
 				<Tooltip>
 					<TooltipTrigger asChild>
 						<span className="flex items-center ml-auto text-muted-foreground/40">
-							<VscGitPullRequest className="w-4 h-4" />
+							<GitPullRequest className="w-4 h-4" />
 						</span>
 					</TooltipTrigger>
 					<TooltipContent side="top">
@@ -95,9 +95,9 @@ export function PRButton({
 						disabled={isCreatePending}
 					>
 						{isCreatePending ? (
-							<VscLoading className="w-4 h-4 animate-spin text-muted-foreground" />
+							<LoaderCircle className="w-4 h-4 animate-spin text-muted-foreground" />
 						) : (
-							<VscGitPullRequest className="w-4 h-4 text-muted-foreground" />
+							<GitPullRequest className="w-4 h-4 text-muted-foreground" />
 						)}
 					</button>
 				</TooltipTrigger>
@@ -154,9 +154,9 @@ export function PRButton({
 						}
 					>
 						{mergePRMutation.isPending ? (
-							<VscLoading className="size-3 animate-spin text-muted-foreground" />
+							<LoaderCircle className="size-3 animate-spin text-muted-foreground" />
 						) : (
-							<VscChevronDown className="size-3 text-muted-foreground" />
+							<ChevronDown className="size-3 text-muted-foreground" />
 						)}
 					</button>
 				</DropdownMenuTrigger>
@@ -169,7 +169,7 @@ export function PRButton({
 						className="text-xs"
 						disabled={mergePRMutation.isPending}
 					>
-						<VscGitMerge className="size-3.5" />
+						<GitMerge className="size-3.5" />
 						Squash and merge
 					</DropdownMenuItem>
 					<DropdownMenuItem
@@ -177,7 +177,7 @@ export function PRButton({
 						className="text-xs"
 						disabled={mergePRMutation.isPending}
 					>
-						<VscGitMerge className="size-3.5" />
+						<GitMerge className="size-3.5" />
 						Create merge commit
 					</DropdownMenuItem>
 					<DropdownMenuItem
@@ -185,7 +185,7 @@ export function PRButton({
 						className="text-xs"
 						disabled={mergePRMutation.isPending}
 					>
-						<VscGitMerge className="size-3.5" />
+						<GitMerge className="size-3.5" />
 						Rebase and merge
 					</DropdownMenuItem>
 				</DropdownMenuContent>

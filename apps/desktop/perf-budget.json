@@ -1,19 +1,54 @@
 {
 	"$schema": "./scripts/perf-budget.schema.json",
 	"packageSize": {
-		"notes": "Canary regression guard after moving heavy runtimes and the Superset CLI to on-demand resource packs. Published installer artifacts should stay well below 200 MiB; 300 MiB is the hard rollback line.",
+		"notes": "Canary regression guard after moving heavy runtimes and the Superset CLI to on-demand resource packs. The active target is 100 MiB for user-facing release artifacts; 150 MiB is the temporary hard guard while the current 114.5 MiB macOS arm64 ZIP is driven below target.",
 		"releaseArtifacts": {
 			"dmg": {
-				"maxBytes": 314572800,
-				"targetBytes": 209715200
+				"maxBytes": 157286400,
+				"targetBytes": 104857600
 			},
 			"zip": {
-				"maxBytes": 314572800,
-				"targetBytes": 209715200
+				"maxBytes": 157286400,
+				"targetBytes": 104857600
 			},
 			"AppImage": {
-				"maxBytes": 314572800,
-				"targetBytes": 209715200
+				"maxBytes": 157286400,
+				"targetBytes": 104857600
+			}
+		}
+	},
+	"build": {
+		"notes": "Canary GitHub Actions budget. Quick branch validation must feel cheap enough for frequent use; published quick canaries keep GitHub Releases as the installer channel and use S3-compatible storage only for on-demand resource packs.",
+		"canary": {
+			"quick": {
+				"maxSeconds": 300,
+				"targetSeconds": 180,
+				"criticalPathMaxSeconds": {
+					"dependencyCache": 45,
+					"install": 45,
+					"compile": 90,
+					"electronBuilderZip": 45,
+					"artifactUpload": 10
+				}
+			},
+			"publishedQuick": {
+				"maxSeconds": 480,
+				"targetSeconds": 300,
+				"criticalPathMaxSeconds": {
+					"resourcePackBuildUploadVerify": 90,
+					"compile": 90,
+					"electronBuilderZip": 45,
+					"releaseUpdate": 30
+				}
+			},
+			"full": {
+				"maxSeconds": 900,
+				"targetSeconds": 600,
+				"criticalPathMaxSeconds": {
+					"macArm64": 300,
+					"macX64": 360,
+					"linuxX64": 360
+				}
 			}
 		}
 	},
@@ -34,39 +69,40 @@
 		}
 	},
 	"runtime": {
-		"notes": "Phase 0 dev/canary process-tree guard. maxBytes is intentionally loose until measured baselines are checked in; targets capture the requested steady-state direction.",
+		"notes": "Dev/canary guard after the desktop-online-lite and resource-pack overhaul. Reports must separate current worktree app+helpers, visible Superset-related services, and whole developer-tooling pressure; optimization claims must not cite only the Electron subtree.",
 		"processTree": {
 			"desktopMemory": {
-				"maxBytes": 8589934592,
-				"targetBytes": 4294967296
+				"maxBytes": 4294967296,
+				"targetBytes": 1610612736
 			},
 			"allMemory": {
-				"maxBytes": 10737418240,
-				"targetBytes": 6442450944
+				"maxBytes": 6442450944,
+				"targetBytes": 3221225472
 			},
 			"desktopProcessCount": {
-				"max": 40,
-				"target": 24
+				"max": 24,
+				"target": 16
 			},
 			"allProcessCount": {
-				"max": 60,
-				"target": 36
+				"max": 36,
+				"target": 28
 			}
 		},
 		"renderer": {
 			"domNodes": {
-				"max": 30000,
-				"target": 15000
+				"max": 10000,
+				"target": 5000
 			},
 			"usedJsHeap": {
-				"maxBytes": 2147483648,
-				"targetBytes": 1073741824
+				"maxBytes": 1073741824,
+				"targetBytes": 536870912
 			},
 			"consoleErrors": {
 				"max": 0
 			}
 		},
 		"routes": {
+			"requiredRoutes": ["/sign-in"],
 			"openDuration": {
 				"maxMs": 5000,
 				"targetMs": 2000

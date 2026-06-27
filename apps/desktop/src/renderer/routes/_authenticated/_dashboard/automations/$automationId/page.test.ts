@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 function readRouteSource() {
-	return Bun.file(`${import.meta.dir}/page.tsx`).text();
+	return Bun.file(`${import.meta.dir}/AutomationDetailPageContent.tsx`).text();
 }
 
 describe("automation detail route source", () => {

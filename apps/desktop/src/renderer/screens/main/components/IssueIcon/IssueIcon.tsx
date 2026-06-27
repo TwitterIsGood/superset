@@ -1,5 +1,5 @@
 import { cn } from "@superset/ui/utils";
-import { LuCircleCheck, LuCircleDot } from "react-icons/lu";
+import { CircleCheck, CircleDot } from "lucide-react";
 
 export type IssueState = "open" | "closed";
 
@@ -22,9 +22,9 @@ export function IssueIcon({ state, className }: IssueIconProps) {
 	const baseClass = cn(stateStyles[state], className);
 
 	if (state === "closed") {
-		return <LuCircleCheck className={baseClass} />;
+		return <CircleCheck className={baseClass} />;
 	}
 
 	// open
-	return <LuCircleDot className={baseClass} />;
+	return <CircleDot className={baseClass} />;
 }

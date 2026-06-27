@@ -6,17 +6,17 @@ import {
 	DialogContent,
 	DialogTitle,
 } from "@superset/ui/dialog";
-import { toast } from "@superset/ui/sonner";
 import {
 	keepPreviousData,
 	useMutation,
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { LuX } from "react-icons/lu";
 import { MarkdownRenderer } from "renderer/components/MarkdownRenderer";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
+import { toast } from "renderer/lib/toast";
 import { VersionRow } from "./components/VersionRow";
 
 interface VersionHistorySheetProps {
@@ -138,7 +138,7 @@ export function VersionHistorySheet({
 						<h2 className="text-base font-semibold">Version history</h2>
 						<DialogClose asChild>
 							<Button variant="ghost" size="icon-xs" aria-label="Close">
-								<LuX className="size-3.5" />
+								<X className="size-3.5" />
 							</Button>
 						</DialogClose>
 					</div>

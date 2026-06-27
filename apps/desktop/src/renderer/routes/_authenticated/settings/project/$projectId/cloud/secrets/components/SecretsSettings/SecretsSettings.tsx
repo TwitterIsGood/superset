@@ -1,7 +1,7 @@
 import { Button } from "@superset/ui/button";
 import { useLiveQuery } from "@tanstack/react-db";
+import { Cloud } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { HiOutlineCloud } from "react-icons/hi2";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { authClient } from "renderer/lib/auth-client";
 import { electronTrpc } from "renderer/lib/electron-trpc";
@@ -131,7 +131,7 @@ export function SecretsSettings({ projectId }: SecretsSettingsProps) {
 					/>
 				) : (
 					<SettingsSection
-						icon={<HiOutlineCloud className="h-4 w-4" />}
+						icon={<Cloud className="h-4 w-4" />}
 						title="Cloud Project"
 						description="Link this project to a cloud project for sandboxes and environment variables."
 					>

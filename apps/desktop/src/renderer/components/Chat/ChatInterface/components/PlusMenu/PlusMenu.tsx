@@ -3,7 +3,7 @@ import {
 	usePromptInputAttachments,
 } from "@superset/ui/ai-elements/prompt-input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
-import { HiMiniPaperClip } from "react-icons/hi2";
+import { Paperclip } from "lucide-react";
 import { PILL_BUTTON_CLASS } from "../../styles";
 
 export function PlusMenu() {
@@ -17,7 +17,7 @@ export function PlusMenu() {
 					className={`${PILL_BUTTON_CLASS} w-[23px]`}
 					onClick={() => attachments.openFileDialog()}
 				>
-					<HiMiniPaperClip className="size-3.5" />
+					<Paperclip className="size-3.5" />
 				</PromptInputButton>
 			</TooltipTrigger>
 			<TooltipContent side="top">Add attachment</TooltipContent>

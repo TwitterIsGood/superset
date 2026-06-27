@@ -10,6 +10,7 @@ import {
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { zipSync } from "fflate";
 import { PackManager } from "./pack-manager";
 import {
 	type PackManifest,
@@ -52,6 +53,33 @@ function makeIndex(manifest: PackManifest): PackManifestIndex {
 		schemaVersion: 1,
 		packs: {
 			[manifest.packId]: [manifest],
+		},
+	};
+}
+
+function makeArchiveManifest(files: Record<string, string>): {
+	archive: Uint8Array;
+	manifest: PackManifest;
+} {
+	const manifest = makeManifest(files["bin/tool"] ?? "downloaded runtime");
+	const archive = zipSync(
+		Object.fromEntries(
+			Object.entries(files).map(([path, content]) => [
+				path,
+				ENCODER.encode(content),
+			]),
+		),
+	);
+	return {
+		archive,
+		manifest: {
+			...manifest,
+			archive: {
+				format: "zip",
+				path: "pack.zip",
+				size: archive.byteLength,
+				sha256: sha256(archive),
+			},
 		},
 	};
 }
@@ -161,6 +189,77 @@ describe("PackManager", () => {
 			),
 		).toBe(true);
 		expect(statuses.at(-1)?.status).toBe("installed");
+	});
+
+	test("prefers a manifest archive over per-file downloads", async () => {
+		const content = "archived runtime";
+		const { archive, manifest } = makeArchiveManifest({ "bin/tool": content });
+		const fetchedUrls: string[] = [];
+		const manager = new PackManager({
+			homeDir,
+			manifestIndex: makeIndex(manifest),
+			fetchImpl: async (url) => {
+				fetchedUrls.push(url);
+				return new Response(Buffer.from(archive), { status: 200 });
+			},
+		});
+
+		const resolution = await manager.resolvePack(TEST_PACK_ID);
+
+		expect(resolution.ok).toBe(true);
+		expect(fetchedUrls).toEqual([
+			"https://packs.example.test/demo-pack/1.0.0/pack.zip",
+		]);
+		expect(readFileSync(packFilePath(homeDir), "utf8")).toBe(content);
+	});
+
+	test("falls back to per-file downloads when archive verification fails", async () => {
+		const content = "fallback runtime";
+		const { manifest } = makeArchiveManifest({ "bin/tool": content });
+		const fetchedUrls: string[] = [];
+		const manager = new PackManager({
+			homeDir,
+			manifestIndex: makeIndex(manifest),
+			fetchImpl: async (url) => {
+				fetchedUrls.push(url);
+				if (url.endsWith("/pack.zip")) {
+					return new Response(ENCODER.encode("bad archive"), { status: 200 });
+				}
+				return new Response(ENCODER.encode(content), { status: 200 });
+			},
+		});
+
+		const resolution = await manager.resolvePack(TEST_PACK_ID);
+
+		expect(resolution.ok).toBe(true);
+		expect(fetchedUrls).toEqual([
+			"https://packs.example.test/demo-pack/1.0.0/pack.zip",
+			"https://packs.example.test/demo-pack/1.0.0/bin/tool",
+		]);
+		expect(readFileSync(packFilePath(homeDir), "utf8")).toBe(content);
+	});
+
+	test("rejects archive entries that are not in the manifest file list", async () => {
+		const content = "archived runtime";
+		const { archive, manifest } = makeArchiveManifest({
+			"bin/tool": content,
+			"bin/extra": "unexpected",
+		});
+		const manager = new PackManager({
+			homeDir,
+			manifestIndex: makeIndex(manifest),
+			fetchImpl: async (url) => {
+				if (url.endsWith("/pack.zip")) {
+					return new Response(Buffer.from(archive), { status: 200 });
+				}
+				throw new Error("per-file fallback should not be needed");
+			},
+		});
+
+		const resolution = await manager.resolvePack(TEST_PACK_ID);
+
+		expect(resolution.ok).toBe(false);
+		expect(existsSync(packFilePath(homeDir))).toBe(false);
 	});
 
 	test("replaces a corrupt cache after hash verification fails", async () => {

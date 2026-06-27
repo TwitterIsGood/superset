@@ -3,6 +3,14 @@ import { Checkbox } from "@superset/ui/checkbox";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
+	CircleCheckIcon,
+	CircleDotIcon,
+	ExternalLink,
+	Minus,
+	Plus,
+	RefreshCw,
+} from "lucide-react";
+import {
 	useCallback,
 	useEffect,
 	useId,
@@ -10,9 +18,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { GoIssueClosed, GoIssueOpened } from "react-icons/go";
-import { HiOutlineArrowTopRightOnSquare } from "react-icons/hi2";
-import { LuMinus, LuPlus, LuRefreshCw } from "react-icons/lu";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { useDebouncedValue } from "renderer/hooks/useDebouncedValue";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
@@ -194,7 +199,7 @@ export function GitHubIssuesContent({
 		return (
 			<div className="flex h-full items-center justify-center p-8">
 				<div className="flex flex-col items-center gap-2 text-muted-foreground text-center">
-					<GoIssueOpened className="h-8 w-8" />
+					<CircleDotIcon className="h-8 w-8" />
 					<span className="text-sm">Select a project to see issues.</span>
 				</div>
 			</div>
@@ -211,7 +216,7 @@ export function GitHubIssuesContent({
 	return (
 		<div className="@container flex flex-col h-full overflow-hidden">
 			<div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30 shrink-0">
-				<GoIssueOpened className="size-3.5 text-muted-foreground" />
+				<CircleDotIcon className="size-3.5 text-muted-foreground" />
 				<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
 					GitHub issues
 				</span>
@@ -225,7 +230,7 @@ export function GitHubIssuesContent({
 					disabled={isFetching}
 					onClick={() => refetch()}
 				>
-					<LuRefreshCw
+					<RefreshCw
 						className={isFetching ? "size-3.5 animate-spin" : "size-3.5"}
 					/>
 				</Button>
@@ -236,7 +241,7 @@ export function GitHubIssuesContent({
 						title="Minimize"
 						onClick={onCollapse}
 					>
-						<LuMinus className="size-3.5" />
+						<Minus className="size-3.5" />
 					</Button>
 				)}
 			</div>
@@ -273,7 +278,7 @@ export function GitHubIssuesContent({
 
 				{isInitialLoad ? (
 					<div className="flex h-full items-center justify-center gap-2 p-8 text-muted-foreground">
-						<LuRefreshCw className="size-4 animate-spin" />
+						<RefreshCw className="size-4 animate-spin" />
 						<span className="text-sm">Loading issues…</span>
 					</div>
 				) : totalCount === 0 && !isFetching && !error ? (
@@ -286,7 +291,7 @@ export function GitHubIssuesContent({
 					<div className="flex flex-col">
 						{issues.map((issue) => {
 							const isClosed = issue.state.toLowerCase() === "closed";
-							const StateIcon = isClosed ? GoIssueClosed : GoIssueOpened;
+							const StateIcon = isClosed ? CircleCheckIcon : CircleDotIcon;
 							const isSelected = selectedIssues.has(issue.issueNumber);
 							return (
 								// biome-ignore lint/a11y/useSemanticElements: row contains nested action buttons, so the outer element is a div with role/tabIndex
@@ -349,7 +354,7 @@ export function GitHubIssuesContent({
 												handleOpenUrl(issue.url);
 											}}
 										>
-											<HiOutlineArrowTopRightOnSquare className="size-3.5" />
+											<ExternalLink className="size-3.5" />
 										</Button>
 										<Button
 											variant="outline"
@@ -361,7 +366,7 @@ export function GitHubIssuesContent({
 												handleAddToWorkspace(issue);
 											}}
 										>
-											<LuPlus className="size-3.5" />
+											<Plus className="size-3.5" />
 											<span className="hidden @lg:inline">
 												Add to workspace
 											</span>

@@ -1,4 +1,3 @@
-import { WorkerPoolContextProvider } from "@pierre/diffs/react";
 import { Button } from "@superset/ui/button";
 import { Spinner } from "@superset/ui/spinner";
 import {
@@ -8,10 +7,16 @@ import {
 	useLocation,
 	useNavigate,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { DndProvider } from "react-dnd";
-import { HiOutlineWifi } from "react-icons/hi2";
-import { Paywall } from "renderer/components/Paywall";
+import { Wifi } from "lucide-react";
+import {
+	lazy,
+	Suspense,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import { Paywall } from "renderer/components/Paywall/Paywall";
 import { useUpdateListener } from "renderer/components/UpdateToast";
 import { env } from "renderer/env.renderer";
 import { useOnlineStatus } from "renderer/hooks/useOnlineStatus";
@@ -26,33 +31,94 @@ import {
 	hasAuthenticatedSessionRecoveryTimedOut,
 	shouldRecoverAuthenticatedSession,
 } from "renderer/lib/auth-session-state";
-import { dragDropManager } from "renderer/lib/dnd";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { showWorkspaceAutoNameWarningToast } from "renderer/lib/workspaces/showWorkspaceAutoNameWarningToast";
 import { InitGitDialog } from "renderer/react-query/projects/InitGitDialog";
-import { DaemonAutoUpdateFailureDialog } from "renderer/routes/_authenticated/components/DaemonAutoUpdateFailureDialog";
-import { DashboardNewWorkspaceModal } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal";
 import { WorkspaceInitEffects } from "renderer/screens/main/components/WorkspaceInitEffects";
+import { useNewWorkspaceModalOpen } from "renderer/stores/new-workspace-modal";
 import { useSettingsStore } from "renderer/stores/settings-state";
-import { useTabsStore } from "renderer/stores/tabs/store";
 import { useAgentHookListener } from "renderer/stores/tabs/useAgentHookListener";
-import { setPaneWorkspaceRunState } from "renderer/stores/tabs/workspace-run";
 import { useWorkspaceInitStore } from "renderer/stores/workspace-init";
+import { useWorkspaceSidebarStore } from "renderer/stores/workspace-sidebar-state";
 import { MOCK_ORG_ID, NOTIFICATION_EVENTS } from "shared/constants";
 import { AgentHooks } from "./components/AgentHooks";
 import { ControlChatHost } from "./components/ControlChatHost";
 import { FileMenuListener } from "./components/FileMenuListener";
-import { GlobalBrowserLifecycle } from "./components/GlobalBrowserLifecycle";
-import { TeardownLogsDialog } from "./components/TeardownLogsDialog";
-import { V2NotificationController } from "./components/V2NotificationController";
-import { createPierreWorker } from "./lib/pierreWorker";
+import { TeardownLogsDialog } from "./components/TeardownLogsDialog/TeardownLogsDialog";
 import { CollectionsProvider } from "./providers/CollectionsProvider";
 import { DeletingWorkspacesProvider } from "./providers/DeletingWorkspacesProvider";
-import { LocalHostServiceProvider } from "./providers/LocalHostServiceProvider";
+import {
+	LocalHostServiceProvider,
+	useLocalHostService,
+} from "./providers/LocalHostServiceProvider";
 
 export const Route = createFileRoute("/_authenticated")({
 	component: AuthenticatedLayout,
 });
+
+const LazyDashboardNewWorkspaceModal = lazy(async () => ({
+	default: (await import("./components/DashboardNewWorkspaceModal"))
+		.DashboardNewWorkspaceModal,
+}));
+
+const LazyReactDndBoundary = lazy(async () => ({
+	default: (await import("./components/ReactDndBoundary")).ReactDndBoundary,
+}));
+
+const LazyDaemonAutoUpdateFailureDialog = lazy(async () => ({
+	default: (await import("./components/DaemonAutoUpdateFailureDialog"))
+		.DaemonAutoUpdateFailureDialog,
+}));
+
+const LazyGlobalBrowserLifecycle = lazy(async () => ({
+	default: (await import("./components/GlobalBrowserLifecycle"))
+		.GlobalBrowserLifecycle,
+}));
+
+const LazyV2NotificationController = lazy(async () => ({
+	default: (await import("./components/V2NotificationController"))
+		.V2NotificationController,
+}));
+
+function routeUsesReactDnd(pathname: string) {
+	return (
+		pathname.startsWith("/v2-workspace") ||
+		pathname.startsWith("/workspace") ||
+		pathname.startsWith("/settings/terminal")
+	);
+}
+
+function routeUsesGlobalBrowserLifecycle(pathname: string) {
+	return pathname.startsWith("/v2-workspace");
+}
+
+function routeUsesV2Notifications(
+	pathname: string,
+	isWorkspaceSidebarOpen: boolean,
+) {
+	return pathname.startsWith("/v2-workspace") || isWorkspaceSidebarOpen;
+}
+
+function DeferredDaemonAutoUpdateFailureDialog() {
+	const { activeHostUrl } = useLocalHostService();
+	const [shouldLoad, setShouldLoad] = useState(false);
+
+	useEffect(() => {
+		if (!activeHostUrl) {
+			setShouldLoad(false);
+			return;
+		}
+		const timeout = window.setTimeout(() => setShouldLoad(true), 15_000);
+		return () => window.clearTimeout(timeout);
+	}, [activeHostUrl]);
+
+	if (!activeHostUrl || !shouldLoad) return null;
+	return (
+		<Suspense fallback={null}>
+			<LazyDaemonAutoUpdateFailureDialog />
+		</Suspense>
+	);
+}
 
 function AuthenticatedLayout() {
 	const {
@@ -65,7 +131,17 @@ function AuthenticatedLayout() {
 	const isOnline = useOnlineStatus();
 	const navigate = useNavigate();
 	const location = useLocation();
+	const shouldEnableReactDnd = routeUsesReactDnd(location.pathname);
+	const shouldEnableGlobalBrowserLifecycle = routeUsesGlobalBrowserLifecycle(
+		location.pathname,
+	);
+	const isWorkspaceSidebarOpen = useWorkspaceSidebarStore((s) => s.isOpen);
+	const shouldEnableV2Notifications = routeUsesV2Notifications(
+		location.pathname,
+		isWorkspaceSidebarOpen,
+	);
 	const setOriginRoute = useSettingsStore((s) => s.setOriginRoute);
+	const isNewWorkspaceModalOpen = useNewWorkspaceModalOpen();
 	const utils = electronTrpc.useUtils();
 	const shownWorkspaceInitWarningsRef = useRef(new Set<string>());
 	const signOut = electronTrpc.auth.signOut.useMutation();
@@ -215,14 +291,20 @@ function AuthenticatedLayout() {
 			) {
 				return;
 			}
-			const pane = useTabsStore.getState().panes[event.data.paneId];
-			if (pane?.workspaceRun?.state === "running") {
+			const { paneId, reason } = event.data;
+
+			void (async () => {
+				const { getPaneWorkspaceRun, setPaneWorkspaceRunState } = await import(
+					"renderer/stores/tabs/workspace-run"
+				);
+				const workspaceRun = getPaneWorkspaceRun(paneId);
+				if (workspaceRun?.state !== "running") {
+					return;
+				}
 				const nextState =
-					event.data.reason === "killed"
-						? "stopped-by-user"
-						: "stopped-by-exit";
-				setPaneWorkspaceRunState(event.data.paneId, nextState);
-			}
+					reason === "killed" ? "stopped-by-user" : "stopped-by-exit";
+				setPaneWorkspaceRunState(paneId, nextState);
+			})();
 		},
 	});
 
@@ -293,7 +375,7 @@ function AuthenticatedLayout() {
 	if (!isSignedIn && hasLocalToken && !isOnline) {
 		return (
 			<div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-background">
-				<HiOutlineWifi className="size-12 text-muted-foreground" />
+				<Wifi className="size-12 text-muted-foreground" />
 				<div className="text-center">
 					<h2 className="text-lg font-medium">You're offline</h2>
 					<p className="text-sm text-muted-foreground">
@@ -408,31 +490,44 @@ function AuthenticatedLayout() {
 		);
 	}
 
-	return (
-		<DndProvider manager={dragDropManager}>
-			<CollectionsProvider>
-				<GlobalBrowserLifecycle />
-				<LocalHostServiceProvider>
-					<DeletingWorkspacesProvider>
-						<WorkerPoolContextProvider
-							poolOptions={{ workerFactory: createPierreWorker, poolSize: 2 }}
-							highlighterOptions={{ preferredHighlighter: "shiki-js" }}
-						>
-							<AgentHooks />
-							<FileMenuListener />
-							<V2NotificationController />
-							<DaemonAutoUpdateFailureDialog />
-							<Outlet />
-							<ControlChatHost />
-							<WorkspaceInitEffects />
-							<DashboardNewWorkspaceModal />
-							<InitGitDialog />
-							<TeardownLogsDialog />
-							<Paywall />
-						</WorkerPoolContextProvider>
-					</DeletingWorkspacesProvider>
-				</LocalHostServiceProvider>
-			</CollectionsProvider>
-		</DndProvider>
+	const content = (
+		<CollectionsProvider>
+			{shouldEnableGlobalBrowserLifecycle ? (
+				<Suspense fallback={null}>
+					<LazyGlobalBrowserLifecycle />
+				</Suspense>
+			) : null}
+			<LocalHostServiceProvider>
+				<DeletingWorkspacesProvider>
+					<AgentHooks />
+					<FileMenuListener />
+					{shouldEnableV2Notifications ? (
+						<Suspense fallback={null}>
+							<LazyV2NotificationController />
+						</Suspense>
+					) : null}
+					<DeferredDaemonAutoUpdateFailureDialog />
+					<Outlet />
+					<ControlChatHost />
+					<WorkspaceInitEffects />
+					{isNewWorkspaceModalOpen ? (
+						<Suspense fallback={null}>
+							<LazyDashboardNewWorkspaceModal />
+						</Suspense>
+					) : null}
+					<InitGitDialog />
+					<TeardownLogsDialog />
+					<Paywall />
+				</DeletingWorkspacesProvider>
+			</LocalHostServiceProvider>
+		</CollectionsProvider>
+	);
+
+	return shouldEnableReactDnd ? (
+		<Suspense fallback={null}>
+			<LazyReactDndBoundary>{content}</LazyReactDndBoundary>
+		</Suspense>
+	) : (
+		content
 	);
 }

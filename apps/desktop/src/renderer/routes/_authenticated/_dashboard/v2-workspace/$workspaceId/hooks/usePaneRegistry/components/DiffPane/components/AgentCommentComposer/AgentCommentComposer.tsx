@@ -1,7 +1,7 @@
 import { Button } from "@superset/ui/button";
 import { cn } from "@superset/ui/utils";
+import { CornerDownLeft, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LuCornerDownLeft, LuLoaderCircle } from "react-icons/lu";
 import { useTerminalAgentBindings } from "renderer/hooks/host-service/useTerminalAgentBindings";
 import { useWorkspaceHostUrl } from "renderer/hooks/host-service/useWorkspaceHostUrl";
 import { useV2AgentConfigs } from "renderer/hooks/useV2AgentConfigs";
@@ -165,7 +165,7 @@ export function AgentCommentComposer({
 						)}
 					>
 						{submitting ? (
-							<LuLoaderCircle className="size-3 animate-spin" />
+							<LoaderCircle className="size-3 animate-spin" />
 						) : null}
 						<span>{submitting ? "Sending…" : "Comment"}</span>
 						{submitting ? null : <KbdEnter />}
@@ -189,7 +189,7 @@ function KbdEnter() {
 			)}
 		>
 			<span>{IS_MAC ? "⌘" : "Ctrl"}</span>
-			<LuCornerDownLeft className="size-2.5" strokeWidth={2.5} />
+			<CornerDownLeft className="size-2.5" strokeWidth={2.5} />
 		</span>
 	);
 }

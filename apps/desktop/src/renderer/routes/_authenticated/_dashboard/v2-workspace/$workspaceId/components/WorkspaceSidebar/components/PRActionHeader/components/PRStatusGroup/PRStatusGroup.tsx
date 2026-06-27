@@ -10,11 +10,11 @@ import {
 	HoverCardContent,
 	HoverCardTrigger,
 } from "@superset/ui/hover-card";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { workspaceTrpc } from "@superset/workspace-client";
+import { ChevronDown, GitMerge, LoaderCircle } from "lucide-react";
 import { useMemo } from "react";
-import { VscChevronDown, VscGitMerge, VscLoading } from "react-icons/vsc";
+import { toast } from "renderer/lib/toast";
 import { PRIcon, type PRState } from "renderer/screens/main/components/PRIcon";
 import { computeChecksRollup } from "../../utils/computeChecksStatus";
 import type { PRFlowState } from "../../utils/getPRFlowState";
@@ -162,9 +162,9 @@ export function PRStatusGroup({
 								}
 							>
 								{mergePRMutation.isPending ? (
-									<VscLoading className="size-3 animate-spin text-muted-foreground" />
+									<LoaderCircle className="size-3 animate-spin text-muted-foreground" />
 								) : (
-									<VscChevronDown className="size-3 text-muted-foreground" />
+									<ChevronDown className="size-3 text-muted-foreground" />
 								)}
 							</button>
 						</DropdownMenuTrigger>
@@ -177,7 +177,7 @@ export function PRStatusGroup({
 								className="text-xs"
 								disabled={mergePRMutation.isPending}
 							>
-								<VscGitMerge className="size-3.5" />
+								<GitMerge className="size-3.5" />
 								Squash and merge
 							</DropdownMenuItem>
 							<DropdownMenuItem
@@ -185,7 +185,7 @@ export function PRStatusGroup({
 								className="text-xs"
 								disabled={mergePRMutation.isPending}
 							>
-								<VscGitMerge className="size-3.5" />
+								<GitMerge className="size-3.5" />
 								Create merge commit
 							</DropdownMenuItem>
 							<DropdownMenuItem
@@ -193,7 +193,7 @@ export function PRStatusGroup({
 								className="text-xs"
 								disabled={mergePRMutation.isPending}
 							>
-								<VscGitMerge className="size-3.5" />
+								<GitMerge className="size-3.5" />
 								Rebase and merge
 							</DropdownMenuItem>
 						</DropdownMenuContent>

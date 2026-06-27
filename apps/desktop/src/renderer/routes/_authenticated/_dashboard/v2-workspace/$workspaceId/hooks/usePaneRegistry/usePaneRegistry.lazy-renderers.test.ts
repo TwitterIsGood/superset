@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test";
 const registrySource = await Bun.file(
 	new URL("./usePaneRegistry.tsx", import.meta.url),
 ).text();
-const pageSource = await Bun.file(
-	new URL("../../page.tsx", import.meta.url),
+const workspaceContentSource = await Bun.file(
+	new URL("../../V2WorkspacePageContent.tsx", import.meta.url),
 ).text();
 const browserPassthroughSource = await Bun.file(
 	new URL(
@@ -39,10 +39,10 @@ describe("usePaneRegistry lazy renderers", () => {
 	});
 
 	test("keeps BrowserPane barrel out of workspace shell imports", () => {
-		expect(pageSource).not.toContain(
+		expect(workspaceContentSource).not.toContain(
 			'from "./hooks/usePaneRegistry/components/BrowserPane"',
 		);
-		expect(pageSource).toContain(
+		expect(workspaceContentSource).toContain(
 			'from "./hooks/usePaneRegistry/components/BrowserPane/browserTabIcon"',
 		);
 		expect(browserPassthroughSource).not.toContain(

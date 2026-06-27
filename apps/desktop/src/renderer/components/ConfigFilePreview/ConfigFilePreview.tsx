@@ -1,6 +1,6 @@
 import { Button } from "@superset/ui/button";
 import { cn } from "@superset/ui/utils";
-import { HiArrowTopRightOnSquare } from "react-icons/hi2";
+import { ExternalLink } from "lucide-react";
 import { OpenInButton } from "renderer/components/OpenInButton";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import {
@@ -71,7 +71,7 @@ export function ConfigFilePreview({
 					className="gap-2"
 				>
 					Learn how to use scripts
-					<HiArrowTopRightOnSquare className="h-4 w-4" />
+					<ExternalLink className="h-4 w-4" />
 				</Button>
 			</div>
 		</>

@@ -13,13 +13,6 @@ export const COMMON_CODE_BLOCK_LANGUAGES: CodeBlockLanguageOption[] = [
 	{ value: "json", label: "JSON" },
 	{ value: "bash", label: "Bash" },
 	{ value: "sql", label: "SQL" },
-	{ value: "go", label: "Go" },
-	{ value: "rust", label: "Rust" },
-	{ value: "java", label: "Java" },
-	{ value: "c", label: "C" },
-	{ value: "cpp", label: "C++" },
-	{ value: "ruby", label: "Ruby" },
-	{ value: "php", label: "PHP" },
 	{ value: "yaml", label: "YAML" },
 	{ value: "markdown", label: "Markdown" },
 ];

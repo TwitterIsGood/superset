@@ -3,10 +3,12 @@ import {
 	builtInThemes,
 	DEFAULT_THEME_ID,
 	darkTheme,
+} from "shared/themes/built-in";
+import {
 	getTerminalColors,
 	type Theme,
 	type ThemeMetadata,
-} from "shared/themes";
+} from "shared/themes/types";
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { trpcThemeStorage } from "../../lib/trpc-storage";

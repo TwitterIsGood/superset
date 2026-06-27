@@ -316,6 +316,57 @@ describe("HostServiceCoordinator relay exposure env", () => {
 	});
 });
 
+describe("HostServiceCoordinator active organization pruning", () => {
+	let coordinator: InstanceType<typeof HostServiceCoordinator>;
+
+	beforeEach(() => {
+		resetMocks();
+		testManifestRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hsc-test-"));
+		coordinator = new HostServiceCoordinator();
+		(
+			coordinator as unknown as HostServiceCoordinatorBuildEnvInternals
+		).resolveChildEnv = (env) => Promise.resolve(env);
+	});
+
+	afterEach(() => {
+		coordinator.stopAll();
+		if (testManifestRoot) {
+			fs.rmSync(testManifestRoot, { recursive: true, force: true });
+			testManifestRoot = "";
+		}
+	});
+
+	test("stops the previous organization host-service when another organization starts", async () => {
+		const firstConnection = await coordinator.start("org-1", spawnConfig);
+		const firstChild = spawnedChildren[0];
+		const secondConnection = await coordinator.start("org-2", spawnConfig);
+
+		expect(firstConnection.port).toBe(40000);
+		expect(secondConnection.port).toBe(40000);
+		expect(killedPids).toContainEqual({
+			pid: firstChild.pid,
+			signal: "SIGTERM",
+		});
+		expect(coordinator.getConnection("org-1")).toBeNull();
+		expect(coordinator.getConnection("org-2")).toEqual({
+			port: secondConnection.port,
+			secret: secondConnection.secret,
+			machineId: "host-1",
+		});
+		expect(coordinator.getActiveOrganizationIds()).toEqual(["org-2"]);
+	});
+
+	test("keeps the same organization running when start is called again", async () => {
+		const firstConnection = await coordinator.start("org-1", spawnConfig);
+		const secondConnection = await coordinator.start("org-1", spawnConfig);
+
+		expect(secondConnection).toEqual(firstConnection);
+		expect(spawnedChildren).toHaveLength(1);
+		expect(killedPids).toHaveLength(0);
+		expect(coordinator.getActiveOrganizationIds()).toEqual(["org-1"]);
+	});
+});
+
 describe("HostServiceCoordinator Trellis runtime env", () => {
 	let coordinator: InstanceType<typeof HostServiceCoordinator>;
 	let previousResourcesPath: string | undefined;

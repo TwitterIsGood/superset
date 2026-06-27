@@ -1,4 +1,4 @@
-import { HiOutlineRectangleStack } from "react-icons/hi2";
+import PanelsTopLeft from "lucide-react/dist/esm/icons/panels-top-left.js";
 
 interface AllIssuesIconProps {
 	color?: string;
@@ -9,5 +9,5 @@ export function AllIssuesIcon({
 	color = "currentColor",
 	className,
 }: AllIssuesIconProps) {
-	return <HiOutlineRectangleStack className={className} style={{ color }} />;
+	return <PanelsTopLeft className={className} style={{ color }} />;
 }

@@ -41,13 +41,12 @@ describe("worktree local shell helpers", () => {
 		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
 
 		expect(script).toContain("SUPERSET_DESKTOP_DEV_NODE_OPTIONS");
-		expect(script).toContain('export NODE_OPTIONS="--max-old-space-size=2048"');
+		expect(script).toContain('export NODE_OPTIONS="--max-old-space-size=1536"');
 		expect(script).toContain(
 			`export NODE_OPTIONS="${shellExpansion("SUPERSET_DESKTOP_DEV_NODE_OPTIONS")}${shellExpansion("NODE_OPTIONS:+ $NODE_OPTIONS")}"`,
 		);
-		expect(script).toContain(
-			"exec ./node_modules/.bin/electron-vite dev --watch",
-		);
+		expect(script).toContain("SUPERSET_DESKTOP_DEV_MAIN_WATCH");
+		expect(script).toContain("exec ./node_modules/.bin/electron-vite dev");
 	});
 
 	test("caps only the local API dev runner heap with an override escape hatch", () => {
@@ -68,6 +67,10 @@ describe("worktree local shell helpers", () => {
 
 		expect(script).toContain("WORKTREE_DEV_PROFILE");
 		expect(script).toContain(
+			'WORKTREE_DEV_PROFILE="$' +
+				'{WORKTREE_DEV_PROFILE:-desktop-online-lite}"',
+		);
+		expect(script).toContain(
 			'full)\n      SESSIONS=("api" "relay" "electric-proxy" "desktop")',
 		);
 		expect(script).toContain(
@@ -79,6 +82,7 @@ describe("worktree local shell helpers", () => {
 
 	test("defines a desktop online-lite profile that uses external loaded app services", () => {
 		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+		const setupScript = readFileSync(".superset/setup.local.sh", "utf8");
 		const packageJson = readFileSync("package.json", "utf8");
 
 		expect(script).toContain(
@@ -114,6 +118,21 @@ describe("worktree local shell helpers", () => {
 			"expected external loaded source: bun run online:start:loaded",
 		);
 		expect(script).toContain(
+			"local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:loaded",
+		);
+		expect(script).toContain(
+			'warn "local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:loaded"\n    stop_data_services',
+		);
+		expect(setupScript).toContain(
+			'WORKTREE_DEV_PROFILE="$' +
+				'{WORKTREE_DEV_PROFILE:-desktop-online-lite}"',
+		);
+		expect(setupScript).toContain("local_requires_local_data");
+		expect(setupScript).toContain(
+			"WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE uses external online-like services",
+		);
+		expect(setupScript).toContain('step_skipped "Start local DB stack"');
+		expect(script).toContain(
 			`wait_for_probe "external api session" "${shellExpansion("WORKTREE_DEV_EXTERNAL_API_URL")}/api/auth/get-session" "200"`,
 		);
 		expect(script).toContain(
@@ -123,10 +142,19 @@ describe("worktree local shell helpers", () => {
 			'dev:worktree:start:online-lite": "WORKTREE_DEV_PROFILE=desktop-online-lite',
 		);
 		expect(packageJson).toContain(
+			'dev:worktree:start:full": "WORKTREE_DEV_PROFILE=full',
+		);
+		expect(packageJson).toContain(
 			'dev:worktree:start:online-lite:loaded": "WORKTREE_DEV_PROFILE=desktop-online-lite WORKTREE_DEV_LOAD_FIXTURE=1',
 		);
 		expect(packageJson).toContain(
+			'dev:worktree:start:full:loaded": "WORKTREE_DEV_PROFILE=full WORKTREE_DEV_LOAD_FIXTURE=1',
+		);
+		expect(packageJson).toContain(
 			'dev:worktree:status:online-lite": "WORKTREE_DEV_PROFILE=desktop-online-lite',
+		);
+		expect(packageJson).toContain(
+			'dev:worktree:status:full": "WORKTREE_DEV_PROFILE=full',
 		);
 	});
 
@@ -179,11 +207,73 @@ describe("worktree local shell helpers", () => {
 		expect(script).toContain("print_memory_status");
 		expect(script).toContain("worktree_app_memory_kib");
 		expect(script).toContain("worktree_docker_memory_kib");
+		expect(script).toContain("other_superset_app_memory_kib");
+		expect(script).toContain("other_superset_docker_memory_kib");
 		expect(script).toContain("docker stats --no-stream");
+		expect(script).toContain("scripts/dev-memory-report.ts");
+		expect(script).toContain("--local-db-project");
+		expect(script).toContain("SUPERSET_WORKTREE_MEMORY_BUDGET_MIB:-2048");
 		expect(script).toContain('echo "memory:"');
 		expect(script).toContain('"tracked total"');
+		expect(script).toContain('"other Superset apps"');
+		expect(script).toContain('"visible Superset total"');
+		expect(script).toContain('"memory attribution"');
+		expect(script).toContain("visible total includes other Superset worktrees");
 		expect(script).toContain("top app processes:");
+		expect(script).toContain("top other Superset processes:");
 		expect(script).toContain('print_memory_status\n  echo\n  echo "probes:"');
+	});
+
+	test("adds a macOS footprint worktree memory report command", () => {
+		const packageJson = readFileSync("package.json", "utf8");
+		const reportScript = readFileSync("scripts/dev-memory-report.ts", "utf8");
+
+		expect(packageJson).toContain(
+			'dev:worktree:memory": "bun run scripts/dev-memory-report.ts"',
+		);
+		expect(reportScript).toContain("getPhysFootprints");
+		expect(reportScript).toContain("current worktree app");
+		expect(reportScript).toContain("current worktree loose helpers");
+		expect(reportScript).toContain("other Superset apps");
+		expect(reportScript).toContain("isOnlineLikeServiceProcess");
+		expect(reportScript).toContain("scripts/superset-online.sh");
+		expect(reportScript).toContain("Codex app");
+		expect(reportScript).toContain("container runtime");
+		expect(reportScript).toContain("developer tooling incl. Codex");
+		expect(reportScript).toContain("Force Quit style memory metric");
+		expect(reportScript).toContain("--max-current-mib");
+		expect(reportScript).toContain("--baseline-report");
+		expect(reportScript).toContain("baseline comparison");
+		expect(reportScript).toContain("current worktree delta");
+		expect(reportScript).toContain("visible Superset-related delta");
+		expect(reportScript).toContain("developer tooling delta");
+		expect(reportScript).toContain(
+			"current worktree app + loose helpers exceeds budget",
+		);
+	});
+
+	test("cleans stale orphaned node-pty helpers from the current worktree", () => {
+		const packageJson = readFileSync("package.json", "utf8");
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+		const cleanupScript = readFileSync(
+			"scripts/clean-stale-worktree-pty-helpers.ts",
+			"utf8",
+		);
+
+		expect(packageJson).toContain(
+			'dev:worktree:cleanup-pty-helpers": "bun run scripts/clean-stale-worktree-pty-helpers.ts"',
+		);
+		expect(script).toContain("cleanup_stale_worktree_pty_helpers");
+		expect(script).toContain("scripts/clean-stale-worktree-pty-helpers.ts");
+		expect(script).toContain("SUPERSET_STALE_PTY_HELPER_MIN_AGE_MINUTES:-30");
+		expect(script).toContain("cleanup_stale_worktree_pty_helpers\n  if");
+		expect(script).toContain(
+			"stop_data_services\n    cleanup_stale_worktree_pty_helpers",
+		);
+		expect(cleanupScript).toContain("ppid !== 1");
+		expect(cleanupScript).toContain("node-pty@");
+		expect(cleanupScript).toContain("spawn-helper");
+		expect(cleanupScript).toContain('process.kill(-row.pgid, "SIGTERM")');
 	});
 
 	test("profile switches stop app sessions that are no longer managed", () => {
@@ -234,7 +324,7 @@ describe("worktree local shell helpers", () => {
 
 		expect(onlineScript).not.toContain("compose up -d --build postgres");
 		expect(onlineScript).toContain(
-			"compose up -d --no-build postgres electric redis minio",
+			"compose up -d --remove-orphans --no-build postgres electric redis minio",
 		);
 		expect(onlineScript).toContain(
 			'log "kv-rest image missing; building it once"',

@@ -1,0 +1,1 @@
+export { DashboardSidebarStaticExpandedProjectContent } from "./DashboardSidebarStaticExpandedProjectContent";

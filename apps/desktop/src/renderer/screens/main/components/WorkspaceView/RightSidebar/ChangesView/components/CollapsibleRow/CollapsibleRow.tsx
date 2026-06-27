@@ -4,8 +4,8 @@ import {
 	CollapsibleTrigger,
 } from "@superset/ui/collapsible";
 import { cn } from "@superset/ui/utils";
+import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
-import { VscChevronRight } from "react-icons/vsc";
 
 interface CollapsibleRowProps {
 	isExpanded: boolean;
@@ -42,7 +42,7 @@ export function CollapsibleRow({
 				)}
 			>
 				{showChevron && (
-					<VscChevronRight
+					<ChevronRight
 						className={cn(
 							"size-2.5 text-muted-foreground shrink-0 transition-transform duration-150",
 							isExpanded && "rotate-90",

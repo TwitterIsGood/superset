@@ -3,9 +3,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { Avatar } from "@superset/ui/atoms/Avatar";
 import { Badge } from "@superset/ui/badge";
 import { cn } from "@superset/ui/utils";
-import { format } from "date-fns";
 import { PriorityIcon } from "../../../../components/shared/PriorityIcon";
 import type { TaskWithStatus } from "../../../../hooks/useTasksData";
+import { formatTaskShortDate } from "../../../../utils/formatTaskShortDate";
 
 interface KanbanCardProps {
 	task: TaskWithStatus;
@@ -36,9 +36,9 @@ export function KanbanCard({ task, onClick, overlay }: KanbanCardProps) {
 	const assigneeImage = task.assignee?.image ?? task.assigneeAvatarUrl ?? null;
 	const labels = task.labels ?? [];
 	const createdDate = task.createdAt
-		? format(new Date(task.createdAt), "MMM d")
+		? formatTaskShortDate(task.createdAt)
 		: null;
-	const dueDate = task.dueDate ? format(new Date(task.dueDate), "MMM d") : null;
+	const dueDate = task.dueDate ? formatTaskShortDate(task.dueDate) : null;
 
 	return (
 		// biome-ignore lint/a11y/useSemanticElements: Draggable card requires div for dnd-kit, button cannot receive drag attributes

@@ -1,7 +1,7 @@
 import type { BranchPrefixMode } from "@superset/shared/workspace-launch";
-import { toast } from "@superset/ui/sonner";
 import { useMutation } from "@tanstack/react-query";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
+import { toast } from "renderer/lib/toast";
 import { BranchPrefixControl } from "renderer/routes/_authenticated/settings/components/BranchPrefixControl";
 
 interface BranchPrefixSectionProps {

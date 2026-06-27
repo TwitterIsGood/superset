@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { parseDesktopPerfLoadedUiArgs } from "./desktop-perf-loaded-ui";
+import {
+	DASHBOARD_SIDEBAR_WORKSPACE_ROW_SELECTOR,
+	parseDesktopPerfLoadedUiArgs,
+} from "./desktop-perf-loaded-ui";
 
 describe("desktop loaded UI verification helper", () => {
 	test("parses loaded UI verification options", () => {
@@ -18,6 +21,10 @@ describe("desktop loaded UI verification helper", () => {
 				"40",
 				"--min-task-mentions",
 				"12",
+				"--max-workspace-dom-nodes",
+				"5000",
+				"--max-tasks-dom-nodes",
+				"6000",
 				"--timeout-ms",
 				"45000",
 				"--skip-navigation",
@@ -36,7 +43,7 @@ describe("desktop loaded UI verification helper", () => {
 				"--fixture-host-backed-workspaces",
 				"1",
 				"--fixture-database-url",
-				"postgres://postgres:postgres@localhost:43015/main",
+				"postgres://postgres:postgres@localhost:43014/main",
 				"--fixture-database-url-unpooled",
 				"postgres://postgres:postgres@localhost:43014/main",
 				"--allow-remote-fixture",
@@ -53,6 +60,8 @@ describe("desktop loaded UI verification helper", () => {
 			minWorkspaceRows: 24,
 			minSidebarWorkspaceRows: 40,
 			minTaskMentions: 12,
+			maxWorkspaceDomNodes: 5000,
+			maxTasksDomNodes: 6000,
 			timeoutMs: 45_000,
 			skipNavigation: true,
 			allowConsoleErrors: true,
@@ -66,7 +75,7 @@ describe("desktop loaded UI verification helper", () => {
 			fixtureWorkspacesPerProject: 20,
 			fixtureTasks: 300,
 			fixtureHostBackedWorkspaces: 1,
-			fixtureDatabaseUrl: "postgres://postgres:postgres@localhost:43015/main",
+			fixtureDatabaseUrl: "postgres://postgres:postgres@localhost:43014/main",
 			fixtureDatabaseUrlUnpooled:
 				"postgres://postgres:postgres@localhost:43014/main",
 			allowRemoteFixture: true,
@@ -78,6 +87,9 @@ describe("desktop loaded UI verification helper", () => {
 		expect(() =>
 			parseDesktopPerfLoadedUiArgs(["--min-workspace-rows", "0"]),
 		).toThrow(/--min-workspace-rows must be a positive integer/);
+		expect(() =>
+			parseDesktopPerfLoadedUiArgs(["--max-workspace-dom-nodes", "0"]),
+		).toThrow(/--max-workspace-dom-nodes must be a positive integer/);
 	});
 
 	test("allows sidebar density checks to be disabled", () => {
@@ -102,7 +114,7 @@ describe("desktop loaded UI verification helper", () => {
 			'"desktop:perf-loaded-ui:dev-login": "bun run desktop:perf-loaded-ui -- --auto-login-dev --ensure-fixture"',
 		);
 		expect(packageJson).toContain(
-			'"desktop:perf-loaded-ui:online-lite": "DESKTOP_PERF_FIXTURE_DATABASE_URL=postgres://postgres:postgres@localhost:43015/main DESKTOP_PERF_FIXTURE_DATABASE_URL_UNPOOLED=postgres://postgres:postgres@localhost:43014/main bun run desktop:perf-loaded-ui -- --auto-login-dev --ensure-fixture --fixture-host-backed-workspaces 0"',
+			'"desktop:perf-loaded-ui:online-lite": "DESKTOP_PERF_FIXTURE_DATABASE_URL=postgres://postgres:postgres@localhost:43014/main DESKTOP_PERF_FIXTURE_DATABASE_URL_UNPOOLED=postgres://postgres:postgres@localhost:43014/main bun run desktop:perf-loaded-ui -- --auto-login-dev --ensure-fixture --fixture-host-backed-workspaces 1"',
 		);
 	});
 
@@ -111,6 +123,71 @@ describe("desktop loaded UI verification helper", () => {
 
 		expect(source).toContain("taskMentions: countText");
 		expect(source).toContain("tasksView.taskMentions");
+		expect(source).toContain("maxWorkspaceDomNodes");
+		expect(source).toContain("maxTasksDomNodes");
+		expect(source).toContain("workspace view rendered");
+		expect(source).toContain("report.workspaceView.domNodeCount");
+		expect(source).toContain("tasks view rendered");
+		expect(source).toContain("report.tasksView.domNodeCount");
+	});
+
+	test("covers loaded first-use interaction paths", () => {
+		const source = readFileSync("scripts/desktop-perf-loaded-ui.ts", "utf8");
+
+		expect(source).toContain("LoadedInteractionSummary");
+		expect(source).toContain("runLoadedInteraction");
+		expect(source).toContain("open-v2-workspace-detail");
+		expect(source).toContain("getFixtureHostBackedWorkspaceId");
+		expect(source).toContain("fixtureHostBackedWorkspaceId");
+		expect(source).toContain("preferredWorkspaceId");
+		expect(source).toContain("host-backed workspace detail id");
+		expect(source).toContain("waitForV2WorkspaceDetailShell");
+		expect(source).toContain("v2 workspace detail shell");
+		expect(source).toContain("open-v2-workspace-right-sidebar");
+		expect(source).toContain('["Files", "Changes", "Review", "Models"]');
+		expect(source).toContain("switch-v2-workspace-sidebar-");
+		expect(source).toContain("label.toLowerCase()");
+		expect(source).toContain("open-tasks-project-filter");
+		expect(source).toContain("open-tasks-status-filter");
+		expect(source).toContain("open-tasks-assignee-filter");
+		expect(source).toContain("switch-tasks-board-view");
+		expect(source).toContain("switch-tasks-table-view");
+		expect(source).toContain('["PRs", "Issues", "Tasks"]');
+		expect(source).toContain("switch-tasks-type-");
+		expect(source).toContain("typeTab.toLowerCase()");
+		expect(source).toContain("loaded-workspace-detail-ui.png");
+		expect(source).toContain("open-workspace-terminal-pane");
+		expect(source).toContain("openTerminalPaneFromEmptyWorkspace");
+		expect(source).toContain("terminal pane attached");
+		expect(source).toContain("open-workspace-chat-pane");
+		expect(source).toContain("openChatPaneFromEmptyWorkspace");
+		expect(source).toContain("workspace-chat-first-send");
+		expect(source).toContain("sendWorkspaceChatProbe");
+		expect(source).toContain("chat first send user message");
+		expect(source).toContain("open-workspace-file-pane");
+		expect(source).toContain("openFilePaneFromFilesSidebar");
+		expect(source).toContain("[data-item-path]");
+	});
+
+	test("counts both sortable and static dashboard sidebar workspace rows", () => {
+		expect(DASHBOARD_SIDEBAR_WORKSPACE_ROW_SELECTOR).toContain(
+			"data-dashboard-sidebar-workspace-item",
+		);
+		expect(DASHBOARD_SIDEBAR_WORKSPACE_ROW_SELECTOR).toContain(
+			"data-dashboard-sidebar-expanded-workspace-wrapper",
+		);
+		expect(DASHBOARD_SIDEBAR_WORKSPACE_ROW_SELECTOR).toContain(
+			"data-dashboard-sidebar-collapsed-workspace-row",
+		);
+	});
+
+	test("opens the lazy dashboard sidebar before sidebar density checks", () => {
+		const source = readFileSync("scripts/desktop-perf-loaded-ui.ts", "utf8");
+
+		expect(source).toContain("openWorkspaceSidebarForDensityCheck");
+		expect(source).toContain("options.minSidebarWorkspaceRows <= 0");
+		expect(source).toContain('"workspace-sidebar-store"');
+		expect(source).toContain("isOpen: true");
 	});
 
 	test("can auto-login to the local loaded dev account before verifying data", () => {
@@ -155,9 +232,37 @@ describe("desktop loaded UI verification helper", () => {
 		const source = readFileSync("scripts/desktop-perf-loaded-ui.ts", "utf8");
 
 		expect(source).toContain("__supersetCollectionsDebug");
+		expect(source).toContain("switchActiveOrganization");
+		expect(source).toContain("waitForRendererFixtureOrganization");
+		expect(source).toContain("getRendererActiveOrganizationId");
+		expect(source).toContain("renderer active organization is");
+		expect(source).toContain(
+			"switched.result?.activeOrganizationId === fixtureOrganizationId",
+		);
+		expect(source).toContain("debugActiveOrganizationId");
 		expect(source).toContain("getV2WorkspaceGraphHealth");
 		expect(source).toContain("recoverPartialV2WorkspaceGraphCache");
 		expect(source).toContain("Collection health:");
 		expect(source).toContain("collections: collectionHealth");
+	});
+
+	test("exposes a development-only renderer organization switch hook", () => {
+		const providerSource = readFileSync(
+			"apps/desktop/src/renderer/routes/_authenticated/providers/CollectionsProvider/CollectionsProvider.tsx",
+			"utf8",
+		);
+		const collectionsSource = readFileSync(
+			"apps/desktop/src/renderer/routes/_authenticated/providers/CollectionsProvider/collections.ts",
+			"utf8",
+		);
+
+		expect(providerSource).toContain('env.NODE_ENV !== "development"');
+		expect(providerSource).toContain("__supersetCollectionsDebug");
+		expect(providerSource).toContain("switchActiveOrganization");
+		expect(providerSource).toContain(
+			"await switchOrganization(organizationId)",
+		);
+		expect(collectionsSource).toContain("switchActiveOrganization?:");
+		expect(collectionsSource).toContain("getActiveOrganizationId?:");
 	});
 });

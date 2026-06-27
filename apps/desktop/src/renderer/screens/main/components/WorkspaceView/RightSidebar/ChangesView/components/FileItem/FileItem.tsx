@@ -8,16 +8,16 @@ import {
 } from "@superset/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
-import { useCallback, useEffect, useRef, useState } from "react";
 import {
-	VscAdd,
-	VscClippy,
-	VscDiscard,
-	VscFolderOpened,
-	VscLinkExternal,
-	VscRemove,
-	VscTrash,
-} from "react-icons/vsc";
+	Clipboard,
+	ExternalLink,
+	FolderOpen,
+	Minus,
+	Plus,
+	Trash2,
+	Undo2,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toAbsoluteWorkspacePath } from "shared/absolute-paths";
 import type { ChangeCategory, ChangedFile } from "shared/changes-types";
 import { createFileKey, useScrollContext } from "../../../../ChangesContent";
@@ -178,9 +178,9 @@ export function FileItem({
 						key: "discard",
 						label: discardLabel,
 						icon: isDeleteAction ? (
-							<VscTrash className="size-3" />
+							<Trash2 className="size-3" />
 						) : (
-							<VscDiscard className="size-3" />
+							<Undo2 className="size-3" />
 						),
 						onClick: handleDiscardClick,
 						isDestructive: true,
@@ -193,7 +193,7 @@ export function FileItem({
 					{
 						key: "stage",
 						label: "Stage",
-						icon: <VscAdd className="size-3" />,
+						icon: <Plus className="size-3" />,
 						onClick: onStage,
 						disabled: isActioning,
 					},
@@ -204,7 +204,7 @@ export function FileItem({
 					{
 						key: "unstage",
 						label: "Unstage",
-						icon: <VscRemove className="size-3" />,
+						icon: <Minus className="size-3" />,
 						onClick: onUnstage,
 						disabled: isActioning,
 					},
@@ -276,20 +276,20 @@ export function FileItem({
 				<ContextMenuTrigger asChild>{fileContent}</ContextMenuTrigger>
 				<ContextMenuContent className="w-48">
 					<ContextMenuItem onClick={copyPath}>
-						<VscClippy className="mr-2 size-4" />
+						<Clipboard className="mr-2 size-4" />
 						Copy Path
 					</ContextMenuItem>
 					<ContextMenuItem onClick={copyRelativePath}>
-						<VscClippy className="mr-2 size-4" />
+						<Clipboard className="mr-2 size-4" />
 						Copy Relative Path
 					</ContextMenuItem>
 					<ContextMenuSeparator />
 					<ContextMenuItem onClick={revealInFinder}>
-						<VscFolderOpened className="mr-2 size-4" />
+						<FolderOpen className="mr-2 size-4" />
 						Reveal in Finder
 					</ContextMenuItem>
 					<ContextMenuItem onClick={openInEditor}>
-						<VscLinkExternal className="mr-2 size-4" />
+						<ExternalLink className="mr-2 size-4" />
 						Open in Editor
 					</ContextMenuItem>
 
@@ -297,14 +297,14 @@ export function FileItem({
 
 					{onStage && (
 						<ContextMenuItem onClick={onStage} disabled={isActioning}>
-							<VscAdd className="mr-2 size-4" />
+							<Plus className="mr-2 size-4" />
 							Stage
 						</ContextMenuItem>
 					)}
 
 					{onUnstage && (
 						<ContextMenuItem onClick={onUnstage} disabled={isActioning}>
-							<VscRemove className="mr-2 size-4" />
+							<Minus className="mr-2 size-4" />
 							Unstage
 						</ContextMenuItem>
 					)}
@@ -316,9 +316,9 @@ export function FileItem({
 							className="text-destructive focus:text-destructive"
 						>
 							{isDeleteAction ? (
-								<VscTrash className="mr-2 size-4" />
+								<Trash2 className="mr-2 size-4" />
 							) : (
-								<VscDiscard className="mr-2 size-4" />
+								<Undo2 className="mr-2 size-4" />
 							)}
 							{discardLabel}
 						</ContextMenuItem>

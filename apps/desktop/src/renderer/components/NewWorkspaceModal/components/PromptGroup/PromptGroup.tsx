@@ -31,32 +31,32 @@ import {
 import { Input } from "@superset/ui/input";
 import { isEnterSubmit } from "@superset/ui/lib/keyboard";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
 	ArrowUpIcon,
+	Check,
+	ChevronsUpDown,
+	CircleDotIcon,
 	ExternalLinkIcon,
+	FolderGit,
+	FolderOpen,
+	GitBranchIcon,
+	GitPullRequest,
+	GlobeIcon,
 	PaperclipIcon,
 	PlusIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-	GoArrowUpRight,
-	GoGitBranch,
-	GoGlobe,
-	GoIssueOpened,
-} from "react-icons/go";
-import { HiCheck, HiChevronUpDown } from "react-icons/hi2";
-import { LuFolderGit, LuFolderOpen, LuGitPullRequest } from "react-icons/lu";
 import { AgentSelect } from "renderer/components/AgentSelect";
 import { LinkedIssuePill } from "renderer/components/Chat/ChatInterface/components/ChatInputFooter/components/LinkedIssuePill";
 import { useAgentLaunchPreferences } from "renderer/hooks/useAgentLaunchPreferences";
 import { PLATFORM } from "renderer/hotkeys";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { formatRelativeTime } from "renderer/lib/formatRelativeTime";
+import { toast } from "renderer/lib/toast";
 import { resolveEffectiveWorkspaceBaseBranch } from "renderer/lib/workspaceBaseBranch";
 import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { ProjectThumbnail } from "renderer/screens/main/components/WorkspaceSidebar/ProjectSection/ProjectThumbnail";
@@ -140,7 +140,7 @@ function AttachmentButtons({
 						className={`${PILL_BUTTON_CLASS} w-[22px]`}
 						onClick={onOpenGitHubIssue}
 					>
-						<GoIssueOpened className="size-3.5" />
+						<CircleDotIcon className="size-3.5" />
 					</PromptInputButton>
 				</TooltipTrigger>
 				<TooltipContent side="bottom">Link GitHub issue</TooltipContent>
@@ -151,7 +151,7 @@ function AttachmentButtons({
 						className={`${PILL_BUTTON_CLASS} w-[22px]`}
 						onClick={onOpenPRLink}
 					>
-						<LuGitPullRequest className="size-3.5" />
+						<GitPullRequest className="size-3.5" />
 					</PromptInputButton>
 				</TooltipTrigger>
 				<TooltipContent side="bottom">Link pull request</TooltipContent>
@@ -195,7 +195,7 @@ function ProjectPickerPill({
 					<span className="truncate">
 						{selectedProject?.name ?? "Select project"}
 					</span>
-					<HiChevronUpDown className="size-3 shrink-0 text-muted-foreground" />
+					<ChevronsUpDown className="size-3 shrink-0 text-muted-foreground" />
 				</PromptInputButton>
 			</PopoverTrigger>
 			<PopoverContent
@@ -227,7 +227,7 @@ function ProjectPickerPill({
 									/>
 									{project.name}
 									{project.id === selectedProject?.id && (
-										<HiCheck className="ml-auto size-4" />
+										<Check className="ml-auto size-4" />
 									)}
 								</CommandItem>
 							))}
@@ -241,7 +241,7 @@ function ProjectPickerPill({
 									onImportRepo();
 								}}
 							>
-								<LuFolderOpen className="size-4" />
+								<FolderOpen className="size-4" />
 								Open project
 							</CommandItem>
 							<CommandItem
@@ -251,7 +251,7 @@ function ProjectPickerPill({
 									onNewProject();
 								}}
 							>
-								<LuFolderGit className="size-4" />
+								<FolderGit className="size-4" />
 								New project
 							</CommandItem>
 						</CommandGroup>
@@ -332,7 +332,7 @@ function CompareBaseBranchPickerInline({
 					disabled={isBranchesLoading}
 					className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 min-w-0 max-w-full"
 				>
-					<GoGitBranch className="size-3 shrink-0" />
+					<GitBranchIcon className="size-3 shrink-0" />
 					{isBranchesLoading ? (
 						<span className="h-2.5 w-14 rounded-sm bg-muted-foreground/15 animate-pulse" />
 					) : (
@@ -340,7 +340,7 @@ function CompareBaseBranchPickerInline({
 							{effectiveCompareBaseBranch || "..."}
 						</span>
 					)}
-					<HiChevronUpDown className="size-3 shrink-0" />
+					<ChevronsUpDown className="size-3 shrink-0" />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent
@@ -392,7 +392,7 @@ function CompareBaseBranchPickerInline({
 							let icon: React.ReactNode;
 							if (activeWorkspaceId) {
 								icon = (
-									<GoArrowUpRight className="size-3.5 shrink-0 text-muted-foreground" />
+									<ExternalLinkIcon className="size-3.5 shrink-0 text-muted-foreground" />
 								);
 							} else if (openAction) {
 								icon = (
@@ -400,11 +400,11 @@ function CompareBaseBranchPickerInline({
 								);
 							} else if (branch.isLocal) {
 								icon = (
-									<GoGitBranch className="size-3.5 shrink-0 text-muted-foreground" />
+									<GitBranchIcon className="size-3.5 shrink-0 text-muted-foreground" />
 								);
 							} else {
 								icon = (
-									<GoGlobe className="size-3.5 shrink-0 text-muted-foreground" />
+									<GlobeIcon className="size-3.5 shrink-0 text-muted-foreground" />
 								);
 							}
 
@@ -456,7 +456,7 @@ function CompareBaseBranchPickerInline({
 										{/* Show checkmark for selected base branch when not hovering */}
 										{!hasExistingWorkspace &&
 											effectiveCompareBaseBranch === branch.name && (
-												<HiCheck className="size-4 text-primary group-data-[selected=true]:hidden" />
+												<Check className="size-4 text-primary group-data-[selected=true]:hidden" />
 											)}
 
 										{/* Action buttons - show on hover/select */}
@@ -476,7 +476,7 @@ function CompareBaseBranchPickerInline({
 														setOpen(false);
 													}}
 												>
-													<GoArrowUpRight className="size-3.5 mr-1" />
+													<ExternalLinkIcon className="size-3.5 mr-1" />
 													Open
 													<span className="ml-1 text-[10px] opacity-60">↵</span>
 												</Button>
@@ -1352,7 +1352,7 @@ ${sanitizeText(truncatedBody)}`;
 								transition={{ duration: 0.2, ease: "easeOut" }}
 								className="flex items-center gap-1 text-xs text-muted-foreground"
 							>
-								<LuGitPullRequest className="size-3 shrink-0" />
+								<GitPullRequest className="size-3 shrink-0" />
 								based off PR #{linkedPR.prNumber}
 							</motion.span>
 						) : (

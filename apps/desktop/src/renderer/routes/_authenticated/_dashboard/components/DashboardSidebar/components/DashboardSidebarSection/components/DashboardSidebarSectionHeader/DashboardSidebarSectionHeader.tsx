@@ -1,11 +1,10 @@
 import { cn } from "@superset/ui/utils";
+import { ChevronRight, GripVertical } from "lucide-react";
 import {
 	type ComponentPropsWithoutRef,
 	forwardRef,
 	type ReactNode,
 } from "react";
-import { HiChevronRight } from "react-icons/hi2";
-import { LuGripVertical } from "react-icons/lu";
 import { RenameInput } from "renderer/screens/main/components/WorkspaceSidebar/RenameInput";
 import type { DashboardSidebarSection } from "../../../../types";
 
@@ -65,13 +64,13 @@ export const DashboardSidebarSectionHeader = forwardRef<
 				{...props}
 			>
 				<div className="mr-2 grid h-5 w-5 shrink-0 cursor-grab items-center justify-center active:cursor-grabbing [&>*]:col-start-1 [&>*]:row-start-1">
-					<HiChevronRight
+					<ChevronRight
 						className={cn(
 							"size-3 text-muted-foreground transition-[opacity,transform] duration-150 group-hover:opacity-0",
 							!section.isCollapsed && "rotate-90",
 						)}
 					/>
-					<LuGripVertical className="size-3 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-60" />
+					<GripVertical className="size-3 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-60" />
 				</div>
 
 				<div className="flex min-w-0 flex-1 items-center gap-1.5">

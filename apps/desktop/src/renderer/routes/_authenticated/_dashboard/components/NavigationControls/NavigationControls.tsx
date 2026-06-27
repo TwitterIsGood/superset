@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { useLocation, useRouter } from "@tanstack/react-router";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect } from "react";
-import { LuArrowLeft, LuArrowRight } from "react-icons/lu";
 import { HotkeyLabel, useHotkey } from "renderer/hotkeys";
 import { HistoryDropdown } from "./components/HistoryDropdown";
 
@@ -40,7 +40,7 @@ export function NavigationControls() {
 						disabled={!canGoBack}
 						className="no-drag flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors disabled:opacity-30 disabled:pointer-events-none"
 					>
-						<LuArrowLeft className="size-4" strokeWidth={1.5} />
+						<ArrowLeft className="size-4" strokeWidth={1.5} />
 					</button>
 				</TooltipTrigger>
 				<TooltipContent side="bottom">
@@ -56,7 +56,7 @@ export function NavigationControls() {
 						disabled={!canGoForward}
 						className="no-drag flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors disabled:opacity-30 disabled:pointer-events-none"
 					>
-						<LuArrowRight className="size-4" strokeWidth={1.5} />
+						<ArrowRight className="size-4" strokeWidth={1.5} />
 					</button>
 				</TooltipTrigger>
 				<TooltipContent side="bottom">

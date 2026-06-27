@@ -80,4 +80,15 @@ describe("desktop perf fixture helpers", () => {
 			'"desktop:perf-fixture:loaded": "bun run desktop:perf-fixture -- ensure --slug desktop-perf-loaded --projects 10 --workspaces-per-project 20 --tasks 300 --host-backed-workspaces 1"',
 		);
 	});
+
+	test("loaded stats require matching local host-service workspace rows", () => {
+		const source = readFileSync("scripts/desktop-perf-fixture.ts", "utf8");
+
+		expect(source).toContain("countLocalHostFixtureWorkspaces");
+		expect(source).toContain("localHostBackedWorkspaceCount");
+		expect(source).toContain("hostBackedWorkspaceIds");
+		expect(source).toContain(
+			"localHostBackedWorkspaceCount >= expectedHostBackedWorkspaces",
+		);
+	});
 });

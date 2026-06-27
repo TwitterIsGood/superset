@@ -1,11 +1,11 @@
 import { Button } from "@superset/ui/button";
 import { Input } from "@superset/ui/input";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
+import { Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { LuSearch, LuX } from "react-icons/lu";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import type { FilterMode, ProjectGroup, WorkspaceItem } from "./types";
 import { WorkspaceRow } from "./WorkspaceRow";
@@ -213,7 +213,7 @@ export function WorkspacesListView() {
 
 				{/* Search */}
 				<div className="relative flex-1">
-					<LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
+					<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
 					<Input
 						type="text"
 						placeholder="Search..."
@@ -230,7 +230,7 @@ export function WorkspacesListView() {
 					onClick={() => navigate({ to: "/workspace" })}
 					className="size-7 text-foreground/60 hover:text-foreground shrink-0"
 				>
-					<LuX className="size-4" />
+					<X className="size-4" />
 				</Button>
 			</div>
 

@@ -2,7 +2,7 @@
  * Build-time guard for native runtime dependencies.
  *
  * This fails early when:
- * 1) libsql internals are accidentally bundled into dist/main (dynamic require risk)
+ * 1) libsql internals accidentally return to the base dist/main bundle
  * 2) @parcel/watcher internals are accidentally bundled into dist/main
  * 3) required native runtime packages are missing from apps/desktop/node_modules
  */
@@ -54,14 +54,13 @@ function readOptionalMainSourceMap(): string | null {
 	return readFileSync(sourceMapPath, "utf8");
 }
 
-function validateLibsqlNotBundled(): void {
+function validateLibsqlAbsentFromBaseBundle(): void {
 	const sourceMap = readOptionalMainSourceMap();
 	if (sourceMap?.includes("node_modules/.bun/libsql@")) {
 		fail(
 			[
-				"Detected bundled `libsql` sources in dist/main/index.js.map.",
-				"This usually causes runtime dynamic require failures in packaged apps.",
-				"Ensure `libsql` stays in `rollupOptions.external` for the main process.",
+				"Detected `libsql` sources in dist/main/index.js.map.",
+				"libsql belongs in the MastraCode runtime pack, not the base desktop app.",
 			].join("\n"),
 		);
 	}
@@ -87,7 +86,7 @@ function validateLibsqlNotBundled(): void {
 			fail(
 				[
 					"Detected dynamic `@libsql/<platform>` require logic in bundled JS output.",
-					"This indicates libsql internals were bundled instead of externalized.",
+					"libsql belongs in the MastraCode runtime pack, not the base desktop app.",
 					`Offending file: ${filePath}`,
 				].join("\n"),
 			);
@@ -95,7 +94,7 @@ function validateLibsqlNotBundled(): void {
 	}
 
 	console.log(
-		"[validate:native-runtime] OK: libsql is externalized from main bundle",
+		"[validate:native-runtime] OK: libsql is absent from base main bundle",
 	);
 }
 
@@ -289,59 +288,6 @@ function collectFiles(rootDir: string): string[] {
 	return files;
 }
 
-function getPlatformLibsqlCandidates(): string[] {
-	const targetArch = process.env.TARGET_ARCH || process.arch;
-	const targetPlatform = process.env.TARGET_PLATFORM || process.platform;
-
-	if (targetPlatform === "darwin") {
-		return [
-			targetArch === "arm64" ? "@libsql/darwin-arm64" : "@libsql/darwin-x64",
-		];
-	}
-
-	if (targetPlatform === "linux") {
-		if (targetArch === "arm64") {
-			return ["@libsql/linux-arm64-gnu", "@libsql/linux-arm64-musl"];
-		}
-		if (targetArch === "arm") {
-			return ["@libsql/linux-arm-gnueabihf", "@libsql/linux-arm-musleabihf"];
-		}
-		return ["@libsql/linux-x64-gnu", "@libsql/linux-x64-musl"];
-	}
-
-	if (targetPlatform === "win32") {
-		return ["@libsql/win32-x64-msvc"];
-	}
-
-	return [];
-}
-
-function getPlatformAstGrepCandidates(): string[] {
-	const targetArch = process.env.TARGET_ARCH || process.arch;
-	const targetPlatform = process.env.TARGET_PLATFORM || process.platform;
-
-	if (targetPlatform === "darwin") {
-		return [
-			targetArch === "arm64"
-				? "@ast-grep/napi-darwin-arm64"
-				: "@ast-grep/napi-darwin-x64",
-		];
-	}
-
-	if (targetPlatform === "linux") {
-		if (targetArch === "arm64") {
-			return ["@ast-grep/napi-linux-arm64-gnu"];
-		}
-		return ["@ast-grep/napi-linux-x64-gnu", "@ast-grep/napi-linux-x64-musl"];
-	}
-
-	if (targetPlatform === "win32") {
-		return ["@ast-grep/napi-win32-x64-msvc"];
-	}
-
-	return [];
-}
-
 function validateNativeModulesPrepared(): void {
 	const nodeModulesDir = join(projectRoot, "node_modules");
 	assertExists(
@@ -351,8 +297,6 @@ function validateNativeModulesPrepared(): void {
 
 	const requiredModules = [
 		"@parcel/watcher/package.json",
-		"libsql/package.json",
-		"@neon-rs/load/package.json",
 		"detect-libc/package.json",
 		"is-glob/package.json",
 		"is-extglob/package.json",
@@ -382,51 +326,6 @@ function validateNativeModulesPrepared(): void {
 				].join("\n"),
 			);
 		}
-	}
-
-	const platformCandidates = getPlatformLibsqlCandidates();
-	if (platformCandidates.length === 0) {
-		console.warn(
-			`[validate:native-runtime] Skipping platform-specific @libsql check for ${process.platform}/${process.arch}`,
-		);
-		return;
-	}
-
-	const hasPlatformPackage = platformCandidates.some((pkg) =>
-		existsSync(join(nodeModulesDir, pkg, "package.json")),
-	);
-	if (!hasPlatformPackage) {
-		fail(
-			[
-				"Missing platform-specific @libsql package.",
-				`Expected one of: ${platformCandidates.join(", ")}`,
-				"Run `bun run copy:native-modules` and ensure optional dependencies are materialized.",
-			].join("\n"),
-		);
-	}
-
-	console.log(
-		`[validate:native-runtime] OK: platform libsql package present (${platformCandidates.join(" | ")})`,
-	);
-
-	// Validate @ast-grep/napi platform package
-	const astGrepCandidates = getPlatformAstGrepCandidates();
-	if (astGrepCandidates.length > 0) {
-		const hasAstGrepPlatformPackage = astGrepCandidates.some((pkg) =>
-			existsSync(join(nodeModulesDir, pkg, "package.json")),
-		);
-		if (!hasAstGrepPlatformPackage) {
-			fail(
-				[
-					"Missing platform-specific @ast-grep/napi package.",
-					`Expected one of: ${astGrepCandidates.join(", ")}`,
-					"Run `bun run copy:native-modules` and ensure optional dependencies are materialized.",
-				].join("\n"),
-			);
-		}
-		console.log(
-			`[validate:native-runtime] OK: platform ast-grep package present (${astGrepCandidates.join(" | ")})`,
-		);
 	}
 }
 
@@ -510,7 +409,7 @@ function validateParcelWatcherPrepared(): void {
 function main(): void {
 	validateWorkspacePackagesBundled();
 	validateOnlyExpectedExternalRequires();
-	validateLibsqlNotBundled();
+	validateLibsqlAbsentFromBaseBundle();
 	validateParcelWatcherNotBundled();
 	validateNativeModulesPrepared();
 	validateParcelWatcherPrepared();

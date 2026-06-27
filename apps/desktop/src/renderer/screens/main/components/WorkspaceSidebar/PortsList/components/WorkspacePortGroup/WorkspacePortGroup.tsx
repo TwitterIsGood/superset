@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { LuLoaderCircle, LuX } from "react-icons/lu";
+import { LoaderCircle, X } from "lucide-react";
 import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { STROKE_WIDTH } from "../../../constants";
 import { useKillPort } from "../../hooks/useKillPort";
@@ -48,12 +48,12 @@ export function WorkspacePortGroup({ group }: WorkspacePortGroupProps) {
 							)}
 						>
 							{isPending ? (
-								<LuLoaderCircle
+								<LoaderCircle
 									className="size-3 animate-spin"
 									strokeWidth={STROKE_WIDTH}
 								/>
 							) : (
-								<LuX className="size-3" strokeWidth={STROKE_WIDTH} />
+								<X className="size-3" strokeWidth={STROKE_WIDTH} />
 							)}
 						</button>
 					</TooltipTrigger>

@@ -3,6 +3,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -10,6 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	normalizeBuilderArch,
+	prunePackagedElectronLocales,
+	prunePackagedElectronSoftwareRenderer,
 	prunePackagedNativePayloads,
 } from "./prune-packaged-native-payloads";
 
@@ -319,6 +322,111 @@ describe("prunePackagedNativePayloads", () => {
 		).toBe(false);
 		expect(existsSync(join(nodeModulesDir, "@parcel/watcher/build"))).toBe(
 			false,
+		);
+	});
+});
+
+describe("prunePackagedElectronLocales", () => {
+	test("keeps only the selected Electron Framework locale payloads", async () => {
+		const { appOutDir } = createTempAppOutDir(true);
+		const resourcesDir = join(
+			appOutDir,
+			"Superset.app",
+			"Contents",
+			"Frameworks",
+			"Electron Framework.framework",
+			"Versions",
+			"A",
+			"Resources",
+		);
+		touch(join(resourcesDir, "en.lproj", "locale.pak"));
+		touch(join(resourcesDir, "en_GB.lproj", "locale.pak"));
+		touch(join(resourcesDir, "zh_CN.lproj", "locale.pak"));
+		touch(join(resourcesDir, "zh_TW.lproj", "locale.pak"));
+		touch(join(resourcesDir, "fr.lproj", "locale.pak"));
+		touch(join(resourcesDir, "ta.lproj", "locale.pak"));
+		touch(join(resourcesDir, "resources.pak"));
+
+		const result = await prunePackagedElectronLocales({ appOutDir });
+
+		expect(result.resourcesDir).toBe(resourcesDir);
+		expect(existsSync(join(resourcesDir, "en.lproj"))).toBe(true);
+		expect(existsSync(join(resourcesDir, "en_GB.lproj"))).toBe(true);
+		expect(existsSync(join(resourcesDir, "zh_CN.lproj"))).toBe(true);
+		expect(existsSync(join(resourcesDir, "zh_TW.lproj"))).toBe(true);
+		expect(existsSync(join(resourcesDir, "fr.lproj"))).toBe(false);
+		expect(existsSync(join(resourcesDir, "ta.lproj"))).toBe(false);
+		expect(existsSync(join(resourcesDir, "resources.pak"))).toBe(true);
+		expect([...result.removedPaths].sort()).toEqual(["fr.lproj", "ta.lproj"]);
+	});
+
+	test("electron-builder afterPack prunes Electron locales on macOS", () => {
+		const builderConfig = readFileSync(
+			join(import.meta.dirname, "..", "electron-builder.ts"),
+			"utf8",
+		);
+
+		expect(builderConfig).toContain("prunePackagedElectronLocales");
+		expect(builderConfig).toContain(
+			'context.electronPlatformName === "darwin"',
+		);
+	});
+});
+
+describe("prunePackagedElectronSoftwareRenderer", () => {
+	test("removes the macOS SwiftShader fallback payload", async () => {
+		const { appOutDir } = createTempAppOutDir(true);
+		const frameworkDir = join(
+			appOutDir,
+			"Superset.app",
+			"Contents",
+			"Frameworks",
+			"Electron Framework.framework",
+			"Versions",
+			"A",
+		);
+		touch(join(frameworkDir, "Libraries", "libvk_swiftshader.dylib"));
+		touch(join(frameworkDir, "Libraries", "libGLESv2.dylib"));
+
+		const result = await prunePackagedElectronSoftwareRenderer({ appOutDir });
+
+		expect(result.frameworkDir).toBe(frameworkDir);
+		expect(
+			existsSync(join(frameworkDir, "Libraries", "libvk_swiftshader.dylib")),
+		).toBe(false);
+		expect(existsSync(join(frameworkDir, "Libraries", "libGLESv2.dylib"))).toBe(
+			true,
+		);
+		expect(result.removedPaths).toEqual([
+			join("Libraries", "libvk_swiftshader.dylib"),
+		]);
+	});
+
+	test("electron-builder afterPack prunes the macOS software renderer fallback", () => {
+		const builderConfig = readFileSync(
+			join(import.meta.dirname, "..", "electron-builder.ts"),
+			"utf8",
+		);
+		const appSetupSource = readFileSync(
+			join(
+				import.meta.dirname,
+				"..",
+				"src",
+				"lib",
+				"electron-app",
+				"factories",
+				"app",
+				"setup.ts",
+			),
+			"utf8",
+		);
+
+		expect(builderConfig).toContain("prunePackagedElectronSoftwareRenderer");
+		expect(builderConfig).toContain(
+			'context.electronPlatformName === "darwin"',
+		);
+		expect(appSetupSource).toContain(
+			'app.commandLine.appendSwitch("disable-software-rasterizer")',
 		);
 	});
 });

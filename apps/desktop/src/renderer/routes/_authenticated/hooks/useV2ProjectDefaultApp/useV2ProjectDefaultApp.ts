@@ -2,7 +2,7 @@ import type { ExternalApp } from "@superset/local-db";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useCallback } from "react";
-import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";
+import { useDashboardSidebarCoreState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarCoreState";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 
 /**
@@ -17,7 +17,7 @@ import { useCollections } from "renderer/routes/_authenticated/providers/Collect
  */
 export function useV2ProjectDefaultApp(projectId: string | undefined) {
 	const collections = useCollections();
-	const { ensureProjectInSidebar } = useDashboardSidebarState();
+	const { ensureProjectInSidebar } = useDashboardSidebarCoreState();
 
 	const { data: rows = [] } = useLiveQuery(
 		(q) =>

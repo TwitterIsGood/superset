@@ -9,7 +9,7 @@ import { useCreateWorkspace } from "renderer/react-query/workspaces/useCreateWor
 import { useDeleteWorkspace } from "renderer/react-query/workspaces/useDeleteWorkspace";
 import { useUpdateWorkspace } from "renderer/react-query/workspaces/useUpdateWorkspace";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider/CollectionsProvider";
-import { executeTool, type ToolContext } from "./tools";
+import type { ToolContext } from "./tools";
 
 const COMMAND_PERSIST_RETRY_MS = 1_000;
 
@@ -48,10 +48,19 @@ export function useCommandWatcher() {
 	const terminalWrite = electronTrpc.terminal.write.useMutation();
 
 	const { data: workspaces, refetch: refetchWorkspaces } =
-		electronTrpc.workspaces.getAll.useQuery();
+		electronTrpc.workspaces.getAll.useQuery(undefined, {
+			enabled: shouldWatch,
+		});
 	const { data: workspaceGroups } =
-		electronTrpc.workspaces.getAllGrouped.useQuery();
-	const { data: projects } = electronTrpc.projects.getRecents.useQuery();
+		electronTrpc.workspaces.getAllGrouped.useQuery(undefined, {
+			enabled: shouldWatch,
+		});
+	const { data: projects } = electronTrpc.projects.getRecents.useQuery(
+		undefined,
+		{
+			enabled: shouldWatch,
+		},
+	);
 	const worktreePathByWorkspaceId = useMemo(() => {
 		const pathByWorkspaceId = new Map<string, string>();
 
@@ -195,6 +204,7 @@ export function useCommandWatcher() {
 
 			let resolvedState: ResolvedCommandState;
 			try {
+				const { executeTool } = await import("./tools");
 				const result = await executeTool(tool, params, toolContext);
 
 				if (result.success) {

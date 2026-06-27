@@ -7,8 +7,8 @@ import {
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { HiChevronDown } from "react-icons/hi2";
 import {
 	getAppOption,
 	OpenInExternalDropdownItems,
@@ -116,7 +116,7 @@ export function OpenInButton({
 						disabled={!path}
 					>
 						<span>Open</span>
-						<HiChevronDown className="size-3" />
+						<ChevronDown className="size-3" />
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" className="w-48">

@@ -7,7 +7,6 @@ import {
 	AlertDialogTitle,
 } from "@superset/ui/alert-dialog";
 import { Button } from "@superset/ui/button";
-import { toast } from "@superset/ui/sonner";
 import {
 	WorkspaceClientProvider,
 	workspaceTrpc,
@@ -17,6 +16,7 @@ import {
 	getHostServiceHeaders,
 	getHostServiceWsToken,
 } from "renderer/lib/host-service-auth";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 
 const STATUS_REFETCH_MS = 5_000;

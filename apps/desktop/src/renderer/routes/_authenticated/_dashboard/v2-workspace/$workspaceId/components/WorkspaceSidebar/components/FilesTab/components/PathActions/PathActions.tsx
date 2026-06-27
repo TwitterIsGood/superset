@@ -2,9 +2,9 @@ import {
 	DropdownMenuItem,
 	DropdownMenuSeparator,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { Clipboard, Copy, FolderOpen } from "lucide-react";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
+import { toast } from "renderer/lib/toast";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 
 interface PathActionsProps {

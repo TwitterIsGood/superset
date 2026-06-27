@@ -1,4 +1,3 @@
-import { toast } from "@superset/ui/sonner";
 import {
 	BellIcon,
 	BellOffIcon,
@@ -8,6 +7,7 @@ import {
 	PanelRightIcon,
 	RefreshCwIcon,
 } from "lucide-react";
+import { toast } from "renderer/lib/toast";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { electronQueryClient } from "renderer/providers/ElectronTRPCProvider";
 import { useRightSidebarToggleIntent } from "renderer/stores/right-sidebar-toggle-intent";

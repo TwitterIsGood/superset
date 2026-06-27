@@ -1,5 +1,5 @@
 import { Button } from "@superset/ui/button";
-import { LuFileText, LuPencil, LuPlay } from "react-icons/lu";
+import { FileText, Pencil, Play } from "lucide-react";
 
 interface AutomationNoRunsPanelProps {
 	onEditPrompt: () => void;
@@ -15,7 +15,7 @@ export function AutomationNoRunsPanel({
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
 			<div className="flex size-12 items-center justify-center rounded-full border bg-muted/30">
-				<LuFileText className="size-6 text-muted-foreground" />
+				<FileText className="size-6 text-muted-foreground" />
 			</div>
 			<div>
 				<h2 className="text-sm font-medium">No runs yet</h2>
@@ -25,11 +25,11 @@ export function AutomationNoRunsPanel({
 			</div>
 			<div className="flex items-center gap-2">
 				<Button variant="outline" size="sm" onClick={onEditPrompt}>
-					<LuPencil className="size-4" />
+					<Pencil className="size-4" />
 					Edit prompt
 				</Button>
 				<Button size="sm" onClick={onRunNow} disabled={runNowDisabled}>
-					<LuPlay className="size-4" />
+					<Play className="size-4" />
 					Run now
 				</Button>
 			</div>

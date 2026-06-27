@@ -56,28 +56,12 @@ const externalizedRuntimeModules: ExternalizedRuntimeModule[] = [
 		asarUnpackGlobs: ["**/node_modules/@superset/macos-process-metrics/**/*"],
 	},
 	{
-		specifier: "@ast-grep/napi",
-		materialize: ["@ast-grep/napi"],
-		packagedCopies: [copyWholeModule("@ast-grep")],
-		asarUnpackGlobs: ["**/node_modules/@ast-grep/napi*/**/*"],
-	},
-	{
 		specifier: "@parcel/watcher",
 		materialize: ["@parcel/watcher"],
 		packagedCopies: [
 			copyModuleSubtree("@parcel", ["watcher/**/*", "watcher-*/**/*"]),
 		],
 		asarUnpackGlobs: ["**/node_modules/@parcel/watcher*/**/*"],
-	},
-	{
-		specifier: "libsql",
-		materialize: ["libsql"],
-		packagedCopies: [
-			copyWholeModule("libsql"),
-			copyWholeModule("@libsql"),
-			copyWholeModule("@neon-rs"),
-		],
-		asarUnpackGlobs: ["**/node_modules/@libsql/**/*"],
 	},
 ];
 
@@ -123,6 +107,9 @@ const packOnlyNodeModuleRoots = [
 	"node_modules/@mastra/memory",
 	"node_modules/@mastra/stagehand",
 	"node_modules/@duckdb",
+	"node_modules/@libsql",
+	"node_modules/@neon-rs",
+	"node_modules/libsql",
 	"node_modules/chromium-bidi",
 	"node_modules/patchright-core",
 	"node_modules/playwright",

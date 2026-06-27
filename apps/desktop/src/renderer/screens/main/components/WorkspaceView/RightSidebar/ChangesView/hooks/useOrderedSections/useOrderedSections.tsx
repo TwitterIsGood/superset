@@ -1,7 +1,7 @@
 import { Button } from "@superset/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
+import { Minus, Plus, Undo2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { VscAdd, VscDiscard, VscRemove } from "react-icons/vsc";
 import { getOrderedChangeSectionIds } from "renderer/stores/changes/section-order";
 import type {
 	ChangeCategory,
@@ -158,7 +158,7 @@ export function useOrderedSections({
 								onClick={onShowDiscardStagedDialog}
 								disabled={isDiscardAllStagedPending}
 							>
-								<VscDiscard className="w-3.5 h-3.5" />
+								<Undo2 className="w-3.5 h-3.5" />
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent side="bottom">Discard all staged</TooltipContent>
@@ -172,7 +172,7 @@ export function useOrderedSections({
 								onClick={onUnstageAll}
 								disabled={isUnstageAllPending}
 							>
-								<VscRemove className="w-4 h-4" />
+								<Minus className="w-4 h-4" />
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent side="bottom">Unstage all</TooltipContent>
@@ -213,7 +213,7 @@ export function useOrderedSections({
 								onClick={onShowDiscardUnstagedDialog}
 								disabled={isDiscardAllUnstagedPending}
 							>
-								<VscDiscard className="w-3.5 h-3.5" />
+								<Undo2 className="w-3.5 h-3.5" />
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent side="bottom">Discard all unstaged</TooltipContent>
@@ -227,7 +227,7 @@ export function useOrderedSections({
 								onClick={onStageAll}
 								disabled={isStageAllPending}
 							>
-								<VscAdd className="w-4 h-4" />
+								<Plus className="w-4 h-4" />
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent side="bottom">Stage all</TooltipContent>

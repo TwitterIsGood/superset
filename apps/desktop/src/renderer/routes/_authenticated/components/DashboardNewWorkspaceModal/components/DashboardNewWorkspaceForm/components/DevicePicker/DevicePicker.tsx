@@ -9,12 +9,7 @@ import {
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
 import { cn } from "@superset/ui/utils";
-import {
-	HiCheck,
-	HiChevronUpDown,
-	HiOutlineComputerDesktop,
-	HiOutlineServer,
-} from "react-icons/hi2";
+import { Check, ChevronsUpDown, Monitor, Server } from "lucide-react";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import { FormPickerTrigger } from "../../PromptGroup/components/FormPickerTrigger";
 import {
@@ -55,9 +50,9 @@ function getSelectedLabel(
 
 function getSelectedIcon(hostId: string | null, machineId: string | null) {
 	if (hostId === null || hostId === machineId) {
-		return <HiOutlineComputerDesktop className="size-4 shrink-0" />;
+		return <Monitor className="size-4 shrink-0" />;
 	}
-	return <HiOutlineServer className="size-4 shrink-0" />;
+	return <Server className="size-4 shrink-0" />;
 }
 
 export function DevicePicker({
@@ -95,21 +90,21 @@ export function DevicePicker({
 					{selectedRemoteOnline !== null && (
 						<OnlineDot online={selectedRemoteOnline} />
 					)}
-					<HiChevronUpDown className="size-3 shrink-0" />
+					<ChevronsUpDown className="size-3 shrink-0" />
 				</FormPickerTrigger>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="w-72">
 				<DropdownMenuItem onSelect={() => onSelectHostId(machineId)}>
-					<HiOutlineComputerDesktop className="size-4" />
+					<Monitor className="size-4" />
 					<span className="min-w-0 flex-1 truncate">Local Device</span>
-					{isLocal && <HiCheck className="size-4" />}
+					{isLocal && <Check className="size-4" />}
 				</DropdownMenuItem>
 				{otherHosts.length > 0 && (
 					<>
 						<DropdownMenuSeparator />
 						<DropdownMenuSub>
 							<DropdownMenuSubTrigger>
-								<HiOutlineServer className="size-4" />
+								<Server className="size-4" />
 								Other Hosts
 							</DropdownMenuSubTrigger>
 							<DropdownMenuSubContent className="w-72">
@@ -121,13 +116,13 @@ export function DevicePicker({
 											key={host.id}
 											onSelect={() => onSelectHostId(host.id)}
 										>
-											<HiOutlineServer className="size-4" />
+											<Server className="size-4" />
 											<span className="min-w-0 flex-1 truncate">
 												{host.name}
 											</span>
 											<OnlineDot online={host.isOnline} />
 											{isSelected && (
-												<HiCheck className="ml-auto size-4 shrink-0" />
+												<Check className="ml-auto size-4 shrink-0" />
 											)}
 										</DropdownMenuItem>
 									);

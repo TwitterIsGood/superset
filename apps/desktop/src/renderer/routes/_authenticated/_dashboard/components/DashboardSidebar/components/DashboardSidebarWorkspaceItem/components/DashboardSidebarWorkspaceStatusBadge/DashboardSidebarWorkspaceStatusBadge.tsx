@@ -1,5 +1,5 @@
 import { cn } from "@superset/ui/utils";
-import { LuCircleDot, LuGitMerge, LuGitPullRequest } from "react-icons/lu";
+import { CircleDot, GitMerge, GitPullRequest } from "lucide-react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import type { DashboardSidebarWorkspacePullRequest } from "../../../../types";
 
@@ -22,7 +22,7 @@ export function DashboardSidebarWorkspaceStatusBadge({
 	const config = {
 		open: {
 			icon: (
-				<LuGitPullRequest
+				<GitPullRequest
 					className={cn(iconClass, "text-emerald-500")}
 					strokeWidth={1.75}
 				/>
@@ -31,7 +31,7 @@ export function DashboardSidebarWorkspaceStatusBadge({
 		},
 		merged: {
 			icon: (
-				<LuGitMerge
+				<GitMerge
 					className={cn(iconClass, "text-purple-500")}
 					strokeWidth={1.75}
 				/>
@@ -40,7 +40,7 @@ export function DashboardSidebarWorkspaceStatusBadge({
 		},
 		closed: {
 			icon: (
-				<LuCircleDot
+				<CircleDot
 					className={cn(iconClass, "text-destructive")}
 					strokeWidth={1.75}
 				/>
@@ -49,7 +49,7 @@ export function DashboardSidebarWorkspaceStatusBadge({
 		},
 		draft: {
 			icon: (
-				<LuGitPullRequest
+				<GitPullRequest
 					className={cn(iconClass, "text-muted-foreground")}
 					strokeWidth={1.75}
 				/>

@@ -1,6 +1,6 @@
 import { ContextMenuItem } from "@superset/ui/context-menu";
 import { cn } from "@superset/ui/utils";
-import { HiCheck } from "react-icons/hi2";
+import { Check } from "lucide-react";
 import {
 	PROJECT_COLOR_DEFAULT,
 	PROJECT_COLORS,
@@ -62,7 +62,7 @@ export function ColorSelector({
 							{renderColorSwatch(color.value, variant)}
 							<span>{color.name}</span>
 							{isSelected ? (
-								<HiCheck className="ml-auto size-3.5 text-muted-foreground" />
+								<Check className="ml-auto size-3.5 text-muted-foreground" />
 							) : null}
 						</ContextMenuItem>
 					);

@@ -4,13 +4,13 @@ import type {
 	SelectedLineRange,
 } from "@pierre/diffs";
 import type { CodeViewHandle } from "@pierre/diffs/react";
-import { toast } from "@superset/ui/sonner";
 import { type RefObject, useCallback, useMemo, useRef, useState } from "react";
 import {
 	type AgentPromptFileSide,
 	formatAgentPromptWithFileContext,
 	useSendToTerminalAgent,
 } from "renderer/hooks/host-service/useSendToTerminalAgent";
+import { toast } from "renderer/lib/toast";
 import type { ChangesetFile } from "../../../../../useChangeset";
 import type { AgentTarget } from "../../components/AgentCommentComposer";
 import type { DiffAnnotationMetadata } from "../useDiffAnnotations";

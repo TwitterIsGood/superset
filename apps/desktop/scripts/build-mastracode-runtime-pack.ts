@@ -1,25 +1,9 @@
-import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import {
-	cp,
-	mkdir,
-	readdir,
-	readFile,
-	rm,
-	stat,
-	unlink,
-	writeFile,
-} from "node:fs/promises";
+import { cp, mkdir, readdir, rm, unlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
-import fg from "fast-glob";
 import { MASTRACODE_RUNTIME_PACK_ID } from "../src/lib/pack-system/pack-ids";
-import {
-	type PackFileManifest,
-	type PackManifestIndex,
-	packManifestIndexSchema,
-	packManifestSchema,
-} from "../src/main/lib/pack-system/types";
+import { packManifestSchema } from "../src/main/lib/pack-system/types";
 import {
 	getDuckdbNodeBindingsPackageName,
 	getMastracodeRuntimeNativePackageNames,
@@ -29,11 +13,13 @@ import {
 	mastracodeRuntimeSeedPackageNames,
 	shouldIncludeMastracodeRuntimeDependency,
 } from "./mastracode-runtime-pack-dependencies";
+import { buildPackArchive } from "./resource-pack-archive";
+import { writeMergedResourcePackAppIndex } from "./resource-pack-index";
+import { defaultResourcePackOutDir } from "./resource-pack-paths";
 
 const require = createRequire(import.meta.url);
 const appDir = resolve(import.meta.dirname, "..");
 const workspaceRoot = resolve(appDir, "..", "..");
-const defaultOutDir = join(appDir, "dist", "resource-packs");
 const RESOURCE_PACK_BASE_URL_ENV = "SUPERSET_RESOURCE_PACK_BASE_URL";
 const NON_RUNTIME_DIR_NAMES = new Set([
 	".github",
@@ -74,7 +60,7 @@ function fail(message: string): never {
 }
 
 function parseArgs(): BuildArgs {
-	const parsed: BuildArgs = { outDir: defaultOutDir };
+	const parsed: BuildArgs = { outDir: defaultResourcePackOutDir };
 	const args = process.argv.slice(2);
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
@@ -294,12 +280,6 @@ function collectRuntimePackages(rootPackageName: string): RuntimePackage[] {
 	);
 }
 
-async function sha256File(path: string): Promise<string> {
-	const hash = createHash("sha256");
-	hash.update(await readFile(path));
-	return hash.digest("hex");
-}
-
 async function copyRuntimePackage(args: {
 	packageInfo: RuntimePackage;
 	versionRoot: string;
@@ -424,23 +404,7 @@ async function buildManifest(args: {
 	version: string;
 	versionRoot: string;
 }) {
-	const filePaths = await fg("**/*", {
-		cwd: args.versionRoot,
-		dot: true,
-		onlyFiles: true,
-		ignore: ["manifest.json"],
-	});
-	const files: PackFileManifest[] = [];
-	for (const path of filePaths.sort()) {
-		const absolutePath = join(args.versionRoot, path);
-		const entry = await stat(absolutePath);
-		files.push({
-			path,
-			size: entry.size,
-			sha256: await sha256File(absolutePath),
-			...(entry.mode & 0o111 ? { executable: true } : {}),
-		});
-	}
+	const { archive, files } = await buildPackArchive(args.versionRoot);
 
 	return packManifestSchema.parse({
 		schemaVersion: 1,
@@ -448,6 +412,7 @@ async function buildManifest(args: {
 		version: args.version,
 		minAppVersion: args.minAppVersion,
 		downloadUrl: args.downloadUrl,
+		archive,
 		files,
 		executeHint: {
 			runtime: "node",
@@ -455,15 +420,6 @@ async function buildManifest(args: {
 			args: [MASTRA_MEMORY_RUNTIME_ENTRY],
 		},
 	});
-}
-
-async function readExistingAppIndex(
-	path: string | undefined,
-): Promise<PackManifestIndex | null> {
-	if (!path || !existsSync(path)) return null;
-	return packManifestIndexSchema.parse(
-		JSON.parse(await readFile(path, "utf8")),
-	);
 }
 
 async function main() {
@@ -517,22 +473,13 @@ async function main() {
 		)}\n`,
 	);
 
-	const existingAppIndex = await readExistingAppIndex(args.appIndexOut);
-	const appIndex = packManifestIndexSchema.parse({
-		schemaVersion: 1,
+	await writeMergedResourcePackAppIndex({
+		appIndexOut: args.appIndexOut,
 		generatedAt,
-		packs: {
-			...(existingAppIndex?.packs ?? {}),
-			[MASTRACODE_RUNTIME_PACK_ID]: [manifest],
-		},
+		manifest,
+		outDir: args.outDir,
+		packId: MASTRACODE_RUNTIME_PACK_ID,
 	});
-	const appIndexJson = `${JSON.stringify(appIndex, null, 2)}\n`;
-	const packAppIndexPath = join(args.outDir, "pack-manifest-index.json");
-	await writeFile(packAppIndexPath, appIndexJson);
-	if (args.appIndexOut) {
-		await mkdir(dirname(args.appIndexOut), { recursive: true });
-		await writeFile(args.appIndexOut, appIndexJson);
-	}
 
 	const totalBytes = manifest.files.reduce((sum, file) => sum + file.size, 0);
 	console.log("# MastraCode Runtime Pack");
@@ -543,7 +490,9 @@ async function main() {
 	console.log(`- Bytes: ${totalBytes}`);
 	console.log(`- DuckDB binding: ${getDuckdbNodeBindingsPackageName()}`);
 	console.log(`- Output: ${relative(process.cwd(), versionRoot)}`);
-	console.log(`- App index: ${relative(process.cwd(), packAppIndexPath)}`);
+	console.log(
+		`- App index: ${relative(process.cwd(), join(args.outDir, "pack-manifest-index.json"))}`,
+	);
 	if (args.appIndexOut) {
 		console.log(
 			`- Embedded index: ${relative(process.cwd(), args.appIndexOut)}`,

@@ -20,7 +20,7 @@ import {
 	isIgnorableKey,
 	normalizeToken,
 	TERMINAL_RESERVED_CHORDS,
-} from "../../utils/resolveHotkeyFromEvent";
+} from "../../utils/hotkey-chord";
 
 // Matches the registry's written modifier order (`meta+alt+up`) so recorded
 // strings stay visually aligned with defaults. Canonicalization handles

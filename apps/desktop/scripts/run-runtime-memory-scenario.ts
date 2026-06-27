@@ -119,6 +119,20 @@ interface ConsoleLogEntry {
 	timestamp: number;
 }
 
+interface LifecycleRoleDelta {
+	label: string;
+	fromSnapshot: string;
+	toSnapshot: string;
+	elapsedMs: number;
+	role: ProcessRole;
+	startMemoryBytes: number;
+	endMemoryBytes: number;
+	memoryDeltaBytes: number;
+	startProcessCount: number;
+	endProcessCount: number;
+	processCountDelta: number;
+}
+
 interface ProcessSummary {
 	pid: number;
 	role: ProcessRole;
@@ -154,6 +168,7 @@ interface MemoryScenarioReport {
 	snapshots: MemorySnapshot[];
 	actions: ScenarioAction[];
 	consoleErrors: ConsoleLogEntry[];
+	lifecycleRoleDeltas: LifecycleRoleDelta[];
 	topProcessesByMemory: ProcessSummary[];
 	outputs: {
 		markdownPath: string;
@@ -163,7 +178,11 @@ interface MemoryScenarioReport {
 
 const desktopDir = resolve(import.meta.dirname, "..");
 const rootDir = resolve(desktopDir, "../..");
-const defaultReportDir = resolve(desktopDir, "performance-reports");
+const defaultReportDir = resolve(
+	rootDir,
+	".tmp",
+	"desktop-performance-reports",
+);
 const defaultIdleMs = 60 * 60 * 1000;
 const defaultSampleIntervalMs = 30_000;
 const execTimeoutMs = 15_000;
@@ -1146,6 +1165,56 @@ function summarizeProcesses(
 		.slice(0, topLimit);
 }
 
+function groupMetricsByRole(
+	sample: ProcessSample,
+): Map<ProcessRole, GroupMetrics> {
+	return new Map(sample.groups.map((group) => [group.role, group]));
+}
+
+export function buildLifecycleRoleDeltas(
+	snapshots: MemorySnapshot[],
+): LifecycleRoleDelta[] {
+	const deltas: LifecycleRoleDelta[] = [];
+	for (let index = 1; index < snapshots.length; index += 1) {
+		const from = snapshots[index - 1];
+		const to = snapshots[index];
+		const fromGroups = groupMetricsByRole(from.process);
+		const toGroups = groupMetricsByRole(to.process);
+		const roles = new Set<ProcessRole>([
+			...fromGroups.keys(),
+			...toGroups.keys(),
+		]);
+
+		for (const role of roles) {
+			const start = fromGroups.get(role);
+			const end = toGroups.get(role);
+			const startMemoryBytes = start?.memoryBytes ?? 0;
+			const endMemoryBytes = end?.memoryBytes ?? 0;
+			const startProcessCount = start?.count ?? 0;
+			const endProcessCount = end?.count ?? 0;
+			const memoryDeltaBytes = endMemoryBytes - startMemoryBytes;
+			const processCountDelta = endProcessCount - startProcessCount;
+			if (memoryDeltaBytes === 0 && processCountDelta === 0) continue;
+
+			deltas.push({
+				label: `${from.label} -> ${to.label}`,
+				fromSnapshot: from.label,
+				toSnapshot: to.label,
+				elapsedMs: Math.max(0, to.process.elapsedMs - from.process.elapsedMs),
+				role,
+				startMemoryBytes,
+				endMemoryBytes,
+				memoryDeltaBytes,
+				startProcessCount,
+				endProcessCount,
+				processCountDelta,
+			});
+		}
+	}
+
+	return deltas;
+}
+
 function buildSummary(
 	snapshots: MemorySnapshot[],
 	actions: ScenarioAction[],
@@ -1336,6 +1405,20 @@ function processRows(processes: ProcessSummary[]): string[][] {
 	]);
 }
 
+function lifecycleRoleDeltaRows(deltas: LifecycleRoleDelta[]): string[][] {
+	return deltas.map((delta) => [
+		delta.label,
+		formatMs(delta.elapsedMs),
+		delta.role,
+		`${formatBytes(delta.startMemoryBytes)} -> ${formatBytes(delta.endMemoryBytes)}`,
+		formatBytes(delta.memoryDeltaBytes),
+		`${delta.startProcessCount} -> ${delta.endProcessCount}`,
+		delta.processCountDelta > 0
+			? `+${delta.processCountDelta}`
+			: String(delta.processCountDelta),
+	]);
+}
+
 function renderMarkdown(report: MemoryScenarioReport): string {
 	const { summary } = report;
 	const failedActions = actionRows(report.actions);
@@ -1396,6 +1479,10 @@ ${budgetLines}
 ## Snapshots
 
 ${markdownTable(["Label", "Elapsed", "Desktop memory", "Desktop procs", "All memory", "All procs", "DOM nodes", "JS heap", "Renderer error"], snapshotRows(report.snapshots))}
+
+## Role Memory Deltas By Lifecycle Step
+
+${markdownTable(["Step", "Elapsed", "Role", "Memory", "Memory delta", "Processes", "Process delta"], lifecycleRoleDeltaRows(report.lifecycleRoleDeltas))}
 
 ## Failed Actions
 
@@ -1482,6 +1569,7 @@ async function main(): Promise<void> {
 		snapshots,
 		actions,
 		consoleErrors,
+		lifecycleRoleDeltas: buildLifecycleRoleDeltas(snapshots),
 		topProcessesByMemory: summarizeProcesses(snapshots, options.topLimit),
 		outputs: {
 			markdownPath,

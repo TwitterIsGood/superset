@@ -1,4 +1,4 @@
-import { toast } from "@superset/ui/sonner";
+import { toast } from "renderer/lib/toast";
 import { TemplateGalleryModal } from "renderer/routes/_authenticated/components/TemplateGalleryModal";
 import {
 	useAddRepositoryModalActive,

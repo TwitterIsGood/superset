@@ -1,7 +1,7 @@
-import { toast } from "@superset/ui/sonner";
 import { useCallback } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import type { DetectedLink } from "renderer/lib/terminal/links";
+import { toast } from "renderer/lib/toast";
 import { electronTrpcClient as trpcClient } from "renderer/lib/trpc-client";
 import { useTabsStore } from "renderer/stores/tabs/store";
 

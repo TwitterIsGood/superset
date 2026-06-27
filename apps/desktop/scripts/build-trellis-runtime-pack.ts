@@ -1,29 +1,25 @@
-import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import {
 	chmod,
 	cp,
 	mkdir,
-	readFile,
+	readdir,
 	rm,
-	stat,
+	unlink,
 	writeFile,
 } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
-import fg from "fast-glob";
 import { TRELLIS_RUNTIME_PACK_ID } from "../src/lib/pack-system/pack-ids";
-import {
-	type PackFileManifest,
-	packManifestIndexSchema,
-	packManifestSchema,
-} from "../src/main/lib/pack-system/types";
+import { packManifestSchema } from "../src/main/lib/pack-system/types";
+import { buildPackArchive } from "./resource-pack-archive";
+import { writeMergedResourcePackAppIndex } from "./resource-pack-index";
+import { defaultResourcePackOutDir } from "./resource-pack-paths";
 import { trellisRuntimePackResourceCopies } from "./trellis-runtime-pack-dependencies";
 
 const require = createRequire(import.meta.url);
 const appDir = resolve(import.meta.dirname, "..");
 const workspaceRoot = resolve(appDir, "..", "..");
-const defaultOutDir = join(appDir, "dist", "resource-packs");
 const RESOURCE_PACK_BASE_URL_ENV = "SUPERSET_RESOURCE_PACK_BASE_URL";
 
 interface BuildArgs {
@@ -40,7 +36,7 @@ function fail(message: string): never {
 }
 
 function parseArgs(): BuildArgs {
-	const parsed: BuildArgs = { outDir: defaultOutDir };
+	const parsed: BuildArgs = { outDir: defaultResourcePackOutDir };
 	const args = process.argv.slice(2);
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
@@ -171,12 +167,6 @@ function resolveCopySource(from: string, trellisRoot: string): string {
 	return resolvePackageRoot(packageName, searchPaths);
 }
 
-async function sha256File(path: string): Promise<string> {
-	const hash = createHash("sha256");
-	hash.update(await readFile(path));
-	return hash.digest("hex");
-}
-
 async function copyRuntimeModule(args: {
 	from: string;
 	to: string;
@@ -193,6 +183,40 @@ async function copyRuntimeModule(args: {
 		filter: (sourcePath) =>
 			!sourcePath.includes(`${join("node_modules", ".cache")}`),
 	});
+}
+
+async function pruneFigletFonts(versionRoot: string): Promise<number> {
+	const figletRoot = join(versionRoot, "node_modules", "figlet");
+	const fontDirs = [
+		{
+			dir: join(figletRoot, "fonts"),
+			keep: new Set(["Rebel.flf"]),
+		},
+		{
+			dir: join(figletRoot, "importable-fonts"),
+			keep: new Set(["Rebel.js", "Rebel.d.ts"]),
+		},
+	];
+	let removedCount = 0;
+
+	for (const { dir, keep } of fontDirs) {
+		if (!existsSync(dir)) continue;
+		for (const entry of await readdir(dir, { withFileTypes: true })) {
+			const path = join(dir, entry.name);
+			if (keep.has(entry.name)) continue;
+			if (entry.isDirectory()) {
+				await rm(path, { force: true, recursive: true });
+				removedCount += 1;
+				continue;
+			}
+			if (entry.isFile()) {
+				await unlink(path);
+				removedCount += 1;
+			}
+		}
+	}
+
+	return removedCount;
 }
 
 function ensureTrailingSlash(value: string): string {
@@ -215,23 +239,7 @@ async function buildManifest(args: {
 	version: string;
 	versionRoot: string;
 }) {
-	const filePaths = await fg("**/*", {
-		cwd: args.versionRoot,
-		dot: true,
-		onlyFiles: true,
-		ignore: ["manifest.json"],
-	});
-	const files: PackFileManifest[] = [];
-	for (const path of filePaths.sort()) {
-		const absolutePath = join(args.versionRoot, path);
-		const entry = await stat(absolutePath);
-		files.push({
-			path,
-			size: entry.size,
-			sha256: await sha256File(absolutePath),
-			...(entry.mode & 0o111 ? { executable: true } : {}),
-		});
-	}
+	const { archive, files } = await buildPackArchive(args.versionRoot);
 
 	return packManifestSchema.parse({
 		schemaVersion: 1,
@@ -239,6 +247,7 @@ async function buildManifest(args: {
 		version: args.version,
 		minAppVersion: args.minAppVersion,
 		downloadUrl: args.downloadUrl,
+		archive,
 		files,
 		executeHint: {
 			runtime: "node",
@@ -270,6 +279,24 @@ async function main() {
 			versionRoot,
 		});
 	}
+	const prunedFigletFonts = await pruneFigletFonts(versionRoot);
+	if (prunedFigletFonts > 0) {
+		console.log(
+			`[build:trellis-pack] pruned ${prunedFigletFonts} unused figlet font file(s)`,
+		);
+	}
+
+	const trellisBin = join(
+		versionRoot,
+		"node_modules",
+		"@mindfoldhq",
+		"trellis",
+		"bin",
+		"trellis.js",
+	);
+	if (existsSync(trellisBin)) {
+		await chmod(trellisBin, 0o755);
+	}
 
 	const manifest = await buildManifest({
 		version,
@@ -298,38 +325,21 @@ async function main() {
 		)}\n`,
 	);
 
-	const appIndex = packManifestIndexSchema.parse({
-		schemaVersion: 1,
+	await writeMergedResourcePackAppIndex({
+		appIndexOut: args.appIndexOut,
 		generatedAt,
-		packs: {
-			[TRELLIS_RUNTIME_PACK_ID]: [manifest],
-		},
+		manifest,
+		outDir: args.outDir,
+		packId: TRELLIS_RUNTIME_PACK_ID,
 	});
-	const appIndexJson = `${JSON.stringify(appIndex, null, 2)}\n`;
-	const packAppIndexPath = join(args.outDir, "pack-manifest-index.json");
-	await writeFile(packAppIndexPath, appIndexJson);
-	if (args.appIndexOut) {
-		await mkdir(dirname(args.appIndexOut), { recursive: true });
-		await writeFile(args.appIndexOut, appIndexJson);
-	}
-
-	const trellisBin = join(
-		versionRoot,
-		"node_modules",
-		"@mindfoldhq",
-		"trellis",
-		"bin",
-		"trellis.js",
-	);
-	if (existsSync(trellisBin)) {
-		await chmod(trellisBin, 0o755);
-	}
 
 	console.log("# Trellis Runtime Pack");
 	console.log(`- Version: ${version}`);
 	console.log(`- Files: ${manifest.files.length}`);
 	console.log(`- Output: ${relative(process.cwd(), versionRoot)}`);
-	console.log(`- App index: ${relative(process.cwd(), packAppIndexPath)}`);
+	console.log(
+		`- App index: ${relative(process.cwd(), join(args.outDir, "pack-manifest-index.json"))}`,
+	);
 	if (args.appIndexOut) {
 		console.log(
 			`- Embedded index: ${relative(process.cwd(), args.appIndexOut)}`,

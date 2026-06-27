@@ -1,6 +1,6 @@
-import { toast } from "@superset/ui/sonner";
 import { useCallback } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import type { ChangedFile } from "shared/changes-types";
 
 export function useFileMutations({

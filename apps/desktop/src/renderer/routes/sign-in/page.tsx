@@ -1,13 +1,13 @@
 import { type AuthProvider, COMPANY } from "@superset/shared/constants";
 import { Button } from "@superset/ui/button";
+import googleColorIcon from "@superset/ui/icons/model-providers/lobe/google-color.svg";
 import { Input } from "@superset/ui/input";
 import { Label } from "@superset/ui/label";
 import { Spinner } from "@superset/ui/spinner";
 import { cn } from "@superset/ui/utils";
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
+import { Github } from "lucide-react";
 import { type FormEvent, useState } from "react";
-import { FaGithub } from "react-icons/fa";
-import { FcGoogle } from "react-icons/fc";
 import { env } from "renderer/env.renderer";
 import { track } from "renderer/lib/analytics";
 import { authClient, setAuthToken, setJwt } from "renderer/lib/auth-client";
@@ -325,7 +325,7 @@ function SignInPage() {
 							className="w-full gap-3"
 							disabled={isBusy}
 						>
-							<FaGithub className="size-5" />
+							<Github className="size-5" />
 							Continue with GitHub
 						</Button>
 
@@ -336,7 +336,7 @@ function SignInPage() {
 							className="w-full gap-3"
 							disabled={isBusy}
 						>
-							<FcGoogle className="size-5" />
+							<img src={googleColorIcon} alt="" className="size-5" />
 							Continue with Google
 						</Button>
 					</div>

@@ -1,14 +1,14 @@
 import { Button } from "@superset/ui/button";
 import { Kbd, KbdGroup } from "@superset/ui/kbd";
 import { formatDistanceToNow } from "date-fns";
-import { FaGithub } from "react-icons/fa";
 import {
-	LuExternalLink,
-	LuGlobe,
-	LuLoaderCircle,
-	LuPencil,
-	LuTriangleAlert,
-} from "react-icons/lu";
+	ExternalLink,
+	Github,
+	Globe,
+	LoaderCircle,
+	Pencil,
+	TriangleAlert,
+} from "lucide-react";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { usePRStatus } from "renderer/screens/main/hooks";
@@ -56,7 +56,7 @@ export function WorkspaceHoverCardContent({
 			asChild
 		>
 			<a href={previewUrl} target="_blank" rel="noopener noreferrer">
-				<LuGlobe className="size-3" strokeWidth={STROKE_WIDTH} />
+				<Globe className="size-3" strokeWidth={STROKE_WIDTH} />
 				Open Preview
 			</a>
 		</Button>
@@ -92,7 +92,7 @@ export function WorkspaceHoverCardContent({
 									title="Rename branch"
 								>
 									<span className="break-all">{branchName}</span>
-									<LuPencil
+									<Pencil
 										className="size-3 shrink-0 opacity-0 group-hover/branch:opacity-100 transition-opacity"
 										strokeWidth={STROKE_WIDTH}
 									/>
@@ -113,10 +113,7 @@ export function WorkspaceHoverCardContent({
 									title="Open branch on GitHub"
 									onClick={(e) => e.stopPropagation()}
 								>
-									<LuExternalLink
-										className="size-3"
-										strokeWidth={STROKE_WIDTH}
-									/>
+									<ExternalLink className="size-3" strokeWidth={STROKE_WIDTH} />
 								</a>
 							)}
 						</div>
@@ -131,7 +128,7 @@ export function WorkspaceHoverCardContent({
 
 			{needsRebase && (
 				<div className="flex items-center gap-2 text-amber-500 text-xs bg-amber-500/10 px-2 py-1.5 rounded-md">
-					<LuTriangleAlert
+					<TriangleAlert
 						className="size-3.5 shrink-0"
 						strokeWidth={STROKE_WIDTH}
 					/>
@@ -144,7 +141,7 @@ export function WorkspaceHoverCardContent({
 
 			{isLoadingGithub ? (
 				<div className="flex items-center gap-2 text-muted-foreground pt-2 border-t border-border">
-					<LuLoaderCircle
+					<LoaderCircle
 						className="size-3 animate-spin"
 						strokeWidth={STROKE_WIDTH}
 					/>
@@ -191,7 +188,7 @@ export function WorkspaceHoverCardContent({
 						asChild
 					>
 						<a href={pr.url} target="_blank" rel="noopener noreferrer">
-							<FaGithub className="size-3" />
+							<Github className="size-3" />
 							View on GitHub
 							{hasOpenPRShortcut && (
 								<KbdGroup className="ml-auto">

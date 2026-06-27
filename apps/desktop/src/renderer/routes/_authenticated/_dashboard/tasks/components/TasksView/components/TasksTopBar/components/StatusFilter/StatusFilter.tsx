@@ -1,13 +1,7 @@
 import { Button } from "@superset/ui/button";
-import {
-	Command,
-	CommandGroup,
-	CommandItem,
-	CommandList,
-} from "@superset/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
-import { useState } from "react";
-import { HiCheck, HiChevronDown } from "react-icons/hi2";
+import { Popover, PopoverTrigger } from "@superset/ui/popover";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down.js";
+import { lazy, Suspense, useState } from "react";
 import { ActiveIcon } from "../../../shared/icons/ActiveIcon";
 import { AllIssuesIcon } from "../../../shared/icons/AllIssuesIcon";
 import { BacklogIcon } from "../../../shared/icons/BacklogIcon";
@@ -28,6 +22,14 @@ const OPTIONS: ReadonlyArray<{
 	{ value: "active", label: "Active", Icon: ActiveIcon },
 	{ value: "backlog", label: "Backlog", Icon: BacklogIcon },
 ];
+
+const StatusFilterMenuContent = lazy(() =>
+	import("./components/StatusFilterMenuContent/StatusFilterMenuContent").then(
+		(module) => ({
+			default: module.StatusFilterMenuContent,
+		}),
+	),
+);
 
 export function StatusFilter({ value, onChange }: StatusFilterProps) {
 	const [open, setOpen] = useState(false);
@@ -51,32 +53,14 @@ export function StatusFilter({ value, onChange }: StatusFilterProps) {
 				>
 					<SelectedIcon className="size-3.5" />
 					<span className="text-sm hidden @4xl:inline">{selected.label}</span>
-					<HiChevronDown className="size-3" />
+					<ChevronDown className="size-3" />
 				</Button>
 			</PopoverTrigger>
-			<PopoverContent align="start" className="w-44 p-0">
-				<Command>
-					<CommandList>
-						<CommandGroup>
-							{OPTIONS.map((option) => {
-								const Icon = option.Icon;
-								return (
-									<CommandItem
-										key={option.value}
-										onSelect={() => handleSelect(option.value)}
-									>
-										<Icon className="size-3.5 shrink-0" />
-										<span className="text-sm">{option.label}</span>
-										{option.value === value && (
-											<HiCheck className="ml-auto size-3.5" />
-										)}
-									</CommandItem>
-								);
-							})}
-						</CommandGroup>
-					</CommandList>
-				</Command>
-			</PopoverContent>
+			{open ? (
+				<Suspense fallback={null}>
+					<StatusFilterMenuContent value={value} onSelect={handleSelect} />
+				</Suspense>
+			) : null}
 		</Popover>
 	);
 }

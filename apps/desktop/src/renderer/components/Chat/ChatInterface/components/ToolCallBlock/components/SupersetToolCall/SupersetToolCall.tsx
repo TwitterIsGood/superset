@@ -1,7 +1,7 @@
 import {
 	MessageResponse,
 	TOOL_CALL_MD_CLASSNAME,
-} from "@superset/ui/ai-elements/message";
+} from "@superset/ui/ai-elements/message-response";
 import { ToolCallRow } from "@superset/ui/ai-elements/tool-call-row";
 import { WrenchIcon } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";

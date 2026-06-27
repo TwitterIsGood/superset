@@ -9,14 +9,8 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { format } from "date-fns";
+import { Ellipsis, Eye, EyeOff, Lock, SquareCode } from "lucide-react";
 import { useCallback, useState } from "react";
-import {
-	HiEllipsisHorizontal,
-	HiEye,
-	HiEyeSlash,
-	HiLockClosed,
-	HiOutlineCodeBracket,
-} from "react-icons/hi2";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 
@@ -78,9 +72,9 @@ export function SecretRow({
 		>
 			<div className="flex items-center justify-center size-9 rounded-full border bg-background shrink-0">
 				{secret.sensitive ? (
-					<HiLockClosed className="h-4 w-4 text-muted-foreground" />
+					<Lock className="h-4 w-4 text-muted-foreground" />
 				) : (
-					<HiOutlineCodeBracket className="h-4 w-4 text-muted-foreground" />
+					<SquareCode className="h-4 w-4 text-muted-foreground" />
 				)}
 			</div>
 
@@ -107,9 +101,9 @@ export function SecretRow({
 								className="text-muted-foreground hover:text-foreground transition-colors p-1"
 							>
 								{isRevealed ? (
-									<HiEyeSlash className="h-4 w-4" />
+									<EyeOff className="h-4 w-4" />
 								) : (
-									<HiEye className="h-4 w-4" />
+									<Eye className="h-4 w-4" />
 								)}
 							</button>
 							{isRevealed ? (
@@ -154,7 +148,7 @@ export function SecretRow({
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-						<HiEllipsisHorizontal className="h-4 w-4" />
+						<Ellipsis className="h-4 w-4" />
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end">

@@ -5,17 +5,17 @@ import type {
 import { formatDateTimeInTimezone } from "@superset/shared/rrule";
 import { Badge } from "@superset/ui/badge";
 import { Button } from "@superset/ui/button";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
 import {
-	LuClipboard,
-	LuFileText,
-	LuMessageSquare,
-	LuPencil,
-	LuTerminal,
-} from "react-icons/lu";
+	Clipboard,
+	FileText,
+	MessageSquare,
+	Pencil,
+	Terminal,
+} from "lucide-react";
 import { MarkdownRenderer } from "renderer/components/MarkdownRenderer";
+import { toast } from "renderer/lib/toast";
 import {
 	getAutomationRunError,
 	getAutomationRunSourceLabel,
@@ -85,7 +85,7 @@ export function AutomationRunResultPanel({
 	if (!run) {
 		return (
 			<div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
-				<LuFileText className="size-8 text-muted-foreground" />
+				<FileText className="size-8 text-muted-foreground" />
 				<div>
 					<h2 className="text-sm font-medium">
 						{loading ? "Loading run..." : "Run not found"}
@@ -97,7 +97,7 @@ export function AutomationRunResultPanel({
 					</p>
 				</div>
 				<Button variant="outline" size="sm" onClick={onEditPrompt}>
-					<LuPencil className="size-4" />
+					<Pencil className="size-4" />
 					Edit prompt
 				</Button>
 			</div>
@@ -162,10 +162,10 @@ export function AutomationRunResultPanel({
 					</div>
 					<div className="flex shrink-0 items-center gap-2">
 						<Button variant="ghost" size="icon-sm" onClick={copyRunId}>
-							<LuClipboard className="size-4" />
+							<Clipboard className="size-4" />
 						</Button>
 						<Button variant="outline" size="sm" onClick={onEditPrompt}>
-							<LuPencil className="size-4" />
+							<Pencil className="size-4" />
 							Edit prompt
 						</Button>
 						<Button
@@ -175,9 +175,9 @@ export function AutomationRunResultPanel({
 							disabled={!hasDebugSession}
 						>
 							{run.sessionKind === "chat" ? (
-								<LuMessageSquare className="size-4" />
+								<MessageSquare className="size-4" />
 							) : (
-								<LuTerminal className="size-4" />
+								<Terminal className="size-4" />
 							)}
 							Open {run.sessionKind === "chat" ? "chat" : "terminal"}
 						</Button>

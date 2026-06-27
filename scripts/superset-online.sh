@@ -33,6 +33,7 @@ PUBLIC_WEB_URL="${SUPERSET_PUBLIC_WEB_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:6
 PUBLIC_API_URL="${SUPERSET_PUBLIC_API_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63001}"
 PUBLIC_ELECTRIC_URL="${SUPERSET_PUBLIC_ELECTRIC_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63012}"
 PUBLIC_RELAY_URL="${SUPERSET_PUBLIC_RELAY_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63013}"
+PUBLIC_RESOURCE_PACK_BASE_URL="${SUPERSET_RESOURCE_PACK_BASE_URL:-}"
 MOBILE_PROFILE="${SUPERSET_MOBILE_PROFILE:-online-canary}"
 
 HOST_DATABASE_URL="postgres://postgres:postgres@localhost:${ONLINE_PG_PORT}/main"
@@ -93,12 +94,12 @@ apply_host_env() {
 	export LOCAL_KV_REST_PORT="$ONLINE_KV_REST_PORT"
 	export LOCAL_S3_PORT="$ONLINE_S3_PORT"
 	export LOCAL_S3_CONSOLE_PORT="$ONLINE_S3_CONSOLE_PORT"
-	export LOCAL_S3_CONSOLE_BIND_HOST="${LOCAL_S3_CONSOLE_BIND_HOST:-127.0.0.1}"
 	if [[ "${SUPERSET_ONLINE_EXPOSE_RESOURCE_PACKS_PUBLIC:-0}" == "1" ]]; then
 		export LOCAL_S3_BIND_HOST="${LOCAL_S3_BIND_HOST:-0.0.0.0}"
 	else
 		export LOCAL_S3_BIND_HOST="${LOCAL_S3_BIND_HOST:-127.0.0.1}"
 	fi
+	export LOCAL_S3_CONSOLE_BIND_HOST="${LOCAL_S3_CONSOLE_BIND_HOST:-127.0.0.1}"
 
 	export DATABASE_URL="$HOST_DATABASE_URL"
 	export DATABASE_URL_UNPOOLED="$HOST_DATABASE_URL_UNPOOLED"
@@ -511,10 +512,10 @@ exit 1
 
 start_data_services() {
 	log "starting Docker data services on 430xx ports"
-	compose up -d --no-build postgres electric redis minio
-	if ! compose up -d --no-build kv-rest; then
+	compose up -d --remove-orphans --no-build postgres electric redis minio
+	if ! compose up -d --remove-orphans --no-build kv-rest; then
 		log "kv-rest image missing; building it once"
-		compose up -d --build kv-rest
+		compose up -d --remove-orphans --build kv-rest
 	fi
 	compose rm -sf minio-init >/dev/null 2>&1 || true
 	cleanup_stale_minio_init_containers
@@ -659,8 +660,33 @@ print_desktop_perf_fixture_status() {
 	fi
 }
 
+minio_api_published_host() {
+	if ! docker info >/dev/null 2>&1; then
+		return 1
+	fi
+
+	local published
+	published="$(docker port "${COMPOSE_PROJECT_NAME}-minio-1" 9000/tcp 2>/dev/null | head -1 || true)"
+	if [[ -z "$published" ]]; then
+		return 1
+	fi
+
+	printf '%s\n' "${published%:*}"
+}
+
+minio_api_is_public() {
+	local host="${1:-}"
+	[[ "$host" == "0.0.0.0" || "$host" == "::" || "$host" == "[::]" ]]
+}
+
 print_status() {
 	prepare_env
+	local runtime_s3_bind_host="$LOCAL_S3_BIND_HOST"
+	local published_s3_host
+	if published_s3_host="$(minio_api_published_host)"; then
+		runtime_s3_bind_host="$published_s3_host"
+	fi
+
 	echo "online local ports:"
 	echo "  web              http://localhost:${ONLINE_WEB_PORT}"
 	echo "  api              http://localhost:${ONLINE_API_PORT}"
@@ -670,14 +696,22 @@ print_status() {
 	echo "  electric         localhost:${ONLINE_ELECTRIC_PORT}"
 	echo "  redis            localhost:${ONLINE_REDIS_PORT}"
 	echo "  kv-rest          localhost:${ONLINE_KV_REST_PORT}"
-	echo "  object-storage   localhost:${ONLINE_S3_PORT}"
-	echo "  object-console   localhost:${ONLINE_S3_CONSOLE_PORT}"
+	echo "  object-storage   ${runtime_s3_bind_host}:${ONLINE_S3_PORT}"
+	echo "  object-console   ${LOCAL_S3_CONSOLE_BIND_HOST}:${ONLINE_S3_CONSOLE_PORT}"
 	echo
 	echo "public router targets:"
 	echo "  63000 -> ${ONLINE_WEB_PORT}"
 	echo "  63001 -> ${ONLINE_API_PORT}"
 	echo "  63012 -> ${ONLINE_ELECTRIC_PROXY_PORT}"
 	echo "  63013 -> ${ONLINE_RELAY_PORT}"
+	if minio_api_is_public "$runtime_s3_bind_host"; then
+		echo "  6XXXX -> ${ONLINE_S3_PORT}  (resource-pack downloads only; do not expose ${ONLINE_S3_CONSOLE_PORT})"
+	else
+		echo "  resource packs: set SUPERSET_ONLINE_EXPOSE_RESOURCE_PACKS_PUBLIC=1 before start if a router must reach MinIO"
+	fi
+	if [[ -n "$PUBLIC_RESOURCE_PACK_BASE_URL" ]]; then
+		echo "  resource pack base URL: ${PUBLIC_RESOURCE_PACK_BASE_URL}"
+	fi
 	echo
 	echo "docker compose project: $COMPOSE_PROJECT_NAME"
 	if docker info >/dev/null 2>&1; then
@@ -730,7 +764,7 @@ stop_all() {
 	ensure_prereqs
 	stop_legacy_host_services
 	log "stopping Docker online stack"
-	compose down
+	compose down --remove-orphans
 }
 
 restart_all() {

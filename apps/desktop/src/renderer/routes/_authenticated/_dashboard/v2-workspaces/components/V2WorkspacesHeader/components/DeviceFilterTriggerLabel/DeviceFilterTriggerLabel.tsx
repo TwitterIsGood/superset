@@ -1,5 +1,5 @@
 import { cn } from "@superset/ui/utils";
-import { LuLaptop, LuLayers, LuMonitor } from "react-icons/lu";
+import { Laptop, Layers, Monitor } from "lucide-react";
 import {
 	DEVICE_FILTER_ALL,
 	DEVICE_FILTER_THIS_DEVICE,
@@ -17,7 +17,7 @@ export function DeviceFilterTriggerLabel({
 	if (deviceFilter === DEVICE_FILTER_ALL) {
 		return (
 			<span className="flex items-center gap-2">
-				<LuLayers className="size-3.5" />
+				<Layers className="size-3.5" />
 				<span>All devices</span>
 			</span>
 		);
@@ -25,14 +25,14 @@ export function DeviceFilterTriggerLabel({
 	if (deviceFilter === DEVICE_FILTER_THIS_DEVICE) {
 		return (
 			<span className="flex items-center gap-2">
-				<LuLaptop className="size-3.5" />
+				<Laptop className="size-3.5" />
 				<span>This device</span>
 			</span>
 		);
 	}
 	return (
 		<span className="flex min-w-0 items-center gap-2">
-			<LuMonitor className="size-3.5" />
+			<Monitor className="size-3.5" />
 			<span className="min-w-0 truncate">
 				{selectedRemoteHost?.hostName ?? "Unknown device"}
 			</span>

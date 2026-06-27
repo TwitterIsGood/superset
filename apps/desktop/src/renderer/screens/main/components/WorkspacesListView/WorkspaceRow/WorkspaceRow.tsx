@@ -4,18 +4,18 @@ import {
 	ContextMenuItem,
 	ContextMenuTrigger,
 } from "@superset/ui/context-menu";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import {
-	LuArrowRight,
-	LuExternalLink,
-	LuFolder,
-	LuFolderGit2,
-	LuRotateCw,
-} from "react-icons/lu";
+	ArrowRight,
+	ExternalLink,
+	Folder,
+	FolderGit2,
+	RotateCw,
+} from "lucide-react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useHoverGitHubStatus } from "renderer/lib/githubQueryPolicy";
+import { toast } from "renderer/lib/toast";
 import { useWorkspaceDeleteHandler } from "renderer/react-query/workspaces/useWorkspaceDeleteHandler";
 import { STROKE_WIDTH } from "../../WorkspaceSidebar/constants";
 import { DeleteWorkspaceDialog } from "../../WorkspaceSidebar/WorkspaceListItem/components/DeleteWorkspaceDialog/DeleteWorkspaceDialog";
@@ -96,12 +96,12 @@ export function WorkspaceRow({
 						)}
 					>
 						{isBranch ? (
-							<LuFolder
+							<Folder
 								className="size-4 text-muted-foreground"
 								strokeWidth={STROKE_WIDTH}
 							/>
 						) : (
-							<LuFolderGit2
+							<FolderGit2
 								className="size-4 text-muted-foreground"
 								strokeWidth={STROKE_WIDTH}
 							/>
@@ -165,18 +165,18 @@ export function WorkspaceRow({
 			<div className="hidden group-hover:flex items-center gap-1.5 text-xs shrink-0">
 				{isOpening ? (
 					<>
-						<LuRotateCw className="size-3 animate-spin text-foreground/60" />
+						<RotateCw className="size-3 animate-spin text-foreground/60" />
 						<span className="text-foreground/60">Opening...</span>
 					</>
 				) : workspace.isOpen ? (
 					<>
 						<span className="font-medium text-foreground/80">Switch to</span>
-						<LuArrowRight className="size-3 text-foreground/80" />
+						<ArrowRight className="size-3 text-foreground/80" />
 					</>
 				) : (
 					<>
 						<span className="font-medium text-foreground/80">Reopen</span>
-						<LuArrowRight className="size-3 text-foreground/80" />
+						<ArrowRight className="size-3 text-foreground/80" />
 					</>
 				)}
 			</div>
@@ -201,10 +201,7 @@ export function WorkspaceRow({
 				<ContextMenuTrigger asChild>{button}</ContextMenuTrigger>
 				<ContextMenuContent>
 					<ContextMenuItem onSelect={handleOpenInEditor}>
-						<LuExternalLink
-							className="size-4 mr-2"
-							strokeWidth={STROKE_WIDTH}
-						/>
+						<ExternalLink className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 						Open in Editor
 					</ContextMenuItem>
 					<ContextMenuItem

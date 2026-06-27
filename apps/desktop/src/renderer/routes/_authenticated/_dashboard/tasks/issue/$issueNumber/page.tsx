@@ -2,10 +2,14 @@ import { Button } from "@superset/ui/button";
 import { ScrollArea } from "@superset/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+	ArrowLeft,
+	CircleCheckIcon,
+	CircleDotIcon,
+	ExternalLink,
+	Plus,
+} from "lucide-react";
 import { useMemo } from "react";
-import { GoIssueClosed, GoIssueOpened } from "react-icons/go";
-import { HiArrowLeft } from "react-icons/hi2";
-import { LuExternalLink, LuPlus } from "react-icons/lu";
 import { MarkdownRenderer } from "renderer/components/MarkdownRenderer";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
@@ -115,7 +119,7 @@ function IssueDetailPage() {
 	}
 
 	const isClosed = data.state.toLowerCase() === "closed";
-	const StateIcon = isClosed ? GoIssueClosed : GoIssueOpened;
+	const StateIcon = isClosed ? CircleCheckIcon : CircleDotIcon;
 
 	return (
 		<div className="flex-1 flex flex-col min-h-0">
@@ -180,7 +184,7 @@ function Header({
 	onBack,
 	onAddToWorkspace,
 }: HeaderProps) {
-	const StateIcon = isClosed ? GoIssueClosed : GoIssueOpened;
+	const StateIcon = isClosed ? CircleCheckIcon : CircleDotIcon;
 	return (
 		<div className="flex items-center gap-3 px-6 py-4 border-b border-border shrink-0">
 			<Button
@@ -190,7 +194,7 @@ function Header({
 				onClick={onBack}
 				aria-label="Back to tasks"
 			>
-				<HiArrowLeft className="w-4 h-4" />
+				<ArrowLeft className="w-4 h-4" />
 			</Button>
 			<StateIcon
 				className={
@@ -209,7 +213,7 @@ function Header({
 						className="text-muted-foreground hover:text-foreground transition-colors p-2"
 						title="Open in GitHub"
 					>
-						<LuExternalLink className="w-4 h-4" />
+						<ExternalLink className="w-4 h-4" />
 					</a>
 				)}
 				{onAddToWorkspace && (
@@ -219,7 +223,7 @@ function Header({
 						className="h-8 gap-1.5"
 						onClick={onAddToWorkspace}
 					>
-						<LuPlus className="size-4" />
+						<Plus className="size-4" />
 						Add to workspace
 					</Button>
 				)}

@@ -1,8 +1,8 @@
-import { toast } from "@superset/ui/sonner";
 import { useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { authClient } from "renderer/lib/auth-client";
 import { useTrellisRuntimePack } from "renderer/lib/pack-system";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import type { NewWorkspacePromptContextApi } from "renderer/stores/new-workspace-prompt-context";
 import { useWorkspaceCreates } from "renderer/stores/workspace-creates";

@@ -7,8 +7,8 @@ import {
 	DropdownMenuSubTrigger,
 } from "@superset/ui/dropdown-menu";
 import { cn } from "@superset/ui/utils";
+import { Copy } from "lucide-react";
 import type { ReactNode } from "react";
-import { LuCopy } from "react-icons/lu";
 import jetbrainsIcon from "renderer/assets/app-icons/jetbrains.svg";
 import terminalIcon from "renderer/assets/app-icons/terminal.png";
 import vscodeIcon from "renderer/assets/app-icons/vscode.svg";
@@ -209,7 +209,7 @@ export function OpenInExternalDropdownItems({
 				<div
 					className={cn("flex items-center gap-2", copyPathContentClassName)}
 				>
-					<LuCopy className={cn("size-4", copyPathIconClassName)} />
+					<Copy className={cn("size-4", copyPathIconClassName)} />
 					<span className={copyPathLabelClassName}>Copy path</span>
 				</div>
 				{copyPathTrailing}

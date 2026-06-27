@@ -1,12 +1,12 @@
 import { Avatar } from "@superset/ui/atoms/Avatar";
 import { Button } from "@superset/ui/button";
 import { Input } from "@superset/ui/input";
-import { toast } from "@superset/ui/sonner";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useEffect, useState } from "react";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { authClient } from "renderer/lib/auth-client";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import {
 	getImageExtensionFromMimeType,

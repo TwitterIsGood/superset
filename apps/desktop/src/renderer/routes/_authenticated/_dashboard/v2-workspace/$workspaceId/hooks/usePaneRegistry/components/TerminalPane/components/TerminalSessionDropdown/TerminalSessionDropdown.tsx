@@ -7,7 +7,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { workspaceTrpc } from "@superset/workspace-client";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
@@ -16,6 +15,7 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { useRenderStressInstrumentation } from "renderer/lib/performance/stress-instrumentation";
 import { markTerminalForBackground } from "renderer/lib/terminal/terminal-background-intents";
 import { terminalRuntimeRegistry } from "renderer/lib/terminal/terminal-runtime-registry";
+import { toast } from "renderer/lib/toast";
 import type { TerminalLauncher } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/hooks/useV2TerminalLauncher";
 import type {
 	PaneViewerData,

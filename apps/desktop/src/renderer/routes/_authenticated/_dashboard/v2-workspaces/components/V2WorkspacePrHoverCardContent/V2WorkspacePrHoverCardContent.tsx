@@ -1,7 +1,6 @@
 import { Button } from "@superset/ui/button";
 import { formatDistanceToNow } from "date-fns";
-import { FaGithub } from "react-icons/fa";
-import { LuGitBranch } from "react-icons/lu";
+import { GitBranch, Github } from "lucide-react";
 import type { V2WorkspacePrSummary } from "renderer/routes/_authenticated/_dashboard/v2-workspaces/hooks/useAccessibleV2Workspaces";
 import { ChecksList } from "./components/ChecksList";
 import { ChecksSummary } from "./components/ChecksSummary";
@@ -27,7 +26,7 @@ export function V2WorkspacePrHoverCardContent({
 					Branch
 				</span>
 				<div className="flex items-center gap-1.5 text-sm">
-					<LuGitBranch className="size-3 shrink-0 text-muted-foreground" />
+					<GitBranch className="size-3 shrink-0 text-muted-foreground" />
 					<code className="block min-w-0 flex-1 break-all font-mono text-xs">
 						{branch}
 					</code>
@@ -78,7 +77,7 @@ export function V2WorkspacePrHoverCardContent({
 						rel="noopener noreferrer"
 						onClick={(event) => event.stopPropagation()}
 					>
-						<FaGithub className="size-3" />
+						<Github className="size-3" />
 						View on GitHub
 					</a>
 				</Button>

@@ -1,8 +1,8 @@
-import { toast } from "@superset/ui/sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { useCreateOrAttachWithTheme } from "renderer/hooks/useCreateOrAttachWithTheme";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import { bootstrapOpenWorktree } from "./bootstrap-open-worktree";

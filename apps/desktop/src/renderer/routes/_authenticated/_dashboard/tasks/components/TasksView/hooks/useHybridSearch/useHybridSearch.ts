@@ -1,5 +1,4 @@
-import Fuse from "fuse.js";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 
 interface SearchableTask {
 	id: string;
@@ -15,40 +14,61 @@ interface SearchResult<T extends SearchableTask> {
 	matchType: "exact" | "fuzzy";
 }
 
+function normalizeSearchText(value: string | null | undefined): string {
+	return value?.trim().toLowerCase() ?? "";
+}
+
+function includesSubsequence(value: string, query: string): boolean {
+	if (!query) return true;
+	let queryIndex = 0;
+	for (const char of value) {
+		if (char === query[queryIndex]) {
+			queryIndex += 1;
+			if (queryIndex === query.length) return true;
+		}
+	}
+	return false;
+}
+
+function textScore(value: string, query: string): number {
+	if (!value || !query) return 0;
+	if (value === query) return 1;
+	if (value.startsWith(query)) return 0.95;
+	if (value.includes(query)) return 0.85;
+
+	const tokens = query.split(/\s+/).filter(Boolean);
+	if (tokens.length > 1 && tokens.every((token) => value.includes(token))) {
+		return 0.75;
+	}
+
+	return includesSubsequence(value, query) ? 0.5 : 0;
+}
+
+function scoreExactFields(task: SearchableTask, query: string): number {
+	const slugScore = textScore(normalizeSearchText(task.slug), query);
+	const labelScore = Math.max(
+		0,
+		...(task.labels ?? []).map((label) =>
+			textScore(normalizeSearchText(label), query),
+		),
+	);
+	return Math.max(slugScore, labelScore);
+}
+
+function scoreFuzzyFields(task: SearchableTask, query: string): number {
+	const titleScore = textScore(normalizeSearchText(task.title), query);
+	const descriptionScore = textScore(
+		normalizeSearchText(task.description),
+		query,
+	);
+	return Math.max(titleScore, descriptionScore * 0.8);
+}
+
 export function useHybridSearch<T extends SearchableTask>(tasks: T[]) {
-	const exactFuse = useMemo(
-		() =>
-			new Fuse(tasks, {
-				keys: [
-					{ name: "slug", weight: 2 },
-					{ name: "labels", weight: 1 },
-				],
-				threshold: 0,
-				includeScore: true,
-				ignoreLocation: true,
-				useExtendedSearch: false,
-			}),
-		[tasks],
-	);
-
-	const fuzzyFuse = useMemo(
-		() =>
-			new Fuse(tasks, {
-				keys: [
-					{ name: "title", weight: 2 },
-					{ name: "description", weight: 1 },
-				],
-				threshold: 0.3,
-				includeScore: true,
-				ignoreLocation: true,
-				useExtendedSearch: false,
-			}),
-		[tasks],
-	);
-
 	const search = useCallback(
 		(query: string): SearchResult<T>[] => {
-			if (!query.trim()) {
+			const normalizedQuery = normalizeSearchText(query);
+			if (!normalizedQuery) {
 				return tasks.map((item) => ({
 					item,
 					score: 1,
@@ -56,27 +76,31 @@ export function useHybridSearch<T extends SearchableTask>(tasks: T[]) {
 				}));
 			}
 
-			const exactMatches = exactFuse.search(query);
-			const exactIds = new Set(exactMatches.map((m) => m.item.id));
+			const results: SearchResult<T>[] = [];
+			for (const item of tasks) {
+				const exactScore = scoreExactFields(item, normalizedQuery);
+				if (exactScore > 0) {
+					results.push({
+						item,
+						score: exactScore,
+						matchType: "exact",
+					});
+					continue;
+				}
 
-			const fuzzyMatches = fuzzyFuse
-				.search(query)
-				.filter((m) => !exactIds.has(m.item.id));
+				const fuzzyScore = scoreFuzzyFields(item, normalizedQuery);
+				if (fuzzyScore > 0) {
+					results.push({
+						item,
+						score: fuzzyScore,
+						matchType: "fuzzy",
+					});
+				}
+			}
 
-			return [
-				...exactMatches.map((m) => ({
-					item: m.item,
-					score: 1 - (m.score ?? 0),
-					matchType: "exact" as const,
-				})),
-				...fuzzyMatches.map((m) => ({
-					item: m.item,
-					score: 1 - (m.score ?? 0),
-					matchType: "fuzzy" as const,
-				})),
-			];
+			return results.sort((a, b) => b.score - a.score);
 		},
-		[exactFuse, fuzzyFuse, tasks],
+		[tasks],
 	);
 
 	return { search };

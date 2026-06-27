@@ -5,7 +5,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@superset/ui/select";
-import { HiOutlineComputerDesktop, HiOutlineServer } from "react-icons/hi2";
+import { Monitor, Server } from "lucide-react";
 
 export interface HostSelectOption {
 	id: string;
@@ -60,9 +60,9 @@ export function HostSelect({
 					<SelectItem key={option.id} value={option.id}>
 						<span className="flex items-center gap-2">
 							{option.isLocal ? (
-								<HiOutlineComputerDesktop className="size-4 text-muted-foreground" />
+								<Monitor className="size-4 text-muted-foreground" />
 							) : (
-								<HiOutlineServer className="size-4 text-muted-foreground" />
+								<Server className="size-4 text-muted-foreground" />
 							)}
 							<span className="truncate">
 								{option.isLocal ? "This device" : option.name}

@@ -14,13 +14,8 @@ import {
 	type Range,
 	useVirtualizer,
 } from "@tanstack/react-virtual";
+import { ChevronDown, ChevronRight, Layers, SearchX } from "lucide-react";
 import { Fragment, useCallback, useMemo, useRef, useState } from "react";
-import {
-	LuChevronDown,
-	LuChevronRight,
-	LuLayers,
-	LuSearchX,
-} from "react-icons/lu";
 import type {
 	AccessibleV2Workspace,
 	V2WorkspaceHostType,
@@ -282,7 +277,7 @@ export function V2WorkspacesList({ workspaces }: V2WorkspacesListProps) {
 							variant="icon"
 							className="size-14 [&_svg:not([class*='size-'])]:size-7"
 						>
-							{hasActiveFilters ? <LuSearchX /> : <LuLayers />}
+							{hasActiveFilters ? <SearchX /> : <Layers />}
 						</EmptyMedia>
 						<EmptyTitle>
 							{hasActiveFilters
@@ -370,7 +365,7 @@ function ProjectHeader({ project, isCollapsed }: ProjectHeaderProps) {
 	const toggleCollapsed = useV2ProjectLocalMetaStore(
 		(state) => state.toggleProjectCollapsed,
 	);
-	const Chevron = isCollapsed ? LuChevronRight : LuChevronDown;
+	const Chevron = isCollapsed ? ChevronRight : ChevronDown;
 
 	return (
 		<button

@@ -1,7 +1,7 @@
 import type { SelectV2Project, SelectV2Workspace } from "@superset/db/schema";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";
+import { useDashboardSidebarCoreState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarCoreState";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { hostProjectListQueryKey } from "../useHostProjectIds";
 
@@ -20,7 +20,7 @@ export interface ProjectSetupResult {
  */
 export function useFinalizeProjectSetup() {
 	const { ensureProjectInSidebar, ensureWorkspaceInSidebar } =
-		useDashboardSidebarState();
+		useDashboardSidebarCoreState();
 	const queryClient = useQueryClient();
 	const collections = useCollections();
 

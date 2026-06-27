@@ -1,5 +1,6 @@
 import { CodeBlock as UiCodeBlock } from "@superset/ui/ai-elements/code-block";
 import { Avatar, AvatarFallback, AvatarImage } from "@superset/ui/avatar";
+import { ArrowUpRight, Check, Copy, Github, MessageSquare } from "lucide-react";
 import {
 	lazy,
 	type ReactNode,
@@ -9,13 +10,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { FaGithub } from "react-icons/fa";
-import {
-	LuArrowUpRight,
-	LuCheck,
-	LuCopy,
-	LuMessageSquare,
-} from "react-icons/lu";
 import ReactMarkdown from "react-markdown";
 import type { MosaicBranch } from "react-mosaic-component";
 import rehypeRaw from "rehype-raw";
@@ -107,7 +101,7 @@ export function CommentPane({
 								className="size-4 shrink-0 rounded-full"
 							/>
 						) : (
-							<LuMessageSquare className="size-4 shrink-0 text-muted-foreground" />
+							<MessageSquare className="size-4 shrink-0 text-muted-foreground" />
 						)}
 						<PaneTitle
 							name={paneName ?? ""}
@@ -122,8 +116,8 @@ export function CommentPane({
 								className="flex shrink-0 items-center gap-0.5 text-muted-foreground hover:text-foreground"
 								aria-label="View on GitHub"
 							>
-								<FaGithub className="size-3.5" />
-								<LuArrowUpRight className="size-3" />
+								<Github className="size-3.5" />
+								<ArrowUpRight className="size-3" />
 							</a>
 						)}
 					</div>
@@ -170,12 +164,12 @@ export function CommentPane({
 						>
 							{copied ? (
 								<>
-									<LuCheck className="size-3" />
+									<Check className="size-3" />
 									Copied
 								</>
 							) : (
 								<>
-									<LuCopy className="size-3" />
+									<Copy className="size-3" />
 									Copy All
 								</>
 							)}
@@ -334,7 +328,7 @@ function CopyableTable({ children }: { children?: ReactNode }) {
 			>
 				{copied ? (
 					<span className="flex items-center gap-1">
-						<LuCheck className="size-3" />
+						<Check className="size-3" />
 						Copied
 					</span>
 				) : (

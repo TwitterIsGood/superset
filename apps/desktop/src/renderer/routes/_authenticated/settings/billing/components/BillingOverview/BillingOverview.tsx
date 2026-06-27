@@ -1,11 +1,11 @@
 import { Button } from "@superset/ui/button";
-import { toast } from "@superset/ui/sonner";
 import { useLiveQuery } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
+import { ArrowRight } from "lucide-react";
 import { useState } from "react";
-import { HiArrowRight } from "react-icons/hi2";
 import { env } from "renderer/env.renderer";
 import { authClient } from "renderer/lib/auth-client";
+import { toast } from "renderer/lib/toast";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import {
 	isItemVisible,
@@ -149,7 +149,7 @@ export function BillingOverview({ visibleItems }: BillingOverviewProps) {
 				<Button variant="ghost" size="sm" asChild>
 					<Link to="/settings/billing/plans">
 						All plans
-						<HiArrowRight className="h-3 w-3" />
+						<ArrowRight className="h-3 w-3" />
 					</Link>
 				</Button>
 			</div>

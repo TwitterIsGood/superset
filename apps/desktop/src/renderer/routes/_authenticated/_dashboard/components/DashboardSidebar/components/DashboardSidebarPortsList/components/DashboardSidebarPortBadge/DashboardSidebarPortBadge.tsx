@@ -1,8 +1,8 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
+import { ExternalLink, LoaderCircle, X } from "lucide-react";
 import type { MouseEvent } from "react";
-import { LuExternalLink, LuLoaderCircle, LuX } from "react-icons/lu";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { navigateToV2Workspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { STROKE_WIDTH } from "renderer/screens/main/components/WorkspaceSidebar/constants";
@@ -95,7 +95,7 @@ export function DashboardSidebarPortBadge({
 							aria-label={`Open ${port.label || `port ${port.port}`} in browser`}
 							className="text-muted-foreground opacity-0 transition-opacity hover:text-primary focus-visible:opacity-100 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 group-hover:opacity-100"
 						>
-							<LuExternalLink className="size-3.5" strokeWidth={STROKE_WIDTH} />
+							<ExternalLink className="size-3.5" strokeWidth={STROKE_WIDTH} />
 						</button>
 					)}
 					<button
@@ -107,12 +107,12 @@ export function DashboardSidebarPortBadge({
 						className="pr-1 text-muted-foreground opacity-0 transition-opacity hover:text-primary focus-visible:opacity-100 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-70 group-hover:opacity-100"
 					>
 						{isPending ? (
-							<LuLoaderCircle
+							<LoaderCircle
 								className="size-3.5 animate-spin"
 								strokeWidth={STROKE_WIDTH}
 							/>
 						) : (
-							<LuX className="size-3.5" strokeWidth={STROKE_WIDTH} />
+							<X className="size-3.5" strokeWidth={STROKE_WIDTH} />
 						)}
 					</button>
 				</div>

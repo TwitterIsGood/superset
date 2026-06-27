@@ -13,14 +13,14 @@ import {
 } from "@superset/ui/dropdown-menu";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
-import { FiUsers } from "react-icons/fi";
 import {
-	HiCheck,
-	HiChevronUpDown,
-	HiOutlineArrowRightOnRectangle,
-	HiOutlineCog6Tooth,
-	HiOutlinePlus,
-} from "react-icons/hi2";
+	Check,
+	ChevronsUpDown,
+	LogOut,
+	Plus,
+	Settings,
+	Users,
+} from "lucide-react";
 import { HotkeyMenuShortcut } from "renderer/components/HotkeyMenuShortcut";
 import { useCurrentPlan } from "renderer/hooks/useCurrentPlan";
 import { authClient } from "renderer/lib/auth-client";
@@ -98,7 +98,7 @@ export function OrganizationDropdown({
 				/>
 				<span className="truncate">{displayName}</span>
 				{planBadge}
-				<HiChevronUpDown className="ml-auto h-3.5 w-3.5 text-muted-foreground shrink-0" />
+				<ChevronsUpDown className="ml-auto h-3.5 w-3.5 text-muted-foreground shrink-0" />
 			</button>
 		) : (
 			<button
@@ -116,7 +116,7 @@ export function OrganizationDropdown({
 					{displayName}
 				</span>
 				{planBadge}
-				<HiChevronUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+				<ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
 			</button>
 		);
 
@@ -138,14 +138,14 @@ export function OrganizationDropdown({
 				<DropdownMenuItem
 					onSelect={() => navigate({ to: "/settings/account" })}
 				>
-					<HiOutlineCog6Tooth className="h-4 w-4" />
+					<Settings className="h-4 w-4" />
 					<span>Settings</span>
 					<HotkeyMenuShortcut hotkeyId="OPEN_SETTINGS" />
 				</DropdownMenuItem>
 				<DropdownMenuItem
 					onSelect={() => navigate({ to: "/settings/organization" })}
 				>
-					<FiUsers className="h-4 w-4" />
+					<Users className="h-4 w-4" />
 					<span>Manage members</span>
 				</DropdownMenuItem>
 				{organizations && organizations.length > 0 && (
@@ -175,7 +175,7 @@ export function OrganizationDropdown({
 									/>
 									<span className="flex-1 truncate">{organization.name}</span>
 									{organization.id === activeOrganization?.id && (
-										<HiCheck className="h-4 w-4 text-primary" />
+										<Check className="h-4 w-4 text-primary" />
 									)}
 								</DropdownMenuItem>
 							))}
@@ -183,7 +183,7 @@ export function OrganizationDropdown({
 							<DropdownMenuItem
 								onSelect={() => navigate({ to: "/create-organization" })}
 							>
-								<HiOutlinePlus className="h-4 w-4" />
+								<Plus className="h-4 w-4" />
 								<span>Create organization</span>
 							</DropdownMenuItem>
 						</DropdownMenuSubContent>
@@ -194,7 +194,7 @@ export function OrganizationDropdown({
 
 				{/* Account */}
 				<DropdownMenuItem onSelect={handleSignOut} className="gap-2">
-					<HiOutlineArrowRightOnRectangle className="h-4 w-4" />
+					<LogOut className="h-4 w-4" />
 					<span>Log out</span>
 				</DropdownMenuItem>
 			</DropdownMenuContent>

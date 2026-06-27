@@ -10,7 +10,6 @@ import {
 	useFileTree as usePierreFileTree,
 } from "@pierre/trees/react";
 import type { AppRouter } from "@superset/host-service";
-import { toast } from "@superset/ui/sonner";
 import { workspaceTrpc } from "@superset/workspace-client";
 import type { inferRouterOutputs } from "@trpc/server";
 import {
@@ -29,6 +28,7 @@ import {
 } from "renderer/lib/clickPolicy";
 import { useFallthroughIcons } from "renderer/lib/fileIcons";
 import { createPierreTreeStyle } from "renderer/lib/pierreTree";
+import { toast } from "renderer/lib/toast";
 import { useOpenInExternalEditor } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/hooks/useOpenInExternalEditor";
 import { PierreRowContextMenu } from "../PierreRowContextMenu";
 import { FileMenuItems } from "./components/FileMenuItems";

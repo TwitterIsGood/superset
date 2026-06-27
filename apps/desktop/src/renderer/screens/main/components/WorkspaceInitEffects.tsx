@@ -2,12 +2,12 @@ import {
 	type AgentLaunchRequest,
 	normalizeAgentLaunchRequest,
 } from "@superset/shared/agent-launch";
-import { toast } from "@superset/ui/sonner";
 import { useCallback, useEffect, useRef } from "react";
 import { useCreateOrAttachWithTheme } from "renderer/hooks/useCreateOrAttachWithTheme";
 import { launchAgentSession } from "renderer/lib/agent-session-orchestrator";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { writeCommandsInPane } from "renderer/lib/terminal/launch-command";
+import { toast } from "renderer/lib/toast";
 import { isTerminalAttachCanceledMessage } from "renderer/screens/main/components/WorkspaceView/ContentView/TabsContent/Terminal/attach-cancel";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import { useTabsWithPresets } from "renderer/stores/tabs/useTabsWithPresets";

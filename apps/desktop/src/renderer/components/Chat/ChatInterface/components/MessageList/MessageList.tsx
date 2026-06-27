@@ -7,16 +7,20 @@ import {
 import { Message, MessageContent } from "@superset/ui/ai-elements/message";
 import { ShimmerLabel } from "@superset/ui/ai-elements/shimmer-label";
 import type { ChatStatus, UIMessage } from "ai";
-import { isToolUIPart } from "ai";
-import { FileIcon, FileTextIcon, ImageIcon } from "lucide-react";
+import {
+	FileIcon,
+	FileTextIcon,
+	ImageIcon,
+	MessagesSquare,
+} from "lucide-react";
 import { useCallback } from "react";
-import { HiMiniChatBubbleLeftRight } from "react-icons/hi2";
 import { FileMentionChip } from "renderer/components/Chat/components/FileMentionChip";
 import { LinkedTaskChip } from "renderer/components/Chat/components/LinkedTaskChip";
 import { parseUserMentions } from "renderer/components/Chat/utils/parseUserMentions";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import type { InterruptedMessagePreview } from "../../types";
 import { normalizeWorkspaceFilePath } from "../../utils/file-paths";
+import { isToolUIPart } from "../../utils/tool-helpers";
 import { MessagePartsRenderer } from "../MessagePartsRenderer";
 import { MessageScrollbackRail } from "./components/MessageScrollbackRail";
 
@@ -94,7 +98,7 @@ export function MessageList({
 					<ConversationEmptyState
 						title="Start a conversation"
 						description="Ask anything to get started"
-						icon={<HiMiniChatBubbleLeftRight className="size-8" />}
+						icon={<MessagesSquare className="size-8" />}
 					/>
 				) : (
 					messages.map((msg, index) => {

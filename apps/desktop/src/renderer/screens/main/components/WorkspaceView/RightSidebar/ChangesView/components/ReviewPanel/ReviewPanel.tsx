@@ -6,19 +6,19 @@ import {
 	CollapsibleTrigger,
 } from "@superset/ui/collapsible";
 import { Skeleton } from "@superset/ui/skeleton";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
-import { useEffect, useRef, useState } from "react";
 import {
-	LuArrowUpRight,
-	LuCheck,
-	LuCheckCheck,
-	LuCopy,
-	LuLoaderCircle,
-	LuUndo2,
-} from "react-icons/lu";
-import { VscChevronRight } from "react-icons/vsc";
+	ArrowUpRight,
+	Check,
+	CheckCheck,
+	ChevronRight,
+	Copy,
+	LoaderCircle,
+	Undo2,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { PRIcon } from "renderer/screens/main/components/PRIcon";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import {
@@ -315,11 +315,11 @@ export function ReviewPanel({
 								aria-label={comment.isResolved ? "Undo done" : "Mark as done"}
 							>
 								{resolvingThreadIds.has(comment.threadId) ? (
-									<LuLoaderCircle className="size-3 animate-spin" />
+									<LoaderCircle className="size-3 animate-spin" />
 								) : comment.isResolved ? (
-									<LuUndo2 className="size-3" />
+									<Undo2 className="size-3" />
 								) : (
-									<LuCheckCheck className="size-3" />
+									<CheckCheck className="size-3" />
 								)}
 							</button>
 						) : null}
@@ -334,9 +334,9 @@ export function ReviewPanel({
 							aria-label={isCopied ? "Copied comment" : "Copy comment"}
 						>
 							{isCopied ? (
-								<LuCheck className="size-3" />
+								<Check className="size-3" />
 							) : (
-								<LuCopy className="size-3" />
+								<Copy className="size-3" />
 							)}
 						</button>
 						{comment.url ? (
@@ -347,7 +347,7 @@ export function ReviewPanel({
 								className="inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 								aria-label="Open comment on GitHub"
 							>
-								<LuArrowUpRight className="size-3" />
+								<ArrowUpRight className="size-3" />
 							</a>
 						) : null}
 					</div>
@@ -371,7 +371,7 @@ export function ReviewPanel({
 					>
 						{pr.title}
 					</span>
-					<LuArrowUpRight className="size-3.5 shrink-0 text-muted-foreground/70 opacity-0 transition-opacity group-hover:opacity-100" />
+					<ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground/70 opacity-0 transition-opacity group-hover:opacity-100" />
 				</a>
 				<div className="flex items-center gap-1.5">
 					<span
@@ -400,7 +400,7 @@ export function ReviewPanel({
 					)}
 				>
 					<div className="flex min-w-0 items-center gap-1.5">
-						<VscChevronRight
+						<ChevronRight
 							className={cn(
 								"size-3 text-muted-foreground shrink-0 transition-transform duration-150",
 								checksOpen && "rotate-90",
@@ -457,7 +457,7 @@ export function ReviewPanel({
 										/>
 										<div className="flex min-w-0 flex-1 items-center gap-1">
 											<span className="min-w-0 truncate">{check.name}</span>
-											<LuArrowUpRight className="size-3.5 shrink-0 text-muted-foreground/70 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+											<ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground/70 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
 										</div>
 										{check.durationText && (
 											<span className="shrink-0 text-[10px] text-muted-foreground">
@@ -505,7 +505,7 @@ export function ReviewPanel({
 							"hover:bg-accent/30 cursor-pointer transition-colors",
 						)}
 					>
-						<VscChevronRight
+						<ChevronRight
 							className={cn(
 								"size-3 text-muted-foreground shrink-0 transition-transform duration-150",
 								commentsOpen && "rotate-90",
@@ -526,9 +526,9 @@ export function ReviewPanel({
 									disabled={isResolvingAll}
 								>
 									{isResolvingAll ? (
-										<LuLoaderCircle className="size-3 animate-spin" />
+										<LoaderCircle className="size-3 animate-spin" />
 									) : (
-										<LuCheckCheck className="size-3" />
+										<CheckCheck className="size-3" />
 									)}
 									<span>Mark all done</span>
 								</button>
@@ -539,9 +539,9 @@ export function ReviewPanel({
 								onClick={handleCopyCommentsList}
 							>
 								{copiedActionKey === ALL_COMMENTS_COPY_ACTION_KEY ? (
-									<LuCheck className="size-3" />
+									<Check className="size-3" />
 								) : (
-									<LuCopy className="size-3" />
+									<Copy className="size-3" />
 								)}
 								<span>{copyAllCommentsLabel}</span>
 							</button>
@@ -577,7 +577,7 @@ export function ReviewPanel({
 							"hover:bg-accent/30 cursor-pointer transition-colors",
 						)}
 					>
-						<VscChevronRight
+						<ChevronRight
 							className={cn(
 								"size-3 text-muted-foreground shrink-0 transition-transform duration-150",
 								resolvedCommentsGroupOpen && "rotate-90",

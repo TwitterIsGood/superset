@@ -10,7 +10,6 @@ import {
 } from "@superset/ui/command";
 import { Label } from "@superset/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
-import { toast } from "@superset/ui/sonner";
 import { Switch } from "@superset/ui/switch";
 import { cn } from "@superset/ui/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,6 +26,7 @@ import { useWorkspaceHostUrl } from "renderer/hooks/host-service/useWorkspaceHos
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { workspaceModelProvidersQueryKey } from "renderer/lib/model-provider-query-keys";
 import { syncCloudModelProvidersToHost } from "renderer/lib/sync-cloud-model-providers";
+import { toast } from "renderer/lib/toast";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type ModelProvider = RouterOutputs["modelProviders"]["list"][number];

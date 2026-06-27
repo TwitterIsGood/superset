@@ -19,6 +19,7 @@ source "$SUPERSET_SCRIPT_DIR/lib/setup/steps.sh" # reuse allocate_port_base + he
 cd "$ROOT_DIR" || exit 1
 
 ELECTRIC_SECRET_VALUE="local_electric_dev_secret"
+WORKTREE_DEV_PROFILE="${WORKTREE_DEV_PROFILE:-desktop-online-lite}"
 
 # Set by local_allocate_ports; consumed by docker compose + .env writing.
 SUPERSET_WORKTREE_ID=""
@@ -200,6 +201,10 @@ local_seed_dev_account() {
   fi
   success "Dev account ready (sign in via the dev button)"
   return 0
+}
+
+local_requires_local_data() {
+  [ "$WORKTREE_DEV_PROFILE" != "desktop-online-lite" ]
 }
 
 local_write_env() {
@@ -424,9 +429,16 @@ local_setup_main() {
   step_install_dependencies || step_failed "Install dependencies"
   local_allocate_ports || step_failed "Allocate ports"
   local_write_env || step_failed "Write workspace .env"
-  local_db_up || step_failed "Start local DB stack"
-  local_migrate || step_failed "Apply migrations"
-  local_seed_dev_account || step_failed "Seed dev account"
+  if local_requires_local_data; then
+    local_db_up || step_failed "Start local DB stack"
+    local_migrate || step_failed "Apply migrations"
+    local_seed_dev_account || step_failed "Seed dev account"
+  else
+    warn "Skipping local DB stack, migrations, and dev-account seed because WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE uses external online-like services"
+    step_skipped "Start local DB stack"
+    step_skipped "Apply migrations"
+    step_skipped "Seed dev account"
+  fi
   local_write_config_overlay || step_failed "Write config overlay"
 
   print_summary "Local setup"

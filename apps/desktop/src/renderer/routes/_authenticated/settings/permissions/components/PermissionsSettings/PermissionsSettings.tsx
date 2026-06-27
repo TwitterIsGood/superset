@@ -2,7 +2,7 @@ import { Badge } from "@superset/ui/badge";
 import { Button } from "@superset/ui/button";
 import { Label } from "@superset/ui/label";
 import { Skeleton } from "@superset/ui/skeleton";
-import { LuExternalLink } from "react-icons/lu";
+import { ExternalLink } from "lucide-react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import {
 	isItemVisible,
@@ -44,7 +44,7 @@ function PermissionRow({
 			<div className="flex items-center gap-3 shrink-0">
 				<StatusBadge granted={granted} />
 				<Button variant="outline" size="sm" onClick={onRequest}>
-					<LuExternalLink className="h-3.5 w-3.5 mr-1.5" />
+					<ExternalLink className="h-3.5 w-3.5 mr-1.5" />
 					Open settings
 				</Button>
 			</div>

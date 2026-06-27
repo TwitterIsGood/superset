@@ -1,7 +1,7 @@
 import { Button } from "@superset/ui/button";
 import { cn } from "@superset/ui/utils";
+import { ChevronsUpDown } from "lucide-react";
 import type * as React from "react";
-import { HiChevronUpDown } from "react-icons/hi2";
 
 type PickerTriggerProps = Omit<
 	React.ComponentProps<typeof Button>,
@@ -43,7 +43,7 @@ export function PickerTrigger({
 				</span>
 				{endAdornment}
 			</span>
-			<HiChevronUpDown className="size-3 shrink-0" />
+			<ChevronsUpDown className="size-3 shrink-0" />
 		</Button>
 	);
 }

@@ -2,7 +2,7 @@ import { OverflowFadeContainer } from "@superset/ui/overflow-fade-container";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { LuLoaderCircle, LuX } from "react-icons/lu";
+import { LoaderCircle, X } from "lucide-react";
 import { navigateToV2Workspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { STROKE_WIDTH } from "renderer/screens/main/components/WorkspaceSidebar/constants";
 import { useDashboardSidebarPortKill } from "../../hooks/useDashboardSidebarPortKill";
@@ -54,12 +54,12 @@ export function DashboardSidebarPortGroup({
 							)}
 						>
 							{isPending ? (
-								<LuLoaderCircle
+								<LoaderCircle
 									className="size-3 animate-spin"
 									strokeWidth={STROKE_WIDTH}
 								/>
 							) : (
-								<LuX className="size-3" strokeWidth={STROKE_WIDTH} />
+								<X className="size-3" strokeWidth={STROKE_WIDTH} />
 							)}
 						</button>
 					</TooltipTrigger>

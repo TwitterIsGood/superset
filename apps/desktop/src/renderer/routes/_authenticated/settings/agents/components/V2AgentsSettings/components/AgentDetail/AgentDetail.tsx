@@ -3,7 +3,6 @@ import type { PromptTransport } from "@superset/shared/agent-prompt-launch";
 import { Button } from "@superset/ui/button";
 import { Input } from "@superset/ui/input";
 import { Label } from "@superset/ui/label";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { useMutation } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
@@ -20,6 +19,7 @@ import {
 import { joinArgs, parseArgs } from "renderer/lib/argv";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { getHostServiceUnavailableMessage } from "renderer/lib/host-service-unavailable";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 
 interface AgentDetailProps {

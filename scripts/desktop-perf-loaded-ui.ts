@@ -8,6 +8,7 @@ import {
 	DEV_EMAIL,
 	DEV_PASSWORD,
 } from "../packages/shared/src/dev-credentials";
+import { getHostName } from "../packages/shared/src/host-info";
 
 const DEFAULT_ARTIFACT_DIR =
 	".trellis/tasks/06-25-desktop-perf-architecture-overhaul/artifacts/loaded-ui";
@@ -18,6 +19,13 @@ const DEFAULT_FIXTURE_PROJECTS = 10;
 const DEFAULT_FIXTURE_WORKSPACES_PER_PROJECT = 20;
 const DEFAULT_FIXTURE_TASKS = 300;
 const DEFAULT_FIXTURE_HOST_BACKED_WORKSPACES = 1;
+const DEFAULT_MAX_WORKSPACE_DOM_NODES = 5000;
+const DEFAULT_MAX_TASKS_DOM_NODES = 6000;
+export const DASHBOARD_SIDEBAR_WORKSPACE_ROW_SELECTOR = [
+	"[data-dashboard-sidebar-workspace-item]",
+	"[data-dashboard-sidebar-expanded-workspace-wrapper]",
+	"[data-dashboard-sidebar-collapsed-workspace-row]",
+].join(", ");
 
 export interface ParsedDesktopPerfLoadedUiOptions {
 	artifactDir: string;
@@ -26,6 +34,8 @@ export interface ParsedDesktopPerfLoadedUiOptions {
 	minWorkspaceRows: number;
 	minSidebarWorkspaceRows: number;
 	minTaskMentions: number;
+	maxWorkspaceDomNodes: number;
+	maxTasksDomNodes: number;
 	timeoutMs: number;
 	skipNavigation: boolean;
 	allowConsoleErrors: boolean;
@@ -49,6 +59,7 @@ interface LoadedViewSummary {
 	href: string;
 	domNodeCount: number;
 	bodyTextLength: number;
+	debugActiveOrganizationId?: string | null;
 	projectMentions: number;
 	taskMentions: number;
 	workspaceRowCount: number;
@@ -63,14 +74,24 @@ interface LoadedViewSummary {
 	textSample: string;
 }
 
+interface LoadedInteractionSummary {
+	name: string;
+	durationMs: number;
+	href: string;
+	domNodeCount: number;
+	bodyTextSample: string;
+}
+
 interface LoadedUiReport {
 	startedAt: string;
 	completedAt: string;
 	workspaceView: LoadedViewSummary;
 	tasksView: LoadedViewSummary;
+	interactions: LoadedInteractionSummary[];
 	screenshots: {
 		workspaces: string;
 		tasks: string;
+		workspaceDetail?: string;
 	};
 	consoleErrorCount: number;
 	consoleResourceErrorCount: number;
@@ -93,6 +114,13 @@ interface LoadedUiReport {
 
 interface FixtureResult {
 	organizationId?: unknown;
+	hostBackedWorkspaceIds?: unknown;
+	seedResult?: {
+		hostBackedWorkspaceIds?: unknown;
+	};
+	before?: {
+		hostBackedWorkspaceIds?: unknown;
+	};
 }
 
 interface DesktopEmailAuthResponse {
@@ -229,6 +257,16 @@ export function parseDesktopPerfLoadedUiArgs(
 			10,
 			"min-task-mentions",
 		),
+		maxWorkspaceDomNodes: positiveInteger(
+			stringFlag(args, "max-workspace-dom-nodes"),
+			DEFAULT_MAX_WORKSPACE_DOM_NODES,
+			"max-workspace-dom-nodes",
+		),
+		maxTasksDomNodes: positiveInteger(
+			stringFlag(args, "max-tasks-dom-nodes"),
+			DEFAULT_MAX_TASKS_DOM_NODES,
+			"max-tasks-dom-nodes",
+		),
 		timeoutMs: positiveInteger(
 			stringFlag(args, "timeout-ms"),
 			30_000,
@@ -277,6 +315,382 @@ function sleep(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getTextMatcherScript(text: string): string {
+	return `((document.body?.innerText ?? "").includes(${JSON.stringify(text)}))`;
+}
+
+async function waitForRendererExpression(
+	automation: DesktopAutomation,
+	expression: string,
+	options: ParsedDesktopPerfLoadedUiOptions,
+	description: string,
+): Promise<void> {
+	const deadline = Date.now() + options.timeoutMs;
+	let lastValue: unknown = null;
+	while (Date.now() < deadline) {
+		lastValue = await automation.evaluateJs(`(() => Boolean(${expression}))()`);
+		if (lastValue === true) return;
+		await sleep(250);
+	}
+	throw new Error(
+		`Timed out waiting for ${description} after ${options.timeoutMs}ms; last value ${JSON.stringify(lastValue)}`,
+	);
+}
+
+async function summarizeInteraction(
+	automation: DesktopAutomation,
+	name: string,
+	startedAtMs: number,
+): Promise<LoadedInteractionSummary> {
+	const raw = await automation.evaluateJs(`(() => JSON.stringify({
+  href: location.href,
+  domNodeCount: document.querySelectorAll("*").length,
+  bodyTextSample: (document.body?.innerText ?? "").slice(0, 1000),
+}))()`);
+	if (typeof raw !== "string") {
+		throw new Error(`Interaction summary "${name}" did not return JSON`);
+	}
+	const parsed = JSON.parse(raw) as Omit<
+		LoadedInteractionSummary,
+		"name" | "durationMs"
+	>;
+	return {
+		name,
+		durationMs: Date.now() - startedAtMs,
+		...parsed,
+	};
+}
+
+async function runLoadedInteraction(
+	automation: DesktopAutomation,
+	name: string,
+	action: () => Promise<void>,
+): Promise<LoadedInteractionSummary> {
+	const startedAtMs = Date.now();
+	try {
+		await action();
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
+		throw new Error(`Loaded interaction "${name}" failed: ${detail}`);
+	}
+	return summarizeInteraction(automation, name, startedAtMs);
+}
+
+async function clickButtonByAriaLabel(
+	automation: DesktopAutomation,
+	label: string,
+	index = 0,
+): Promise<void> {
+	await automation.evaluateJs(`(() => {
+  const buttons = [...document.querySelectorAll("button")].filter((button) => button.getAttribute("aria-label") === ${JSON.stringify(label)});
+  const button = buttons[${index}];
+  if (!button) {
+    throw new Error(${JSON.stringify(`Could not find button with aria-label ${label} at index ${index}`)});
+  }
+  button.scrollIntoView({ block: "nearest", inline: "nearest" });
+  button.click();
+  return true;
+})()`);
+}
+
+async function clickButtonByTitle(
+	automation: DesktopAutomation,
+	title: string,
+): Promise<void> {
+	await automation.evaluateJs(`(() => {
+  const button = [...document.querySelectorAll("button")].find((candidate) => candidate.getAttribute("title") === ${JSON.stringify(title)});
+  if (!button) {
+    throw new Error(${JSON.stringify(`Could not find button with title ${title}`)});
+  }
+  button.scrollIntoView({ block: "nearest", inline: "nearest" });
+  button.click();
+  return true;
+})()`);
+}
+
+async function clickFirstWorkspaceRow(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+	preferredWorkspaceId?: string,
+): Promise<void> {
+	if (preferredWorkspaceId) {
+		await automation.navigate({
+			path: `/v2-workspace/${preferredWorkspaceId}`,
+		});
+		await automation.waitFor({
+			urlIncludes: `#/v2-workspace/${preferredWorkspaceId}`,
+			timeoutMs: options.timeoutMs,
+		});
+		await waitForV2WorkspaceDetailShell(
+			automation,
+			options,
+			preferredWorkspaceId,
+		);
+		return;
+	}
+
+	const localHostName = getHostName();
+	await automation.evaluateJs(`(() => {
+  const rows = [...document.querySelectorAll("[data-v2-workspace-row]")];
+  const preferredRow = rows.find((candidate) => (candidate.textContent || "").includes(${JSON.stringify(localHostName)}));
+  const row = (preferredRow ?? rows[0])?.querySelector("[role='button']");
+  if (!row) throw new Error("Could not find a v2 workspace row to open");
+  row.scrollIntoView({ block: "nearest" });
+  row.click();
+  return true;
+})()`);
+	await automation.waitFor({
+		urlIncludes: "#/v2-workspace",
+		timeoutMs: options.timeoutMs,
+	});
+	await waitForV2WorkspaceDetailShell(automation, options);
+}
+
+async function waitForV2WorkspaceDetailShell(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+	expectedWorkspaceId?: string,
+): Promise<void> {
+	await waitForRendererExpression(
+		automation,
+		`location.hash.startsWith("#/v2-workspace/") && (
+  Boolean(document.querySelector("[data-workspace-id]")) ||
+  Boolean(document.querySelector("[data-testid='workspace-right-sidebar-toggle']")) ||
+  (document.body?.innerText ?? "").includes(${JSON.stringify(options.projectText)})
+)`,
+		options,
+		"v2 workspace detail shell",
+	);
+	if (!expectedWorkspaceId) return;
+	await waitForRendererExpression(
+		automation,
+		`document.querySelector("[data-workspace-id]")?.getAttribute("data-workspace-id") === ${JSON.stringify(expectedWorkspaceId)}`,
+		options,
+		"host-backed workspace detail id",
+	);
+}
+
+async function ensureV2WorkspaceRightSidebarOpen(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+): Promise<void> {
+	await automation.waitFor({
+		testId: "workspace-right-sidebar-toggle",
+		timeoutMs: options.timeoutMs,
+	});
+	const deadline = Date.now() + options.timeoutMs;
+	while (Date.now() < deadline) {
+		const isOpen = await automation.evaluateJs(
+			"(() => Boolean(document.querySelector(\"#workspace-right-sidebar-slot [aria-label='Files'], #workspace-right-sidebar-slot [aria-label^='Changes']\") || (document.querySelector('#workspace-right-sidebar-slot')?.innerText ?? '').length > 0))()",
+		);
+		if (isOpen === true) return;
+		await automation.evaluateJs(`(() => {
+  const button = document.querySelector("[data-testid='workspace-right-sidebar-toggle']");
+  if (!button) throw new Error("Could not find workspace right sidebar toggle");
+  if (button.getAttribute("aria-label") !== "Close workspace sidebar") {
+    button.click();
+  }
+  return true;
+})()`);
+		await sleep(500);
+	}
+	throw new Error(
+		`Timed out waiting for workspace right sidebar content after ${options.timeoutMs}ms`,
+	);
+}
+
+async function switchV2WorkspaceSidebarTab(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+	label: "Files" | "Changes" | "Review" | "Models",
+): Promise<void> {
+	await automation.evaluateJs(`(() => {
+  const slot = document.querySelector("#workspace-right-sidebar-slot");
+  const button = [...(slot?.querySelectorAll("button") ?? [])].find((candidate) => {
+    const aria = candidate.getAttribute("aria-label") || "";
+    const text = candidate.textContent || "";
+    return aria === ${JSON.stringify(label)} || aria.startsWith(${JSON.stringify(`${label} (`)}) || text.trim() === ${JSON.stringify(label)};
+  });
+  if (!button) throw new Error(${JSON.stringify(`Could not find workspace sidebar tab ${label}`)});
+  button.scrollIntoView({ block: "nearest", inline: "nearest" });
+  button.click();
+  return true;
+})()`);
+	await waitForRendererExpression(
+		automation,
+		`document.querySelector("#workspace-right-sidebar-slot")?.innerText?.includes(${JSON.stringify(label)})`,
+		options,
+		`${label} sidebar tab text`,
+	);
+}
+
+async function openTerminalPaneFromEmptyWorkspace(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+): Promise<void> {
+	const clickedEmptyStateButton = await automation
+		.evaluateJs(`(() => {
+  const button = [...document.querySelectorAll("button")].find((candidate) => (candidate.innerText || "").trim().includes("Open Terminal"));
+  if (!button) return false;
+  button.scrollIntoView({ block: "nearest", inline: "nearest" });
+  button.click();
+  return true;
+})()`)
+		.then((value) => value === true);
+	if (!clickedEmptyStateButton) {
+		const addTabTriggerPoint = (await automation.evaluateJs(`(() => {
+  const trigger = [...document.querySelectorAll("button[data-slot='dropdown-menu-trigger']")].find((candidate) => {
+    const rect = candidate.getBoundingClientRect();
+    return rect.top >= 45 && rect.bottom <= 90 && rect.width >= 24 && rect.width <= 40;
+  });
+  if (!trigger) return null;
+  trigger.scrollIntoView({ block: "nearest", inline: "nearest" });
+  const rect = trigger.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+})()`)) as { x: number; y: number } | null;
+		if (addTabTriggerPoint) {
+			await automation.click(addTabTriggerPoint);
+			await waitForRendererExpression(
+				automation,
+				`[...document.querySelectorAll("[role='menuitem']")].some((candidate) => (candidate.textContent || "").trim().includes("Terminal"))`,
+				options,
+				"terminal add-tab menu item",
+			);
+			const terminalMenuItemPoint = (await automation.evaluateJs(`(() => {
+  const item = [...document.querySelectorAll("[role='menuitem']")].find((candidate) => (candidate.textContent || "").trim().includes("Terminal"));
+  const element = item instanceof HTMLElement ? item : item?.parentElement;
+  if (!element) return null;
+  element.scrollIntoView({ block: "nearest", inline: "nearest" });
+  const rect = element.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+})()`)) as { x: number; y: number } | null;
+			if (!terminalMenuItemPoint) {
+				throw new Error("Could not find Terminal add-tab menu item");
+			}
+			await automation.click(terminalMenuItemPoint);
+		} else {
+			await automation.sendKeys({ keys: ["Meta", "t"] });
+		}
+	}
+	await waitForRendererExpression(
+		automation,
+		`Boolean(document.querySelector("[role='application'] .xterm, [aria-label='Terminal sessions'], .xterm"))`,
+		options,
+		"terminal pane attached",
+	);
+}
+
+async function openChatPaneFromEmptyWorkspace(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+): Promise<void> {
+	const clickedEmptyStateButton = await automation
+		.evaluateJs(`(() => {
+  const button = [...document.querySelectorAll("button")].find((candidate) => (candidate.innerText || "").trim().includes("Open Chat"));
+  if (!button) return false;
+  button.scrollIntoView({ block: "nearest", inline: "nearest" });
+  button.click();
+  return true;
+})()`)
+		.then((value) => value === true);
+	if (!clickedEmptyStateButton) {
+		await automation.sendKeys({ keys: ["Meta", "Shift", "t"] });
+	}
+	await waitForRendererExpression(
+		automation,
+		`Boolean(document.querySelector(".tiptap-chat-input, [data-slot='input-group-control']"))`,
+		options,
+		"chat composer mounted",
+	);
+}
+
+async function sendWorkspaceChatProbe(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+): Promise<void> {
+	const probeText = `Loaded UI perf probe ${Date.now()}`;
+	await automation.evaluateJs(`(() => {
+  const editor = document.querySelector(".tiptap-chat-input, [data-slot='input-group-control']");
+  if (!(editor instanceof HTMLElement)) {
+    throw new Error("Could not find workspace chat editor");
+  }
+  editor.focus();
+  document.execCommand("insertText", false, ${JSON.stringify(probeText)});
+  const form = editor.closest("form");
+  if (!form) {
+    throw new Error("Could not find workspace chat form");
+  }
+  form.requestSubmit();
+  return true;
+})()`);
+	await waitForRendererExpression(
+		automation,
+		`(document.body?.innerText ?? "").includes(${JSON.stringify(probeText)}) || /(provider|model|not configured|sign in|API key|authentication|failed|error)/i.test(document.body?.innerText ?? "")`,
+		options,
+		"chat first send user message or local credential feedback",
+	);
+}
+
+async function openFilePaneFromFilesSidebar(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+): Promise<void> {
+	await ensureV2WorkspaceRightSidebarOpen(automation, options);
+	await switchV2WorkspaceSidebarTab(automation, options, "Files");
+	await waitForRendererExpression(
+		automation,
+		`Boolean(document.querySelector("#workspace-right-sidebar-slot")?.textContent?.includes("Explorer"))`,
+		options,
+		"workspace file explorer",
+	);
+	await automation.evaluateJs(`(() => {
+  const visited = new Set();
+  const roots = [document];
+  for (let index = 0; index < roots.length; index += 1) {
+    const root = roots[index];
+    if (!root || visited.has(root)) continue;
+    visited.add(root);
+    for (const element of root.querySelectorAll("*")) {
+      if (element.shadowRoot) roots.push(element.shadowRoot);
+    }
+    const fileRow = [...root.querySelectorAll("[data-item-path]")].find((candidate) => {
+      const path = candidate.getAttribute("data-item-path") || "";
+      return path.length > 0 && !path.endsWith("/");
+    });
+    if (fileRow instanceof HTMLElement) {
+      fileRow.scrollIntoView({ block: "nearest", inline: "nearest" });
+      fileRow.click();
+      return true;
+    }
+  }
+  throw new Error("Could not find a file row in the workspace Files sidebar");
+})()`);
+	await waitForRendererExpression(
+		automation,
+		`Boolean(document.querySelector("[data-testid='code-editor'], .cm-editor, [data-slot='file-viewer']"))`,
+		options,
+		"file pane editor mounted",
+	);
+}
+
+async function verifyTasksPopover(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+	label: string,
+	index: number,
+	expectedText: string,
+): Promise<void> {
+	await clickButtonByAriaLabel(automation, label, index);
+	await waitForRendererExpression(
+		automation,
+		getTextMatcherScript(expectedText),
+		options,
+		`${label} menu text "${expectedText}"`,
+	);
+	await automation.sendKeys({ keys: ["Escape"] });
+	await sleep(100);
+}
+
 async function isOnSignInRoute(
 	automation: DesktopAutomation,
 ): Promise<boolean> {
@@ -287,6 +701,7 @@ async function isOnSignInRoute(
 async function waitForWorkspaceLoadedOrSignIn(
 	automation: DesktopAutomation,
 	options: ParsedDesktopPerfLoadedUiOptions,
+	organizationId?: string,
 ): Promise<"loaded" | "sign-in"> {
 	const deadline = Date.now() + options.timeoutMs;
 	let recoveryAttempted = false;
@@ -307,6 +722,7 @@ async function waitForWorkspaceLoadedOrSignIn(
 			const recovered = await recoverPartialCollectionsIfNeeded(
 				automation,
 				options,
+				organizationId,
 			);
 			recoveryAttempted = recovered;
 			if (recovered) continue;
@@ -369,6 +785,26 @@ function getFixtureOrganizationId(fixtureResult: unknown): string | undefined {
 	return typeof organizationId === "string" && organizationId.length > 0
 		? organizationId
 		: undefined;
+}
+
+function getFixtureHostBackedWorkspaceId(
+	fixtureResult: unknown,
+): string | undefined {
+	if (!fixtureResult || typeof fixtureResult !== "object") return undefined;
+	const result = fixtureResult as FixtureResult;
+	const candidates = [
+		result.hostBackedWorkspaceIds,
+		result.seedResult?.hostBackedWorkspaceIds,
+		result.before?.hostBackedWorkspaceIds,
+	];
+	for (const candidate of candidates) {
+		if (!Array.isArray(candidate)) continue;
+		const workspaceId = candidate.find((value) => typeof value === "string");
+		if (typeof workspaceId === "string" && workspaceId.length > 0) {
+			return workspaceId;
+		}
+	}
+	return undefined;
 }
 
 function normalizeBearerToken(token: string | null): string | null {
@@ -435,7 +871,11 @@ async function callElectronTrpc<T>(
 
 async function callCollectionsDebug<T>(
 	automation: DesktopAutomation,
-	method: "getV2WorkspaceGraphHealth" | "recoverPartialV2WorkspaceGraphCache",
+	method:
+		| "getActiveOrganizationId"
+		| "switchActiveOrganization"
+		| "getV2WorkspaceGraphHealth"
+		| "recoverPartialV2WorkspaceGraphCache",
 	organizationId?: string,
 ): Promise<CollectionsDebugEnvelope<T>> {
 	const code = `(() => Promise.resolve()
@@ -486,6 +926,78 @@ async function getCollectionsDebugHealth(
 		automation,
 		"getV2WorkspaceGraphHealth",
 		organizationId,
+	);
+}
+
+async function getRendererActiveOrganizationId(
+	automation: DesktopAutomation,
+): Promise<CollectionsDebugEnvelope<string | null>> {
+	return callCollectionsDebug(automation, "getActiveOrganizationId");
+}
+
+async function switchRendererActiveOrganization(
+	automation: DesktopAutomation,
+	organizationId: string,
+): Promise<
+	CollectionsDebugEnvelope<{
+		requestedOrganizationId: string;
+		activeOrganizationId: string | null;
+	}>
+> {
+	return callCollectionsDebug(
+		automation,
+		"switchActiveOrganization",
+		organizationId,
+	);
+}
+
+async function waitForRendererFixtureOrganization(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+	fixtureOrganizationId: string,
+): Promise<string> {
+	const deadline = Date.now() + options.timeoutMs;
+	let switchAttempted = false;
+	let lastState: unknown = null;
+
+	while (Date.now() < deadline) {
+		const active = await getRendererActiveOrganizationId(automation).catch(
+			(error) => ({
+				available: false,
+				error: error instanceof Error ? error.message : String(error),
+			}),
+		);
+		lastState = active;
+
+		if (active.available && active.result === fixtureOrganizationId) {
+			return fixtureOrganizationId;
+		}
+
+		if (!switchAttempted && active.available) {
+			const switched = await switchRendererActiveOrganization(
+				automation,
+				fixtureOrganizationId,
+			);
+			lastState = switched;
+			if (switched.error) {
+				throw new Error(
+					`Could not switch renderer to fixture organization: ${switched.error}`,
+				);
+			}
+			if (switched.result?.activeOrganizationId === fixtureOrganizationId) {
+				return fixtureOrganizationId;
+			}
+			switchAttempted = true;
+		}
+
+		await sleep(500);
+	}
+
+	throw new Error(
+		[
+			`Timed out waiting for renderer active organization ${fixtureOrganizationId} after ${options.timeoutMs}ms`,
+			`Last renderer organization state: ${JSON.stringify(lastState)}`,
+		].join("\n"),
 	);
 }
 
@@ -558,37 +1070,13 @@ async function forceDevLoginForFixtureOrganization(
 		throw new Error("Loaded UI dev sign-in did not return a bearer token.");
 	}
 
-	const setActive = await postJson<Record<string, unknown>>(
-		`${origin}/api/auth/organization/set-active`,
-		{ organizationId: fixtureOrganizationId },
-		{ Authorization: `Bearer ${signInToken}` },
-	);
-
-	if (!setActive.response.ok) {
-		throw new Error(
-			`Could not switch loaded UI dev account to fixture organization (${setActive.response.status}).`,
-		);
-	}
-
-	const headerToken = normalizeBearerToken(
-		setActive.response.headers.get("set-auth-token"),
-	);
-	const token = headerToken ?? signInToken;
+	const token = signInToken;
 	const sessionResponse = await fetch(`${origin}/api/auth/get-session`, {
 		headers: { Authorization: `Bearer ${token}` },
 	});
 	const session = (await sessionResponse
 		.json()
 		.catch(() => null)) as DesktopSessionResponse | null;
-	const activeOrganizationId =
-		session?.session?.activeOrganizationId ?? undefined;
-
-	if (activeOrganizationId !== fixtureOrganizationId) {
-		throw new Error(
-			`Loaded UI dev session active organization is ${activeOrganizationId ?? "missing"}; expected ${fixtureOrganizationId}.`,
-		);
-	}
-
 	await callElectronTrpc(automation, "auth.persistToken", "mutation", {
 		token,
 		expiresAt:
@@ -605,6 +1093,11 @@ async function forceDevLoginForFixtureOrganization(
 		urlIncludes: "#/",
 		timeoutMs: options.timeoutMs,
 	});
+	const activeOrganizationId = await waitForRendererFixtureOrganization(
+		automation,
+		options,
+		fixtureOrganizationId,
+	);
 
 	return {
 		attempted: true,
@@ -618,14 +1111,16 @@ function buildSummaryScript(projectText: string, taskText: string): string {
 	return `(() => {
   const text = document.body?.innerText ?? "";
   const countText = (needle) => needle ? text.split(needle).length - 1 : 0;
+  const debugActiveOrganizationId = window.__supersetCollectionsDebug?.getActiveOrganizationId?.() ?? localStorage.getItem("active_organization_id");
   return JSON.stringify({
     href: location.href,
     domNodeCount: document.querySelectorAll("*").length,
     bodyTextLength: text.length,
+    debugActiveOrganizationId,
     projectMentions: countText(${JSON.stringify(projectText)}),
     taskMentions: countText(${JSON.stringify(taskText)}),
     workspaceRowCount: document.querySelectorAll("[data-v2-workspace-row]").length,
-    sidebarWorkspaceRowCount: document.querySelectorAll("[data-dashboard-sidebar-workspace-item], [data-dashboard-sidebar-collapsed-workspace-row]").length,
+    sidebarWorkspaceRowCount: document.querySelectorAll(${JSON.stringify(DASHBOARD_SIDEBAR_WORKSPACE_ROW_SELECTOR)}).length,
     sidebarProjectSectionCount: document.querySelectorAll("[data-dashboard-sidebar-project-section]").length,
     sidebarOverflowLinkCount: document.querySelectorAll("[data-dashboard-sidebar-overflow-link]").length,
     env: {
@@ -649,6 +1144,51 @@ async function collectSummary(
 		throw new Error("Desktop summary script did not return JSON");
 	}
 	return JSON.parse(raw) as LoadedViewSummary;
+}
+
+async function openWorkspaceSidebarForDensityCheck(
+	automation: DesktopAutomation,
+	options: ParsedDesktopPerfLoadedUiOptions,
+): Promise<void> {
+	if (options.minSidebarWorkspaceRows <= 0) return;
+
+	await automation.evaluateJs(`(() => {
+  const key = "workspace-sidebar-store";
+  const fallbackState = {
+    isOpen: true,
+    width: 280,
+    lastExpandedWidth: 280,
+    collapsedProjectIds: [],
+  };
+  const parsed = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "null");
+    } catch {
+      return null;
+    }
+  })();
+  const state = {
+    ...fallbackState,
+    ...(parsed && typeof parsed === "object" && parsed.state && typeof parsed.state === "object" ? parsed.state : {}),
+    isOpen: true,
+    width: 280,
+    lastExpandedWidth: 280,
+  };
+  localStorage.setItem(key, JSON.stringify({ state, version: 2 }));
+  location.reload();
+})()`);
+	await automation.waitFor({
+		urlIncludes: "#/v2-workspaces",
+		timeoutMs: options.timeoutMs,
+	});
+	await automation.waitFor({
+		text: options.projectText,
+		timeoutMs: options.timeoutMs,
+	});
+	await automation.waitFor({
+		selector: DASHBOARD_SIDEBAR_WORKSPACE_ROW_SELECTOR,
+		timeoutMs: options.timeoutMs,
+	});
 }
 
 function ensureLoadedFixture(
@@ -740,12 +1280,30 @@ function assertLoadedViews(
 			`tasks view rendered ${report.tasksView.taskMentions} visible fixture task mentions; expected at least ${options.minTaskMentions}`,
 		);
 	}
+	if (report.workspaceView.domNodeCount > options.maxWorkspaceDomNodes) {
+		failures.push(
+			`workspace view rendered ${report.workspaceView.domNodeCount} DOM nodes; expected at most ${options.maxWorkspaceDomNodes}`,
+		);
+	}
+	if (report.tasksView.domNodeCount > options.maxTasksDomNodes) {
+		failures.push(
+			`tasks view rendered ${report.tasksView.domNodeCount} DOM nodes; expected at most ${options.maxTasksDomNodes}`,
+		);
+	}
 	const blockingConsoleErrorCount = options.failOnResourceErrors
 		? report.consoleErrorCount
 		: report.consoleRuntimeErrorCount;
 	if (!options.allowConsoleErrors && blockingConsoleErrorCount > 0) {
 		failures.push(
 			`renderer logged ${blockingConsoleErrorCount} blocking console error(s) during loaded UI verification`,
+		);
+	}
+	if (
+		report.auth.fixtureOrganizationId &&
+		report.auth.activeOrganizationId !== report.auth.fixtureOrganizationId
+	) {
+		failures.push(
+			`renderer active organization is ${report.auth.activeOrganizationId ?? "missing"}; expected fixture organization ${report.auth.fixtureOrganizationId}`,
 		);
 	}
 
@@ -780,10 +1338,13 @@ async function runLoadedUiVerification(
 	loadRootEnv();
 	const fixtureResult = ensureLoadedFixture(options);
 	const fixtureOrganizationId = getFixtureOrganizationId(fixtureResult);
+	const fixtureHostBackedWorkspaceId =
+		getFixtureHostBackedWorkspaceId(fixtureResult);
 	const automation = new DesktopAutomation();
 	const startedAt = new Date().toISOString();
 	const workspacesScreenshot = `${options.artifactDir}/loaded-workspaces-ui.png`;
 	const tasksScreenshot = `${options.artifactDir}/loaded-tasks-ui.png`;
+	const workspaceDetailScreenshot = `${options.artifactDir}/loaded-workspace-detail-ui.png`;
 	const reportArtifact = `${options.artifactDir}/loaded-ui-report.json`;
 
 	try {
@@ -808,6 +1369,7 @@ async function runLoadedUiVerification(
 		const workspaceState = await waitForWorkspaceLoadedOrSignIn(
 			automation,
 			options,
+			fixtureOrganizationId,
 		);
 		const fallbackAuthResult =
 			workspaceState === "sign-in"
@@ -824,8 +1386,80 @@ async function runLoadedUiVerification(
 			text: options.projectText,
 			timeoutMs: options.timeoutMs,
 		});
+		await openWorkspaceSidebarForDensityCheck(automation, options);
 		await automation.takeScreenshot({ path: workspacesScreenshot });
 		const workspaceView = await collectSummary(automation, options);
+		const interactions: LoadedInteractionSummary[] = [];
+		interactions.push(
+			await runLoadedInteraction(
+				automation,
+				"open-v2-workspace-detail",
+				async () => {
+					await clickFirstWorkspaceRow(
+						automation,
+						options,
+						fixtureHostBackedWorkspaceId,
+					);
+				},
+			),
+		);
+		interactions.push(
+			await runLoadedInteraction(
+				automation,
+				"open-v2-workspace-right-sidebar",
+				async () => {
+					await ensureV2WorkspaceRightSidebarOpen(automation, options);
+				},
+			),
+		);
+		for (const label of ["Files", "Changes", "Review", "Models"] as const) {
+			interactions.push(
+				await runLoadedInteraction(
+					automation,
+					`switch-v2-workspace-sidebar-${label.toLowerCase()}`,
+					async () => {
+						await switchV2WorkspaceSidebarTab(automation, options, label);
+					},
+				),
+			);
+		}
+		interactions.push(
+			await runLoadedInteraction(
+				automation,
+				"open-workspace-chat-pane",
+				async () => {
+					await openChatPaneFromEmptyWorkspace(automation, options);
+				},
+			),
+		);
+		interactions.push(
+			await runLoadedInteraction(
+				automation,
+				"workspace-chat-first-send",
+				async () => {
+					await sendWorkspaceChatProbe(automation, options);
+				},
+			),
+		);
+		interactions.push(
+			await runLoadedInteraction(
+				automation,
+				"open-workspace-terminal-pane",
+				async () => {
+					await openTerminalPaneFromEmptyWorkspace(automation, options);
+				},
+			),
+		);
+		interactions.push(
+			await runLoadedInteraction(
+				automation,
+				"open-workspace-file-pane",
+				async () => {
+					await openFilePaneFromFilesSidebar(automation, options);
+				},
+			),
+		);
+		await automation.takeScreenshot({ path: workspaceDetailScreenshot });
 
 		await automation.navigate({ path: "/tasks" });
 		await automation.waitFor({
@@ -836,8 +1470,74 @@ async function runLoadedUiVerification(
 			text: options.taskText,
 			timeoutMs: options.timeoutMs,
 		});
+		interactions.push(
+			await runLoadedInteraction(automation, "open-tasks-project-filter", () =>
+				verifyTasksPopover(automation, options, "All tasks", 0, "No project"),
+			),
+		);
+		interactions.push(
+			await runLoadedInteraction(automation, "open-tasks-status-filter", () =>
+				verifyTasksPopover(automation, options, "All tasks", 1, "Backlog"),
+			),
+		);
+		interactions.push(
+			await runLoadedInteraction(automation, "open-tasks-assignee-filter", () =>
+				verifyTasksPopover(automation, options, "Assignee", 0, "Unassigned"),
+			),
+		);
+		interactions.push(
+			await runLoadedInteraction(
+				automation,
+				"switch-tasks-board-view",
+				async () => {
+					await clickButtonByTitle(automation, "Board view");
+					await waitForRendererExpression(
+						automation,
+						getTextMatcherScript(options.taskText),
+						options,
+						"board view fixture task text",
+					);
+				},
+			),
+		);
+		interactions.push(
+			await runLoadedInteraction(
+				automation,
+				"switch-tasks-table-view",
+				async () => {
+					await clickButtonByTitle(automation, "Table view");
+					await waitForRendererExpression(
+						automation,
+						getTextMatcherScript(options.taskText),
+						options,
+						"table view fixture task text",
+					);
+				},
+			),
+		);
+		for (const typeTab of ["PRs", "Issues", "Tasks"] as const) {
+			interactions.push(
+				await runLoadedInteraction(
+					automation,
+					`switch-tasks-type-${typeTab.toLowerCase()}`,
+					async () => {
+						await automation.click({ text: typeTab, fuzzy: false });
+						await waitForRendererExpression(
+							automation,
+							getTextMatcherScript(typeTab),
+							options,
+							`${typeTab} task type tab`,
+						);
+					},
+				),
+			);
+		}
 		await automation.takeScreenshot({ path: tasksScreenshot });
 		const tasksView = await collectSummary(automation, options);
+		const rendererActiveOrganization = await getRendererActiveOrganizationId(
+			automation,
+		).catch(() => null);
+		const rendererActiveOrganizationId = rendererActiveOrganization?.result;
 		const consoleErrors = await automation.getConsoleLogs({
 			level: "error",
 			limit: 50,
@@ -849,20 +1549,23 @@ async function runLoadedUiVerification(
 		const consoleRuntimeErrors = consoleErrorMessages.filter(
 			(message) => !isBrowserResourceError(message),
 		);
-		const collectionHealth = await getCollectionsDebugHealth(automation).catch(
-			(error) => ({
-				available: false,
-				error: error instanceof Error ? error.message : String(error),
-			}),
-		);
+		const collectionHealth = await getCollectionsDebugHealth(
+			automation,
+			fixtureOrganizationId,
+		).catch((error) => ({
+			available: false,
+			error: error instanceof Error ? error.message : String(error),
+		}));
 		const report: LoadedUiReport = {
 			startedAt,
 			completedAt: new Date().toISOString(),
 			workspaceView,
 			tasksView,
+			interactions,
 			screenshots: {
 				workspaces: resolve(process.cwd(), workspacesScreenshot),
 				tasks: resolve(process.cwd(), tasksScreenshot),
+				workspaceDetail: resolve(process.cwd(), workspaceDetailScreenshot),
 			},
 			consoleErrorCount: consoleErrorMessages.length,
 			consoleResourceErrorCount: consoleResourceErrors.length,
@@ -878,7 +1581,9 @@ async function runLoadedUiVerification(
 				...("activeOrganizationId" in fallbackAuthResult &&
 				fallbackAuthResult.activeOrganizationId
 					? { activeOrganizationId: fallbackAuthResult.activeOrganizationId }
-					: {}),
+					: rendererActiveOrganizationId
+						? { activeOrganizationId: rendererActiveOrganizationId }
+						: {}),
 				...(fixtureOrganizationId ? { fixtureOrganizationId } : {}),
 			},
 			fixture: {
@@ -910,6 +1615,8 @@ Options:
   --min-workspace-rows <count>         Minimum visible main workspace rows
   --min-sidebar-workspace-rows <count> Minimum visible sidebar workspace rows
   --min-task-mentions <count>          Minimum visible task text mentions
+  --max-workspace-dom-nodes <count>    Maximum DOM nodes on /v2-workspaces
+  --max-tasks-dom-nodes <count>        Maximum DOM nodes on /tasks
   --timeout-ms <ms>                    Wait timeout per UI condition
   --skip-navigation                    Validate the current route first
   --allow-console-errors               Do not fail on renderer console errors
@@ -946,10 +1653,12 @@ if (import.meta.main) {
 				[
 					"Loaded desktop UI verified",
 					`  workspaces: ${report.workspaceView.workspaceRowCount} visible main rows, ${report.workspaceView.sidebarWorkspaceRowCount} sidebar rows`,
+					`  DOM: ${report.workspaceView.domNodeCount} workspace nodes, ${report.tasksView.domNodeCount} task nodes`,
 					`  tasks: ${report.tasksView.taskMentions} visible fixture task mentions`,
+					`  interactions: ${report.interactions.length} loaded interaction checks`,
 					`  auth: ${report.auth.autoLoginAttempted ? `auto-login-dev (${report.auth.devEmail})` : "existing session"}`,
 					`  fixture: ${report.fixture.ensureAttempted ? "ensured before verification" : "existing data only"}`,
-					`  screenshots: ${report.screenshots.workspaces}, ${report.screenshots.tasks}`,
+					`  screenshots: ${report.screenshots.workspaces}, ${report.screenshots.workspaceDetail}, ${report.screenshots.tasks}`,
 					`  report: ${report.reportPath}`,
 				].join("\n"),
 			);

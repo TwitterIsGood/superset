@@ -1,6 +1,6 @@
 import { COMPANY } from "@superset/shared/constants";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
-import { LuChevronRight, LuCircleHelp, LuRadioTower } from "react-icons/lu";
+import { ChevronRight, CircleHelp, RadioTower } from "lucide-react";
 import { STROKE_WIDTH } from "renderer/screens/main/components/WorkspaceSidebar/constants";
 import { usePortsStore } from "renderer/stores";
 import { DashboardSidebarPortGroup } from "./components/DashboardSidebarPortGroup";
@@ -33,11 +33,11 @@ export function DashboardSidebarPortsList() {
 					className="flex items-center gap-1.5 focus-visible:text-muted-foreground focus-visible:outline-none"
 				>
 					<span className="relative size-3">
-						<LuRadioTower
+						<RadioTower
 							className="absolute inset-0 size-3 transition-opacity group-hover:opacity-0"
 							strokeWidth={STROKE_WIDTH}
 						/>
-						<LuChevronRight
+						<ChevronRight
 							className={`absolute inset-0 size-3 opacity-0 transition-[opacity,transform] group-hover:opacity-100 ${isCollapsed ? "" : "rotate-90"}`}
 							strokeWidth={STROKE_WIDTH}
 						/>
@@ -52,7 +52,7 @@ export function DashboardSidebarPortsList() {
 							onClick={handleOpenPortsDocs}
 							className="ml-auto rounded p-0.5 opacity-0 transition-opacity hover:bg-muted/50 group-hover:opacity-100"
 						>
-							<LuCircleHelp className="size-3" strokeWidth={STROKE_WIDTH} />
+							<CircleHelp className="size-3" strokeWidth={STROKE_WIDTH} />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="top" sideOffset={4}>

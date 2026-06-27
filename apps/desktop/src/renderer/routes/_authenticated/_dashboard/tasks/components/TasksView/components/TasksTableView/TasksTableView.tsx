@@ -5,12 +5,17 @@ import {
 	type Range,
 	useVirtualizer,
 } from "@tanstack/react-virtual";
-import { Fragment, useCallback, useMemo, useRef } from "react";
+import { Fragment, lazy, Suspense, useCallback, useMemo, useRef } from "react";
 import type { TaskWithStatus } from "../../hooks/useTasksTable";
-import { TaskContextMenu } from "./components/TaskContextMenu";
 
 const ROW_HEIGHT = 36;
 const OVERSCAN = 50;
+
+const TaskContextMenu = lazy(() =>
+	import("./components/TaskContextMenu").then((module) => ({
+		default: module.TaskContextMenu,
+	})),
+);
 
 interface TasksTableViewProps {
 	table: Table<TaskWithStatus>;
@@ -86,6 +91,37 @@ export function TasksTableView({
 					const row = rows[virtualRow.index];
 					const isGroupHeader = row.subRows && row.subRows.length > 0;
 
+					const rowContent = (
+						// biome-ignore lint/a11y/useSemanticElements: Grid layout requires div, button cannot use grid styling
+						<div
+							role="button"
+							tabIndex={0}
+							className={cn(
+								"grid items-center gap-3 px-4 h-9 cursor-pointer border-b border-border/50 hover:bg-accent/50",
+								row.getIsSelected() && "bg-accent/30",
+							)}
+							style={{
+								gridTemplateColumns: `auto auto ${slugColumnWidth} minmax(0,1fr) auto auto auto`,
+							}}
+							onClick={() => onTaskClick(row.original)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									onTaskClick(row.original);
+								}
+							}}
+						>
+							{row
+								.getVisibleCells()
+								.slice(1)
+								.map((cell) => (
+									<div key={cell.id} className="flex items-center">
+										{flexRender(cell.column.columnDef.cell, cell.getContext())}
+									</div>
+								))}
+						</div>
+					);
+
 					return (
 						<Fragment key={row.id}>
 							{gap > 0 && <div style={{ height: gap }} />}
@@ -97,39 +133,11 @@ export function TasksTableView({
 									)}
 								</div>
 							) : (
-								<TaskContextMenu task={row.original}>
-									{/* biome-ignore lint/a11y/useSemanticElements: Grid layout requires div, button cannot use grid styling */}
-									<div
-										role="button"
-										tabIndex={0}
-										className={cn(
-											"grid items-center gap-3 px-4 h-9 cursor-pointer border-b border-border/50 hover:bg-accent/50",
-											row.getIsSelected() && "bg-accent/30",
-										)}
-										style={{
-											gridTemplateColumns: `auto auto ${slugColumnWidth} minmax(0,1fr) auto auto auto`,
-										}}
-										onClick={() => onTaskClick(row.original)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter" || e.key === " ") {
-												e.preventDefault();
-												onTaskClick(row.original);
-											}
-										}}
-									>
-										{row
-											.getVisibleCells()
-											.slice(1)
-											.map((cell) => (
-												<div key={cell.id} className="flex items-center">
-													{flexRender(
-														cell.column.columnDef.cell,
-														cell.getContext(),
-													)}
-												</div>
-											))}
-									</div>
-								</TaskContextMenu>
+								<Suspense fallback={rowContent}>
+									<TaskContextMenu task={row.original}>
+										{rowContent}
+									</TaskContextMenu>
+								</Suspense>
 							)}
 						</Fragment>
 					);

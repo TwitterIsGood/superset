@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigateAwayFromWorkspace } from "renderer/routes/_authenticated/_dashboard/components/DashboardSidebar/hooks/useNavigateAwayFromWorkspace";
-import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";
+import { useDashboardSidebarCoreState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarCoreState";
 import { useRemoveFromSidebarIntent } from "renderer/stores/remove-workspace-from-sidebar-intent";
 
 /**
@@ -15,7 +15,7 @@ export function RemoveFromSidebarMount() {
 	const target = useRemoveFromSidebarIntent((s) => s.target);
 	const clear = useRemoveFromSidebarIntent((s) => s.clear);
 	const { hideWorkspaceInSidebar, removeWorkspaceFromSidebar } =
-		useDashboardSidebarState();
+		useDashboardSidebarCoreState();
 	const { navigateAwayFromWorkspace } = useNavigateAwayFromWorkspace();
 
 	useEffect(() => {

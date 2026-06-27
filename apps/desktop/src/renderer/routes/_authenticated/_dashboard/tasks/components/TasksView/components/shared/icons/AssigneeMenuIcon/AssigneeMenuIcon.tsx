@@ -1,4 +1,4 @@
-import { HiOutlineUserCircle } from "react-icons/hi2";
+import { CircleUserRound } from "lucide-react";
 
 interface AssigneeMenuIconProps {
 	color?: string;
@@ -9,5 +9,5 @@ export function AssigneeMenuIcon({
 	color = "currentColor",
 	className,
 }: AssigneeMenuIconProps) {
-	return <HiOutlineUserCircle className={className} style={{ color }} />;
+	return <CircleUserRound className={className} style={{ color }} />;
 }

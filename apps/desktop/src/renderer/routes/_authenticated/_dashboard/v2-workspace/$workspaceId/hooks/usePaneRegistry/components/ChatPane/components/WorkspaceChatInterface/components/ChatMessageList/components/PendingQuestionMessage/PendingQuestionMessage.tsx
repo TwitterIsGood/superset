@@ -1,8 +1,5 @@
-import {
-	Message,
-	MessageContent,
-	MessageResponse,
-} from "@superset/ui/ai-elements/message";
+import { Message, MessageContent } from "@superset/ui/ai-elements/message";
+import { MessageResponse } from "@superset/ui/ai-elements/message-response";
 import { Button } from "@superset/ui/button";
 import { Input } from "@superset/ui/input";
 import { useEffect, useMemo, useRef, useState } from "react";

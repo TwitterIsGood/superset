@@ -13,8 +13,8 @@ import {
 } from "@superset/ui/hover-card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
+import { Copy, GitBranch, X } from "lucide-react";
 import { type RefObject, useMemo, useState } from "react";
-import { LuCopy, LuGitBranch, LuX } from "react-icons/lu";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import { createContextMenuDeleteDialogCoordinator } from "renderer/react-query/workspaces/useWorkspaceDeleteHandler";
 import type { ActivePaneStatus } from "shared/tabs-types";
@@ -119,7 +119,7 @@ export function CollapsedWorkspaceItem({
 					</Tooltip>
 					<ContextMenuContent>
 						<ContextMenuItem onSelect={onCopyBranchName}>
-							<LuGitBranch className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+							<GitBranch className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 							Copy Branch Name
 						</ContextMenuItem>
 					</ContextMenuContent>
@@ -152,11 +152,11 @@ export function CollapsedWorkspaceItem({
 						}}
 					>
 						<ContextMenuItem onSelect={onCopyPath}>
-							<LuCopy className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+							<Copy className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 							Copy Path
 						</ContextMenuItem>
 						<ContextMenuItem onSelect={onCopyBranchName}>
-							<LuGitBranch className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+							<GitBranch className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 							Copy Branch Name
 						</ContextMenuItem>
 						<ContextMenuSeparator />
@@ -165,7 +165,7 @@ export function CollapsedWorkspaceItem({
 								deleteDialogCoordinator.requestOpenDeleteDialog();
 							}}
 						>
-							<LuX className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+							<X className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 							Close Workspace
 							{showDeleteShortcut && (
 								<ContextMenuShortcut>{deleteHotkeyText}</ContextMenuShortcut>

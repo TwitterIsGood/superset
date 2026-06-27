@@ -9,7 +9,6 @@ import {
 	FileTree as PierreFileTree,
 	useFileTree as usePierreFileTree,
 } from "@pierre/trees/react";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { workspaceTrpc } from "@superset/workspace-client";
 import { Undo2 } from "lucide-react";
@@ -26,6 +25,7 @@ import {
 	type PierreGitStatusEntry,
 	stripTrailingSlash,
 } from "renderer/lib/pierreTree";
+import { toast } from "renderer/lib/toast";
 import { DiscardConfirmDialog } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/components/DiscardConfirmDialog";
 import { PierreRowContextMenu } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/components/WorkspaceSidebar/components/PierreRowContextMenu";
 import type { ChangesetFile } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/hooks/useChangeset";

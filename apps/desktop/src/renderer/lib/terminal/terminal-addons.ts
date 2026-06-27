@@ -1,6 +1,4 @@
 import { ClipboardAddon } from "@xterm/addon-clipboard";
-import { ImageAddon } from "@xterm/addon-image";
-import { LigaturesAddon } from "@xterm/addon-ligatures";
 import { ProgressAddon } from "@xterm/addon-progress";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
@@ -37,17 +35,11 @@ export function loadAddons(terminal: XTerm): LoadAddonsResult {
 	terminal.loadAddon(unicode11);
 	terminal.unicode.activeVersion = "11";
 
-	terminal.loadAddon(new ImageAddon());
-
 	const searchAddon = new SearchAddon();
 	terminal.loadAddon(searchAddon);
 
 	const progressAddon = new ProgressAddon();
 	terminal.loadAddon(progressAddon);
-
-	try {
-		terminal.loadAddon(new LigaturesAddon());
-	} catch {}
 
 	const rafId = requestAnimationFrame(() => {
 		void (async () => {

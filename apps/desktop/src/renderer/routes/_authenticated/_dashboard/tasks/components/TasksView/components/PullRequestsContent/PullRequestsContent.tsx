@@ -2,10 +2,14 @@ import { Button } from "@superset/ui/button";
 import { Checkbox } from "@superset/ui/checkbox";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import {
+	ExternalLink,
+	GitPullRequestIcon,
+	Minus,
+	Plus,
+	RefreshCw,
+} from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { GoGitPullRequest } from "react-icons/go";
-import { HiOutlineArrowTopRightOnSquare } from "react-icons/hi2";
-import { LuMinus, LuPlus, LuRefreshCw } from "react-icons/lu";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { useDebouncedValue } from "renderer/hooks/useDebouncedValue";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
@@ -142,7 +146,7 @@ export function PullRequestsContent({
 		return (
 			<div className="flex h-full items-center justify-center p-8">
 				<div className="flex flex-col items-center gap-2 text-muted-foreground text-center">
-					<GoGitPullRequest className="h-8 w-8" />
+					<GitPullRequestIcon className="h-8 w-8" />
 					<span className="text-sm">
 						Select a project to see pull requests.
 					</span>
@@ -161,7 +165,7 @@ export function PullRequestsContent({
 	return (
 		<div className="@container flex flex-col h-full overflow-hidden">
 			<div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30 shrink-0">
-				<GoGitPullRequest className="size-3.5 text-muted-foreground" />
+				<GitPullRequestIcon className="size-3.5 text-muted-foreground" />
 				<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
 					Pull requests
 				</span>
@@ -175,7 +179,7 @@ export function PullRequestsContent({
 					disabled={isFetching}
 					onClick={() => refetch()}
 				>
-					<LuRefreshCw
+					<RefreshCw
 						className={isFetching ? "size-3.5 animate-spin" : "size-3.5"}
 					/>
 				</Button>
@@ -186,7 +190,7 @@ export function PullRequestsContent({
 						title="Minimize"
 						onClick={onCollapse}
 					>
-						<LuMinus className="size-3.5" />
+						<Minus className="size-3.5" />
 					</Button>
 				)}
 			</div>
@@ -223,7 +227,7 @@ export function PullRequestsContent({
 
 				{isInitialLoad ? (
 					<div className="flex h-full items-center justify-center gap-2 p-8 text-muted-foreground">
-						<LuRefreshCw className="size-4 animate-spin" />
+						<RefreshCw className="size-4 animate-spin" />
 						<span className="text-sm">Loading pull requests…</span>
 					</div>
 				) : totalCount === 0 && !isFetching && !error ? (
@@ -276,7 +280,7 @@ export function PullRequestsContent({
 												handleOpenUrl(pr.url);
 											}}
 										>
-											<HiOutlineArrowTopRightOnSquare className="size-3.5" />
+											<ExternalLink className="size-3.5" />
 										</Button>
 										<Button
 											variant="outline"
@@ -288,7 +292,7 @@ export function PullRequestsContent({
 												handleAddToWorkspace(pr);
 											}}
 										>
-											<LuPlus className="size-3.5" />
+											<Plus className="size-3.5" />
 											<span className="hidden @lg:inline">
 												Add to workspace
 											</span>

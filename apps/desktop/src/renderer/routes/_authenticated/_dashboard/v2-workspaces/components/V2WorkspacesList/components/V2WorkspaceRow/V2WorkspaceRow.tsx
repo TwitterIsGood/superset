@@ -7,18 +7,18 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
-import { CgLaptop } from "react-icons/cg";
 import {
-	LuCircleCheck,
-	LuCircleDashed,
-	LuCircleX,
-	LuGitBranch,
-	LuLaptop,
-	LuMonitor,
-	LuTrash2,
-} from "react-icons/lu";
-import { RiPushpinFill, RiPushpinLine } from "react-icons/ri";
+	CircleCheck,
+	CircleDashed,
+	CircleX,
+	GitBranch,
+	Laptop,
+	Monitor,
+	Pin,
+	PinOff,
+	Trash2,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { DashboardSidebarDeleteDialog } from "renderer/routes/_authenticated/_dashboard/components/DashboardSidebar/components/DashboardSidebarDeleteDialog";
 import { navigateToV2Workspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { V2WorkspacePrHoverCardContent } from "renderer/routes/_authenticated/_dashboard/v2-workspaces/components/V2WorkspacePrHoverCardContent";
@@ -27,7 +27,7 @@ import type {
 	V2WorkspaceHostType,
 	V2WorkspacePrSummary,
 } from "renderer/routes/_authenticated/_dashboard/v2-workspaces/hooks/useAccessibleV2Workspaces";
-import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";
+import { useDashboardSidebarCoreState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarCoreState";
 import { useDeletingWorkspaces } from "renderer/routes/_authenticated/providers/DeletingWorkspacesProvider";
 import { PRIcon } from "renderer/screens/main/components/PRIcon/PRIcon";
 import { getRelativeTime } from "renderer/screens/main/components/WorkspacesListView/utils";
@@ -39,7 +39,7 @@ interface V2WorkspaceRowProps {
 }
 
 function hostIconFor(hostType: V2WorkspaceHostType) {
-	return hostType === "local-device" ? LuLaptop : LuMonitor;
+	return hostType === "local-device" ? Laptop : Monitor;
 }
 
 export function V2WorkspaceRow({
@@ -51,7 +51,7 @@ export function V2WorkspaceRow({
 		ensureWorkspaceInSidebar,
 		removeWorkspaceFromSidebar,
 		hideWorkspaceInSidebar,
-	} = useDashboardSidebarState();
+	} = useDashboardSidebarCoreState();
 	const isMainWorkspace = workspace.type === "main";
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 	const { isDeleting } = useDeletingWorkspaces();
@@ -188,7 +188,7 @@ export function V2WorkspaceRow({
 										isCurrentRoute && "cursor-not-allowed opacity-50",
 									)}
 								>
-									<RiPushpinFill className="size-4" />
+									<Pin className="size-4 fill-current" />
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent side="right">
@@ -208,7 +208,7 @@ export function V2WorkspaceRow({
 									aria-label="Pin to sidebar"
 									className="size-7 text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
 								>
-									<RiPushpinLine className="size-4" />
+									<PinOff className="size-4" />
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent side="right">Pin to sidebar</TooltipContent>
@@ -220,7 +220,7 @@ export function V2WorkspaceRow({
 					{isMainWorkspace ? (
 						<Tooltip delayDuration={300}>
 							<TooltipTrigger asChild>
-								<CgLaptop
+								<Laptop
 									className="size-3.5 shrink-0 text-muted-foreground"
 									aria-label="Main workspace"
 								/>
@@ -252,7 +252,7 @@ export function V2WorkspaceRow({
 					className="hidden min-w-0 items-center gap-1.5 text-xs text-muted-foreground lg:flex"
 					title={workspace.branch}
 				>
-					<LuGitBranch className="size-3 shrink-0" />
+					<GitBranch className="size-3 shrink-0" />
 					<span className="min-w-0 truncate font-mono text-[11px]">
 						{workspace.branch}
 					</span>
@@ -276,7 +276,7 @@ export function V2WorkspaceRow({
 							aria-label="Delete workspace"
 							className="size-7 text-muted-foreground opacity-0 transition-opacity hover:bg-transparent hover:text-destructive focus-visible:opacity-100 group-hover/row:opacity-100 dark:hover:bg-transparent"
 						>
-							<LuTrash2 className="size-3.5" />
+							<Trash2 className="size-3.5" />
 						</Button>
 					) : null}
 				</div>
@@ -338,12 +338,12 @@ interface ChecksDotProps {
 function ChecksDot({ status }: ChecksDotProps) {
 	if (status === "none") return null;
 	if (status === "pending") {
-		return <LuCircleDashed className="size-3 text-amber-500" />;
+		return <CircleDashed className="size-3 text-amber-500" />;
 	}
 	if (status === "success") {
-		return <LuCircleCheck className="size-3 text-emerald-500" />;
+		return <CircleCheck className="size-3 text-emerald-500" />;
 	}
-	return <LuCircleX className="size-3 text-red-500" />;
+	return <CircleX className="size-3 text-red-500" />;
 }
 
 const ASCII_SPINNER_FRAMES = ["◰", "◳", "◲", "◱"];

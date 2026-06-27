@@ -1,1 +1,1 @@
-export { EmojiSuggestion } from "./EmojiSuggestion";
+export { EmojiSuggestion, emojiSuggestionKey } from "./EmojiSuggestion";

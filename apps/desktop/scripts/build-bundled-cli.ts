@@ -88,10 +88,10 @@ const outfile = resolve(
 	TARGET_PLATFORM === "win32" ? "superset.exe" : "superset",
 );
 
-if (process.env.DESKTOP_BUNDLE_CLI === "false") {
+if (process.env.DESKTOP_BUNDLE_CLI !== "true") {
 	rmSync(outfile, { force: true });
 	console.log(
-		`[desktop] bundled CLI disabled; removed stale output at ${outfile}`,
+		`[desktop] bundled CLI disabled (set DESKTOP_BUNDLE_CLI=true to include it); removed stale output at ${outfile}`,
 	);
 	process.exit(0);
 }

@@ -9,9 +9,9 @@ import {
 } from "@superset/ui/dialog";
 import { Input } from "@superset/ui/input";
 import { Label } from "@superset/ui/label";
-import { toast } from "@superset/ui/sonner";
 import { useState } from "react";
 import { authClient } from "renderer/lib/auth-client";
+import { toast } from "renderer/lib/toast";
 
 interface CreateTeamButtonProps {
 	organizationId: string;

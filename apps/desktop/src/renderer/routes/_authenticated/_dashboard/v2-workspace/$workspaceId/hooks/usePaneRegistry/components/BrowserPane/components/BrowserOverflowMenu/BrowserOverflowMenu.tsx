@@ -6,14 +6,14 @@ import {
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
 import {
-	TbCamera,
-	TbClock,
-	TbCopy,
-	TbDots,
-	TbExternalLink,
-	TbReload,
-	TbTrash,
-} from "react-icons/tb";
+	Camera,
+	Clock,
+	Copy,
+	Ellipsis,
+	ExternalLink,
+	RefreshCw,
+	Trash2,
+} from "lucide-react";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 
@@ -75,7 +75,7 @@ export function BrowserOverflowMenu({
 					type="button"
 					className="rounded p-0.5 text-muted-foreground/60 transition-colors hover:text-muted-foreground"
 				>
-					<TbDots className="size-3.5" />
+					<Ellipsis className="size-3.5" />
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-48">
@@ -84,7 +84,7 @@ export function BrowserOverflowMenu({
 					disabled={!hasPage}
 					className="gap-2"
 				>
-					<TbCamera className="size-4" />
+					<Camera className="size-4" />
 					Take Screenshot
 				</DropdownMenuItem>
 				<DropdownMenuItem
@@ -92,7 +92,7 @@ export function BrowserOverflowMenu({
 					disabled={!hasPage}
 					className="gap-2"
 				>
-					<TbReload className="size-4" />
+					<RefreshCw className="size-4" />
 					Hard Reload
 				</DropdownMenuItem>
 				<DropdownMenuItem
@@ -100,7 +100,7 @@ export function BrowserOverflowMenu({
 					disabled={!hasPage}
 					className="gap-2"
 				>
-					<TbCopy className="size-4" />
+					<Copy className="size-4" />
 					Copy URL
 				</DropdownMenuItem>
 				<DropdownMenuItem
@@ -108,20 +108,20 @@ export function BrowserOverflowMenu({
 					disabled={!hasPage}
 					className="gap-2"
 				>
-					<TbExternalLink className="size-4" />
+					<ExternalLink className="size-4" />
 					Open in Browser
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
 				<DropdownMenuItem onClick={handleClearHistory} className="gap-2">
-					<TbClock className="size-4" />
+					<Clock className="size-4" />
 					Clear Browsing History
 				</DropdownMenuItem>
 				<DropdownMenuItem onClick={handleClearCookies} className="gap-2">
-					<TbTrash className="size-4" />
+					<Trash2 className="size-4" />
 					Clear Cookies
 				</DropdownMenuItem>
 				<DropdownMenuItem onClick={handleClearAllData} className="gap-2">
-					<TbTrash className="size-4" />
+					<Trash2 className="size-4" />
 					Clear All Data
 				</DropdownMenuItem>
 			</DropdownMenuContent>

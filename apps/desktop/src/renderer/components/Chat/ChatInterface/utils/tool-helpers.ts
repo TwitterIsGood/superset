@@ -7,6 +7,16 @@ type ToolPart = Extract<UIMessage["parts"][number], { type: `tool-${string}` }>;
 
 export type { ToolPart };
 
+export function isToolUIPart(
+	part: UIMessage["parts"][number],
+): part is ToolPart {
+	return part.type.startsWith("tool-");
+}
+
+export function getToolName(part: ToolPart): string {
+	return part.type.slice("tool-".length);
+}
+
 export function normalizeToolName(toolName: string): string {
 	return normalizeAgentToolName(toolName);
 }

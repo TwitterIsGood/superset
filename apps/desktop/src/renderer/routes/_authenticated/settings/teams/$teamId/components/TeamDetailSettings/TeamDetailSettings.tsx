@@ -12,7 +12,6 @@ import {
 import { Input } from "@superset/ui/input";
 import { Label } from "@superset/ui/label";
 import { Skeleton } from "@superset/ui/skeleton";
-import { toast } from "@superset/ui/sonner";
 import {
 	Table,
 	TableBody,
@@ -24,10 +23,11 @@ import {
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import { HiArrowLeft } from "react-icons/hi2";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { authClient } from "renderer/lib/auth-client";
+import { toast } from "renderer/lib/toast";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { AddMemberButton } from "./components/AddMemberButton";
 
@@ -211,7 +211,7 @@ export function TeamDetailSettings({ teamId }: TeamDetailSettingsProps) {
 						to="/settings/teams"
 						className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
 					>
-						<HiArrowLeft className="h-4 w-4" />
+						<ArrowLeft className="h-4 w-4" />
 						All teams
 					</Link>
 					<h2 className="text-2xl font-semibold">Team settings</h2>

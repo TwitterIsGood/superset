@@ -1,3 +1,4 @@
+import { Check, Copy } from "lucide-react";
 import {
 	type ComponentProps,
 	type MouseEvent,
@@ -6,7 +7,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { LuCheck, LuCopy } from "react-icons/lu";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
@@ -54,9 +54,9 @@ function CopyableDetails({
 				aria-label={isCopied ? "Copied" : "Copy contents"}
 			>
 				{isCopied ? (
-					<LuCheck className="size-3 text-green-500" />
+					<Check className="size-3 text-green-500" />
 				) : (
-					<LuCopy className="size-3" />
+					<Copy className="size-3" />
 				)}
 			</button>
 			<details ref={ref} open={open}>

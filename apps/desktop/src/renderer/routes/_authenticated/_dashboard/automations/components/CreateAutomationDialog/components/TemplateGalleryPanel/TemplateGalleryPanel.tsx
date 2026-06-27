@@ -1,6 +1,6 @@
 import { Button } from "@superset/ui/button";
 import { DialogClose } from "@superset/ui/dialog";
-import { LuArrowLeft, LuX } from "react-icons/lu";
+import { ArrowLeft, X } from "lucide-react";
 import {
 	AUTOMATION_TEMPLATE_CATEGORIES,
 	type AutomationTemplate,
@@ -25,12 +25,12 @@ export function TemplateGalleryPanel({
 					onClick={onBack}
 					aria-label="Back"
 				>
-					<LuArrowLeft className="size-4" />
+					<ArrowLeft className="size-4" />
 				</Button>
 				<h2 className="flex-1 text-base font-medium">Automation templates</h2>
 				<DialogClose asChild>
 					<Button variant="ghost" size="icon-sm" aria-label="Close">
-						<LuX className="size-4" />
+						<X className="size-4" />
 					</Button>
 				</DialogClose>
 			</div>

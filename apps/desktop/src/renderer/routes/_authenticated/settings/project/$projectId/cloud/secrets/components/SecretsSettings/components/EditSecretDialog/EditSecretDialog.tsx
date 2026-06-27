@@ -8,9 +8,9 @@ import {
 	DialogTitle,
 } from "@superset/ui/dialog";
 import { Input } from "@superset/ui/input";
-import { toast } from "@superset/ui/sonner";
 import { useEffect, useState } from "react";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
+import { toast } from "renderer/lib/toast";
 
 interface EditSecretDialogProps {
 	open: boolean;

@@ -235,7 +235,7 @@ function signS3Request(args: {
 }
 
 async function s3Request(args: {
-	method: "GET" | "PUT" | "DELETE";
+	method: "GET" | "PUT" | "DELETE" | "HEAD";
 	key: string;
 	body?: Uint8Array;
 	contentType?: string;
@@ -282,6 +282,20 @@ export async function putObjectStorageObject(args: {
 			`Object storage upload failed for ${args.key} with HTTP ${response.status}.`,
 		);
 	}
+}
+
+export async function hasObjectStorageObject(key: string): Promise<boolean> {
+	const response = await s3Request({
+		method: "HEAD",
+		key: normalizeCapabilityArtifactPathname(key),
+	});
+	if (response.status === 404) return false;
+	if (!response.ok) {
+		throw new Error(
+			`Object storage HEAD failed for ${key} with HTTP ${response.status}.`,
+		);
+	}
+	return true;
 }
 
 async function putObjectArtifact(args: {

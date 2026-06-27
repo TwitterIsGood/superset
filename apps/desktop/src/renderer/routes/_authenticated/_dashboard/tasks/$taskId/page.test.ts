@@ -12,13 +12,22 @@ function readTaskDetailFile(relativePath: string): string {
 
 describe("Task detail sync fallback", () => {
 	it("renders API fallback task data instead of blocking on local collection sync", () => {
-		const source = readTaskDetailFile("page.tsx");
+		const source = readTaskDetailFile("TaskDetailPageContent.tsx");
 
 		expect(source).toContain(
 			"const fallbackTask = !task ? (taskFallbackQuery.data ?? null) : null;",
 		);
 		expect(source).toContain("<TaskDetailSyncingFallback");
 		expect(source).not.toContain("Syncing task...");
+	});
+
+	it("keeps the route shell thin so task detail editor code is loaded on demand", () => {
+		const source = readTaskDetailFile("page.tsx");
+
+		expect(source).toContain('import("./TaskDetailPageContent")');
+		expect(source).not.toContain("MarkdownEditor");
+		expect(source).not.toContain("useLiveQuery");
+		expect(source).not.toContain("useOptimisticCollectionActions");
 	});
 
 	it("keeps the fallback view read-only until the local task row is synced", () => {

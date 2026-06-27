@@ -8,7 +8,7 @@ import { cn } from "@superset/ui/utils";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { LuCpu, LuGitBranch } from "react-icons/lu";
+import { Cpu, GitBranch } from "lucide-react";
 import {
 	type RecentlyViewedEntry,
 	useRecentlyViewed,
@@ -163,10 +163,7 @@ function V2WorkspaceRow({
 				{ws?.projectName ?? "Workspace"}
 			</span>
 			<span className="flex items-center justify-center w-4 shrink-0">
-				<LuGitBranch
-					className="size-3 text-muted-foreground"
-					strokeWidth={1.5}
-				/>
+				<GitBranch className="size-3 text-muted-foreground" strokeWidth={1.5} />
 			</span>
 			<span
 				className={cn(
@@ -199,7 +196,7 @@ function AutomationRow({
 				Automation
 			</span>
 			<span className="flex items-center justify-center w-4 shrink-0">
-				<LuCpu className="size-3 text-muted-foreground" strokeWidth={1.5} />
+				<Cpu className="size-3 text-muted-foreground" strokeWidth={1.5} />
 			</span>
 			<span
 				className={cn(

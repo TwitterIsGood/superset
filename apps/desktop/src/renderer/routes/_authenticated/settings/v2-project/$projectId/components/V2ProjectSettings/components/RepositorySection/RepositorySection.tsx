@@ -2,8 +2,8 @@ import { parseGitHubRemote } from "@superset/shared/github-remote";
 import { Button } from "@superset/ui/button";
 import { Input } from "@superset/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
+import { Github } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { FaGithub } from "react-icons/fa";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useOptimisticCollectionActions } from "renderer/routes/_authenticated/hooks/useOptimisticCollectionActions";
 
@@ -76,7 +76,7 @@ export function RepositorySection({
 							onClick={() => openUrl.mutate(parsed.url)}
 							aria-label="Open in GitHub"
 						>
-							<FaGithub className="size-4" />
+							<Github className="size-4" />
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>Open in GitHub</TooltipContent>

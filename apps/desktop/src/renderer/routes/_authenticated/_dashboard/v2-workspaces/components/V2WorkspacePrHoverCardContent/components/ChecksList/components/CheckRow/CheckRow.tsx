@@ -1,16 +1,16 @@
 import { cn } from "@superset/ui/utils";
-import { LuCheck, LuLoaderCircle, LuMinus, LuX } from "react-icons/lu";
+import { Check, LoaderCircle, Minus, X } from "lucide-react";
 import type { V2WorkspacePrSummary } from "renderer/routes/_authenticated/_dashboard/v2-workspaces/hooks/useAccessibleV2Workspaces";
 
 const CHECK_ROW_CONFIG: Record<
 	V2WorkspacePrSummary["checks"][number]["status"],
-	{ Icon: typeof LuCheck; className: string }
+	{ Icon: typeof Check; className: string }
 > = {
-	success: { Icon: LuCheck, className: "text-emerald-500" },
-	failure: { Icon: LuX, className: "text-destructive-foreground" },
-	pending: { Icon: LuLoaderCircle, className: "text-amber-500" },
-	skipped: { Icon: LuMinus, className: "text-muted-foreground" },
-	cancelled: { Icon: LuMinus, className: "text-muted-foreground" },
+	success: { Icon: Check, className: "text-emerald-500" },
+	failure: { Icon: X, className: "text-destructive-foreground" },
+	pending: { Icon: LoaderCircle, className: "text-amber-500" },
+	skipped: { Icon: Minus, className: "text-muted-foreground" },
+	cancelled: { Icon: Minus, className: "text-muted-foreground" },
 };
 
 interface CheckRowProps {

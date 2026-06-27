@@ -11,9 +11,11 @@ import {
 	writeFile,
 } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
+import { unzipSync } from "fflate";
 import semver from "semver";
 import {
 	PACK_CACHE_DIR_NAME,
+	type PackArchiveManifest,
 	type PackFileManifest,
 	type PackInstallState,
 	type PackManifest,
@@ -340,13 +342,14 @@ export class PackManager {
 		manifest: PackManifest,
 		file: PackFileManifest,
 	): string {
-		const packRoot = this.getPackRoot(manifest);
-		const target = resolve(packRoot, file.path);
-		const rootWithSeparator = packRoot.endsWith(sep)
-			? packRoot
-			: `${packRoot}${sep}`;
-		if (target !== packRoot && !target.startsWith(rootWithSeparator)) {
-			throw new Error(`Pack file escapes cache root: ${file.path}`);
+		return this.getPackFilePathInRoot(this.getPackRoot(manifest), file.path);
+	}
+
+	private getPackFilePathInRoot(root: string, relativePath: string): string {
+		const target = resolve(root, relativePath);
+		const rootWithSeparator = root.endsWith(sep) ? root : `${root}${sep}`;
+		if (target !== root && !target.startsWith(rootWithSeparator)) {
+			throw new Error(`Pack file escapes cache root: ${relativePath}`);
 		}
 		return target;
 	}
@@ -427,6 +430,24 @@ export class PackManager {
 
 	private async downloadPack(manifest: PackManifest): Promise<void> {
 		await mkdir(this.getPackRoot(manifest), { recursive: true, mode: 0o700 });
+		if (manifest.archive) {
+			try {
+				await this.downloadPackArchive(manifest, manifest.archive);
+				await writeFile(
+					this.getManifestFilePath(manifest),
+					`${JSON.stringify(manifest, null, 2)}\n`,
+					{ mode: 0o600 },
+				);
+				return;
+			} catch {
+				await rm(this.getPackRoot(manifest), { recursive: true, force: true });
+				await mkdir(this.getPackRoot(manifest), {
+					recursive: true,
+					mode: 0o700,
+				});
+			}
+		}
+
 		const totalBytes = this.totalBytes(manifest);
 		let completedBytes = 0;
 
@@ -456,6 +477,70 @@ export class PackManager {
 			`${JSON.stringify(manifest, null, 2)}\n`,
 			{ mode: 0o600 },
 		);
+	}
+
+	private async downloadPackArchive(
+		manifest: PackManifest,
+		archive: PackArchiveManifest,
+	): Promise<void> {
+		await mkdir(this.cacheRoot, { recursive: true, mode: 0o700 });
+		const archiveFile: PackFileManifest = {
+			path: archive.path,
+			size: archive.size,
+			sha256: archive.sha256,
+			downloadUrl: archive.downloadUrl,
+		};
+		const archivePath = join(
+			this.cacheRoot,
+			`${manifest.packId}-${manifest.version}.zip`,
+		);
+
+		await this.downloadFile({
+			manifest,
+			file: archiveFile,
+			targetPath: archivePath,
+			fileIndex: 1,
+			fileCount: 1,
+			completedBytes: 0,
+			totalBytes: archive.size,
+		});
+
+		const stagingRoot = join(
+			this.cacheRoot,
+			`${manifest.packId}-${manifest.version}.extracting`,
+		);
+		await rm(stagingRoot, { recursive: true, force: true });
+		await mkdir(stagingRoot, { recursive: true, mode: 0o700 });
+
+		try {
+			const manifestPaths = new Set(manifest.files.map((file) => file.path));
+			const entries = unzipSync(new Uint8Array(await readFile(archivePath)));
+			for (const [entryPath, data] of Object.entries(entries)) {
+				if (!manifestPaths.has(entryPath)) {
+					throw new Error(
+						`Pack archive contains unexpected file: ${entryPath}`,
+					);
+				}
+				const targetPath = this.getPackFilePathInRoot(stagingRoot, entryPath);
+				await mkdir(dirname(targetPath), { recursive: true, mode: 0o700 });
+				await writeFile(targetPath, data, { mode: 0o600 });
+			}
+
+			for (const file of manifest.files) {
+				if (file.executable) {
+					await chmod(
+						this.getPackFilePathInRoot(stagingRoot, file.path),
+						0o755,
+					);
+				}
+			}
+
+			await rm(this.getPackRoot(manifest), { recursive: true, force: true });
+			await rename(stagingRoot, this.getPackRoot(manifest));
+		} finally {
+			await rm(stagingRoot, { recursive: true, force: true });
+			await rm(archivePath, { force: true });
+		}
 	}
 
 	private async downloadFile(args: {

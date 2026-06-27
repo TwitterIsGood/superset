@@ -5,12 +5,11 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { HiArrowRight, HiChevronDown } from "react-icons/hi2";
 import { AgentSelect } from "renderer/components/AgentSelect";
 import { env } from "renderer/env.renderer";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
@@ -18,6 +17,7 @@ import { useV2AgentChoices } from "renderer/hooks/useV2AgentChoices";
 import { authClient } from "renderer/lib/auth-client";
 import { showHostServiceUnavailableToast } from "renderer/lib/host-service-unavailable";
 import { useTrellisRuntimePack } from "renderer/lib/pack-system";
+import { toast } from "renderer/lib/toast";
 import { DevicePicker } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker";
 import { useWorkspaceHostOptions } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker/hooks/useWorkspaceHostOptions";
 import {
@@ -308,7 +308,7 @@ export function OpenInWorkspaceV2({ task }: OpenInWorkspaceV2Props) {
 									<span className="text-muted-foreground">Select project</span>
 								)}
 							</span>
-							<HiChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+							<ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -347,7 +347,7 @@ export function OpenInWorkspaceV2({ task }: OpenInWorkspaceV2Props) {
 					disabled={!!submitBlocker || trellisRuntimePack.isResolving}
 					onClick={() => void handleOpen()}
 				>
-					<HiArrowRight className="w-3.5 h-3.5" />
+					<ArrowRight className="w-3.5 h-3.5" />
 				</Button>
 			</div>
 			<AgentSelect<SelectedAgent>

@@ -71,6 +71,103 @@ const rendererBundleStatsPlugin = createBundleStatsPlugin({
 	target: "renderer",
 });
 
+const lucideNamedImportRegex =
+	/import\s*\{([^{}]*?)\}\s*from\s*["']lucide-react["'];?/g;
+
+function toLucideIconFileName(iconName: string): string {
+	const withoutIconSuffix =
+		iconName.endsWith("Icon") && iconName !== "Icon"
+			? iconName.slice(0, -"Icon".length)
+			: iconName;
+
+	return withoutIconSuffix
+		.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+		.replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
+		.replace(/([A-Za-z])([0-9])/g, "$1-$2")
+		.toLowerCase();
+}
+
+function isLucideDirectIconImportTarget(id: string): boolean {
+	const cleanId = id.split("?", 1)[0] ?? id;
+	if (!/\.[cm]?[tj]sx?$/.test(cleanId)) {
+		return false;
+	}
+
+	return (
+		cleanId.includes("/src/renderer/") ||
+		cleanId.includes("/packages/ui/src/") ||
+		cleanId.includes("/packages/panes/src/") ||
+		cleanId.startsWith("/routes/") ||
+		cleanId.startsWith("/components/") ||
+		cleanId.startsWith("/screens/") ||
+		cleanId.startsWith("/hooks/") ||
+		cleanId.startsWith("/lib/") ||
+		cleanId.startsWith("/stores/")
+	);
+}
+
+function lucideDirectIconImportsPlugin() {
+	return {
+		name: "superset-lucide-direct-icon-imports",
+		enforce: "pre" as const,
+		transform(code: string, id: string) {
+			if (
+				!isLucideDirectIconImportTarget(id) ||
+				!code.includes("lucide-react")
+			) {
+				return null;
+			}
+
+			let transformed = code;
+			let didTransform = false;
+			transformed = transformed.replace(
+				lucideNamedImportRegex,
+				(_statement, specifierList: string) => {
+					const valueImports: string[] = [];
+					const typeImports: string[] = [];
+
+					for (const rawSpecifier of specifierList.split(",")) {
+						const specifier = rawSpecifier.trim();
+						if (!specifier) continue;
+
+						const typeMatch = specifier.match(/^type\s+(.+)$/);
+						if (typeMatch?.[1]) {
+							typeImports.push(typeMatch[1].trim());
+							continue;
+						}
+
+						const [importedName, localName = importedName] = specifier
+							.split(/\s+as\s+/)
+							.map((part) => part.trim());
+						if (!importedName || !localName) continue;
+
+						const fileName = toLucideIconFileName(importedName);
+						valueImports.push(
+							`import ${localName} from "lucide-react/dist/esm/icons/${fileName}.js";`,
+						);
+					}
+
+					if (valueImports.length === 0 && typeImports.length === 0) {
+						return _statement;
+					}
+
+					didTransform = true;
+					return [
+						typeImports.length
+							? `import type { ${typeImports.join(", ")} } from "lucide-react";`
+							: null,
+						...valueImports,
+					]
+						.filter(Boolean)
+						.join("\n");
+				},
+			);
+
+			return didTransform ? { code: transformed, map: null } : null;
+		},
+	};
+}
+
 export default defineConfig({
 	main: {
 		plugins: [tsconfigPaths, copyResourcesPlugin()],
@@ -128,6 +225,7 @@ export default defineConfig({
 
 		build: {
 			sourcemap: buildSourcemap,
+			reportCompressedSize: false,
 			rollupOptions: {
 				watch: {
 					exclude: generatedOutputWatchIgnores,
@@ -184,6 +282,7 @@ export default defineConfig({
 		},
 
 		build: {
+			reportCompressedSize: false,
 			outDir: resolve(devPath, "preload"),
 			rollupOptions: {
 				watch: {
@@ -258,6 +357,39 @@ export default defineConfig({
 				ignored: generatedOutputWatchIgnores,
 			},
 		},
+		optimizeDeps: {
+			exclude: [
+				"@codemirror/commands",
+				"@codemirror/lang-cpp",
+				"@codemirror/lang-css",
+				"@codemirror/lang-go",
+				"@codemirror/lang-html",
+				"@codemirror/lang-java",
+				"@codemirror/lang-javascript",
+				"@codemirror/lang-json",
+				"@codemirror/lang-markdown",
+				"@codemirror/lang-php",
+				"@codemirror/lang-python",
+				"@codemirror/lang-rust",
+				"@codemirror/lang-sql",
+				"@codemirror/lang-xml",
+				"@codemirror/lang-yaml",
+				"@codemirror/language",
+				"@codemirror/legacy-modes",
+				"@codemirror/search",
+				"@codemirror/state",
+				"@codemirror/view",
+				"@sentry/electron/renderer",
+				"@xterm/addon-webgl",
+				"@xterm/xterm",
+				"lucide-react",
+				"react-day-picker",
+				"shiki",
+			],
+			esbuildOptions: {
+				sourcemap: false,
+			},
+		},
 
 		plugins: [
 			tanstackRouter({
@@ -273,6 +405,7 @@ export default defineConfig({
 			tsconfigPaths,
 			tailwindcss(),
 			...(codeInspectorVitePlugin ? [codeInspectorVitePlugin] : []),
+			lucideDirectIconImportsPlugin(),
 			reactPlugin(),
 			htmlEnvTransformPlugin(),
 		],
@@ -281,10 +414,40 @@ export default defineConfig({
 			format: "es",
 		},
 
+		resolve: {
+			alias: [
+				{
+					find: /^shiki$/,
+					replacement: resolve(
+						"src/renderer/lib/shikiLimitedManifest/shiki.ts",
+					),
+				},
+				{
+					find: "shiki/dist/langs.mjs",
+					replacement: resolve(
+						"src/renderer/lib/shikiLimitedManifest/languages.ts",
+					),
+				},
+				{
+					find: "shiki/dist/themes.mjs",
+					replacement: resolve(
+						"src/renderer/lib/shikiLimitedManifest/themes.ts",
+					),
+				},
+				{
+					find: /^shiki\/wasm$/,
+					replacement: resolve(
+						"src/renderer/lib/shikiLimitedManifest/empty-wasm.ts",
+					),
+				},
+			],
+		},
+
 		publicDir: resolve(resources, "public"),
 
 		build: {
 			sourcemap: buildSourcemap,
+			reportCompressedSize: false,
 			outDir: resolve(devPath, "renderer"),
 
 			rollupOptions: {

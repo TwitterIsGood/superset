@@ -1,4 +1,3 @@
-import type { EmojiItem } from "@tiptap/extension-emoji";
 import type {
 	SuggestionKeyDownProps,
 	SuggestionProps,
@@ -10,6 +9,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import type { EmojiItem } from "../../EmojiSuggestion";
 
 export interface EmojiSuggestionListRef {
 	onKeyDown: (props: SuggestionKeyDownProps) => boolean;

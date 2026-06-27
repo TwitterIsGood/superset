@@ -1,9 +1,9 @@
-import { toast } from "@superset/ui/sonner";
 import {
 	SUPERSET_CLI_RUNTIME_PACK_ID,
 	TRELLIS_RUNTIME_PACK_ID,
 } from "lib/pack-system/pack-ids";
 import { useCallback } from "react";
+import { toast } from "renderer/lib/toast";
 import { usePackStatus } from "./usePackStatus";
 
 export interface TrellisSetupPayload {

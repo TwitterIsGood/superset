@@ -6,8 +6,8 @@ import {
 } from "@superset/ui/dropdown-menu";
 import type { NodeViewProps } from "@tiptap/react";
 import { NodeViewContent, NodeViewWrapper } from "@tiptap/react";
+import { Check, ChevronDown, Clipboard } from "lucide-react";
 import { useState } from "react";
-import { HiCheck, HiChevronDown, HiOutlineClipboard } from "react-icons/hi2";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import {
 	COMMON_CODE_BLOCK_LANGUAGES,
@@ -52,7 +52,7 @@ export function CodeBlockView({
 							className="flex items-center gap-1 h-6 px-2 text-xs bg-background/80 backdrop-blur border border-border rounded hover:bg-accent transition-colors"
 						>
 							{currentLabel}
-							<HiChevronDown className="w-3 h-3" />
+							<ChevronDown className="w-3 h-3" />
 						</button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -80,9 +80,9 @@ export function CodeBlockView({
 					className="flex items-center justify-center h-6 w-6 bg-background/80 backdrop-blur border border-border rounded hover:bg-accent transition-colors"
 				>
 					{copied ? (
-						<HiCheck className="w-3.5 h-3.5 text-green-500" />
+						<Check className="w-3.5 h-3.5 text-green-500" />
 					) : (
-						<HiOutlineClipboard className="w-3.5 h-3.5" />
+						<Clipboard className="w-3.5 h-3.5" />
 					)}
 				</button>
 			</div>

@@ -21,9 +21,9 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@superset/ui/select";
-import { toast } from "@superset/ui/sonner";
 import { useState } from "react";
 import { authClient } from "renderer/lib/auth-client";
+import { toast } from "renderer/lib/toast";
 
 interface InviteMemberDialogProps {
 	open: boolean;

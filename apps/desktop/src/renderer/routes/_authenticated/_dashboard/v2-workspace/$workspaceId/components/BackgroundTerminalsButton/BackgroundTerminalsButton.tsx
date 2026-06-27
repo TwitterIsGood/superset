@@ -8,7 +8,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { workspaceTrpc } from "@superset/workspace-client";
 import { Archive, ChevronDown, Trash2 } from "lucide-react";
 import {
@@ -30,6 +29,7 @@ import {
 	getTerminalBackgroundMarkerIdsKey,
 	subscribeTerminalBackgroundMarkers,
 } from "renderer/lib/terminal/terminal-background-intents";
+import { toast } from "renderer/lib/toast";
 import { getRelativeTime } from "renderer/screens/main/components/WorkspacesListView/utils";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";

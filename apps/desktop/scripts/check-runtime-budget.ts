@@ -37,6 +37,7 @@ interface RuntimePerfBudget {
 		};
 		routes?: {
 			openDuration?: MillisecondBudget;
+			requiredRoutes?: string[];
 		};
 	};
 }
@@ -337,6 +338,11 @@ function readRuntimePerfBudget(budgetPath: string): RuntimePerfBudget {
 						routes.openDuration,
 						"runtime.routes.openDuration",
 					),
+					...(Array.isArray(routes.requiredRoutes) && {
+						requiredRoutes: routes.requiredRoutes.filter(
+							(route): route is string => typeof route === "string",
+						),
+					}),
 				},
 			}),
 		};
@@ -629,6 +635,18 @@ export function evaluateRuntimeBudget(args: {
 	}
 
 	const routeBudget = args.budget.runtime?.routes?.openDuration;
+	const measuredRoutes = new Map(
+		(args.report.routeMeasurements ?? []).map((route) => [route.path, route]),
+	);
+	for (const requiredRoute of args.budget.runtime?.routes?.requiredRoutes ??
+		[]) {
+		if (!measuredRoutes.has(requiredRoute)) {
+			failures.push({
+				reportPath: args.reportPath,
+				message: `Required route ${requiredRoute} was not measured. Pass --route=${requiredRoute} to report:runtime.`,
+			});
+		}
+	}
 	if (routeBudget) {
 		for (const route of args.report.routeMeasurements ?? []) {
 			if (route.error) {

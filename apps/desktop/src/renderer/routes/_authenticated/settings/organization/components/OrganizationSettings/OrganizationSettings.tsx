@@ -8,7 +8,6 @@ import { Badge } from "@superset/ui/badge";
 import { Input } from "@superset/ui/input";
 import { Label } from "@superset/ui/label";
 import { Skeleton } from "@superset/ui/skeleton";
-import { toast } from "@superset/ui/sonner";
 import {
 	Table,
 	TableBody,
@@ -20,15 +19,13 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
+import { Clipboard, ClipboardCheck } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-	HiOutlineClipboardDocument,
-	HiOutlineClipboardDocumentCheck,
-} from "react-icons/hi2";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { authClient } from "renderer/lib/auth-client";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import {
 	getImageExtensionFromMimeType,
@@ -357,9 +354,9 @@ export function OrganizationSettings({
 												<TooltipTrigger asChild>
 													<span className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-md bg-secondary text-secondary-foreground group-hover:bg-secondary/80">
 														{copied ? (
-															<HiOutlineClipboardDocumentCheck className="h-4 w-4" />
+															<ClipboardCheck className="h-4 w-4" />
 														) : (
-															<HiOutlineClipboardDocument className="h-4 w-4" />
+															<Clipboard className="h-4 w-4" />
 														)}
 													</span>
 												</TooltipTrigger>

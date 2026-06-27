@@ -5,8 +5,8 @@ import {
 } from "@superset/local-db";
 import { Button } from "@superset/ui/button";
 import { Label } from "@superset/ui/label";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HiOutlinePlus } from "react-icons/hi2";
 import { useIsDarkTheme } from "renderer/assets/app-icons/preset-icons";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { usePresets } from "renderer/react-query/presets";
@@ -493,7 +493,7 @@ export function PresetsSection({
 						className="gap-2"
 						onClick={() => handleAddRow()}
 					>
-						<HiOutlinePlus className="h-4 w-4" />
+						<Plus className="h-4 w-4" />
 						Add Preset
 					</Button>
 				)}

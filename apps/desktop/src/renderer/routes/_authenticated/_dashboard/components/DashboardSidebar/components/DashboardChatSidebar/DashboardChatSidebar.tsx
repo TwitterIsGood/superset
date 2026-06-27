@@ -5,7 +5,6 @@ import {
 	ContextMenuSeparator,
 	ContextMenuTrigger,
 } from "@superset/ui/context-menu";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { isNull } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
@@ -20,6 +19,7 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
+import { toast } from "renderer/lib/toast";
 import { useOptimisticCollectionActions } from "renderer/routes/_authenticated/hooks/useOptimisticCollectionActions";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { createChatRuntimeServiceIpcClient } from "renderer/screens/main/components/WorkspaceView/ContentView/TabsContent/TabView/ChatPane/utils/chat-runtime-service-client";

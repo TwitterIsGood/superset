@@ -16,6 +16,7 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@superset/ui/popover";
+import { AtSign } from "lucide-react";
 import {
 	createContext,
 	type ReactNode,
@@ -24,7 +25,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { HiMiniAtSymbol } from "react-icons/hi2";
 import { useDebouncedValue } from "renderer/hooks/useDebouncedValue";
 import { FileIcon } from "renderer/lib/fileIcons";
 
@@ -174,7 +174,7 @@ export function MentionTrigger() {
 	return (
 		<PopoverTrigger asChild>
 			<PromptInputButton onClick={() => ctx?.setOpen(!ctx.open)}>
-				<HiMiniAtSymbol className="size-4" />
+				<AtSign className="size-4" />
 			</PromptInputButton>
 		</PopoverTrigger>
 	);

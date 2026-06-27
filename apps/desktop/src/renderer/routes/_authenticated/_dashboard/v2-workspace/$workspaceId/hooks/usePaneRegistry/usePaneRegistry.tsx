@@ -5,29 +5,36 @@ import type {
 	WorkspaceStore,
 } from "@superset/panes";
 import { alert } from "@superset/ui/atoms/Alert";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { workspaceTrpc } from "@superset/workspace-client";
 import {
+	ArrowDownToLine,
 	Circle,
+	Clipboard,
+	ClipboardCopy,
+	Eraser,
 	GitCompareArrows,
 	Globe,
 	MessageSquare,
+	Power,
 	TerminalSquare,
 } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useCallback, useMemo } from "react";
-import {
-	LuArrowDownToLine,
-	LuClipboard,
-	LuClipboardCopy,
-	LuEraser,
-	LuPower,
-} from "react-icons/lu";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import { FileIcon } from "renderer/lib/fileIcons";
 import { getBaseName } from "renderer/lib/pathBasename";
 import { consumeTerminalBackgroundIntent } from "renderer/lib/terminal/terminal-background-intents";
-import { terminalRuntimeRegistry } from "renderer/lib/terminal/terminal-runtime-registry";
+import {
+	clearTerminalLazy,
+	disposeTerminalRuntimeLazy,
+	getTerminalSelectionLazy,
+	getTerminalTitleSnapshotLazy,
+	pasteTerminalLazy,
+	releaseTerminalRuntimeLazy,
+	scrollTerminalToBottomLazy,
+	subscribeTerminalTitleLazy,
+} from "renderer/lib/terminal/terminal-runtime-registry-lazy";
+import { toast } from "renderer/lib/toast";
 import { useWorkspace } from "renderer/routes/_authenticated/_dashboard/v2-workspace/providers/WorkspaceProvider";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import {
@@ -377,26 +384,24 @@ export function usePaneRegistry({
 					const instanceId = pane.id;
 					return {
 						subscribe: (callback) =>
-							terminalRuntimeRegistry.onTitleChange(
+							subscribeTerminalTitleLazy({
 								terminalId,
 								callback,
 								instanceId,
-							),
+							}),
 						getSnapshot: () =>
-							terminalRuntimeRegistry
-								.getTitle(terminalId, instanceId)
-								?.trim() || undefined,
+							getTerminalTitleSnapshotLazy({ terminalId, instanceId }),
 					};
 				},
 				onAfterClose: (pane) => {
 					const { terminalId } = pane.data as TerminalPaneData;
 					if (consumeTerminalBackgroundIntent(terminalId)) {
-						terminalRuntimeRegistry.release(terminalId);
+						void releaseTerminalRuntimeLazy(terminalId);
 						return;
 					}
 					clearV2TerminalRunStatus(terminalId, workspaceId);
 					clearWorkspaceRunTerminal(terminalId);
-					terminalRuntimeRegistry.dispose(terminalId);
+					void disposeTerminalRuntimeLazy(terminalId);
 					killTerminalSessionSilently({ terminalId, workspaceId });
 				},
 				renderTitle: (ctx: RendererContext<PaneViewerData>) => (
@@ -428,18 +433,11 @@ export function usePaneRegistry({
 						{
 							key: "copy",
 							label: "Copy",
-							icon: <LuClipboardCopy />,
+							icon: <ClipboardCopy />,
 							shortcut: `${MOD_KEY}C`,
-							disabled: (ctx) => {
+							onSelect: async (ctx) => {
 								const { terminalId } = ctx.pane.data as TerminalPaneData;
-								return !terminalRuntimeRegistry.getSelection(
-									terminalId,
-									ctx.pane.id,
-								);
-							},
-							onSelect: (ctx) => {
-								const { terminalId } = ctx.pane.data as TerminalPaneData;
-								const text = terminalRuntimeRegistry.getSelection(
+								const text = await getTerminalSelectionLazy(
 									terminalId,
 									ctx.pane.id,
 								);
@@ -449,18 +447,14 @@ export function usePaneRegistry({
 						{
 							key: "paste",
 							label: "Paste",
-							icon: <LuClipboard />,
+							icon: <Clipboard />,
 							shortcut: `${MOD_KEY}V`,
 							onSelect: async (ctx) => {
 								const { terminalId } = ctx.pane.data as TerminalPaneData;
 								try {
 									const text = await navigator.clipboard.readText();
 									if (text) {
-										terminalRuntimeRegistry.paste(
-											terminalId,
-											text,
-											ctx.pane.id,
-										);
+										await pasteTerminalLazy(terminalId, text, ctx.pane.id);
 									}
 								} catch {
 									// Clipboard access denied
@@ -471,25 +465,25 @@ export function usePaneRegistry({
 						{
 							key: "clear-terminal",
 							label: "Clear Terminal",
-							icon: <LuEraser />,
+							icon: <Eraser />,
 							shortcut:
 								clearShortcut !== "Unassigned" ? clearShortcut : undefined,
 							onSelect: (ctx) => {
 								const { terminalId } = ctx.pane.data as TerminalPaneData;
-								terminalRuntimeRegistry.clear(terminalId, ctx.pane.id);
+								void clearTerminalLazy(terminalId, ctx.pane.id);
 							},
 						},
 						{
 							key: "scroll-to-bottom",
 							label: "Scroll to Bottom",
-							icon: <LuArrowDownToLine />,
+							icon: <ArrowDownToLine />,
 							shortcut:
 								scrollToBottomShortcut !== "Unassigned"
 									? scrollToBottomShortcut
 									: undefined,
 							onSelect: (ctx) => {
 								const { terminalId } = ctx.pane.data as TerminalPaneData;
-								terminalRuntimeRegistry.scrollToBottom(terminalId, ctx.pane.id);
+								void scrollTerminalToBottomLazy(terminalId, ctx.pane.id);
 							},
 						},
 						{ key: "sep-terminal-defaults", type: "separator" },
@@ -502,7 +496,7 @@ export function usePaneRegistry({
 					const killAction: ContextMenuActionConfig<PaneViewerData> = {
 						key: "kill-terminal-session",
 						label: "Kill Terminal Session",
-						icon: <LuPower />,
+						icon: <Power />,
 						variant: "destructive",
 						disabled: isKillingTerminalSession,
 						onSelect: (ctx) => {

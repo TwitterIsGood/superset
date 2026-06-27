@@ -15,13 +15,13 @@ import {
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { useNavigate } from "@tanstack/react-router";
+import { EllipsisVertical, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { HiEllipsisVertical, HiOutlineTrash } from "react-icons/hi2";
 import { useCurrentPlan } from "renderer/hooks/useCurrentPlan";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { authClient } from "renderer/lib/auth-client";
+import { toast } from "renderer/lib/toast";
 import type { TeamMember } from "../../../../types";
 
 export function MemberActions({
@@ -150,7 +150,7 @@ export function MemberActions({
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<Button variant="ghost" size="icon" className="h-8 w-8">
-					<HiEllipsisVertical className="h-4 w-4" />
+					<EllipsisVertical className="h-4 w-4" />
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">
@@ -178,7 +178,7 @@ export function MemberActions({
 						className="text-destructive gap-2"
 						onSelect={handleRemoveClick}
 					>
-						<HiOutlineTrash className="h-4 w-4 text-destructive" />
+						<Trash2 className="h-4 w-4 text-destructive" />
 						<span>Leave organization...</span>
 					</DropdownMenuItem>
 				) : canRemove ? (
@@ -186,7 +186,7 @@ export function MemberActions({
 						className="text-destructive gap-2"
 						onSelect={handleRemoveClick}
 					>
-						<HiOutlineTrash className="h-4 w-4 text-destructive" />
+						<Trash2 className="h-4 w-4 text-destructive" />
 						<span>Remove member</span>
 					</DropdownMenuItem>
 				) : null}

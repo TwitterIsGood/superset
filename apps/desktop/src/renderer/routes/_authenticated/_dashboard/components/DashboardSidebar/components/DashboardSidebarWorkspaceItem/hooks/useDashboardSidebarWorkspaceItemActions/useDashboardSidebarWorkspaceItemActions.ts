@@ -1,9 +1,9 @@
-import { toast } from "@superset/ui/sonner";
 import { useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { showHostServiceUnavailableToast } from "renderer/lib/host-service-unavailable";
+import { toast } from "renderer/lib/toast";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { useDashboardSidebarSectionRename } from "renderer/routes/_authenticated/_dashboard/components/DashboardSidebar/components/DashboardSidebarSectionRenameContext";
 import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";

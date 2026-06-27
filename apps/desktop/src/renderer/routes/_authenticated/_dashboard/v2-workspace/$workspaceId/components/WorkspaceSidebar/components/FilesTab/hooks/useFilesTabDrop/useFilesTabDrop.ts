@@ -1,8 +1,8 @@
 import type { FileTree } from "@pierre/trees";
 import { alert } from "@superset/ui/atoms/Alert";
-import { toast } from "@superset/ui/sonner";
 import { workspaceTrpc } from "@superset/workspace-client";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "renderer/lib/toast";
 import {
 	asDirectoryHandle,
 	basename,

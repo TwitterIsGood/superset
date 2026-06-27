@@ -24,14 +24,14 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@superset/ui/select";
-import { toast } from "@superset/ui/sonner";
 import { Switch } from "@superset/ui/switch";
 import { cn } from "@superset/ui/utils";
+import { ImagePlus, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LuImagePlus, LuTrash2 } from "react-icons/lu";
 import { ColorSelector } from "renderer/components/ColorSelector";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import {
 	useImportAllWorktrees,
 	useOpenExternalWorktree,
@@ -549,7 +549,7 @@ export function ProjectSettings({
 										"hover:bg-muted transition-colors",
 									)}
 								>
-									<LuImagePlus className="size-4" />
+									<ImagePlus className="size-4" />
 									{project.iconUrl ? "Replace icon" : "Upload icon"}
 								</button>
 								{project.iconUrl && (
@@ -562,7 +562,7 @@ export function ProjectSettings({
 											"hover:bg-destructive/10 text-destructive transition-colors",
 										)}
 									>
-										<LuTrash2 className="size-4" />
+										<Trash2 className="size-4" />
 										Remove
 									</button>
 								)}

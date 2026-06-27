@@ -14,8 +14,8 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@superset/ui/select";
+import { Clock } from "lucide-react";
 import { useMemo, useState } from "react";
-import { LuClock } from "react-icons/lu";
 import { PickerTrigger } from "renderer/components/PickerTrigger";
 
 type PresetKind = PresetMatch["kind"];
@@ -145,7 +145,7 @@ export function SchedulePicker({
 			<PopoverTrigger asChild>
 				<PickerTrigger
 					className={className}
-					icon={<LuClock className="size-4 shrink-0" />}
+					icon={<Clock className="size-4 shrink-0" />}
 					label={triggerLabel}
 				/>
 			</PopoverTrigger>

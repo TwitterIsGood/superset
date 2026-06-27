@@ -1,7 +1,7 @@
 import { Textarea } from "@superset/ui/textarea";
 import { cn } from "@superset/ui/utils";
+import { Upload } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import { HiDocumentArrowUp } from "react-icons/hi2";
 
 interface ScriptFieldProps {
 	placeholder: string;
@@ -80,13 +80,13 @@ export function ScriptField({
 					title="Import from file"
 					className="absolute bottom-2 right-2 flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
 				>
-					<HiDocumentArrowUp className="h-3.5 w-3.5" />
+					<Upload className="h-3.5 w-3.5" />
 					Import
 				</button>
 				{isDragOver && (
 					<div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-primary/10">
 						<div className="flex items-center gap-2 text-primary text-sm font-medium">
-							<HiDocumentArrowUp className="h-5 w-5" />
+							<Upload className="h-5 w-5" />
 							Drop to import
 						</div>
 					</div>

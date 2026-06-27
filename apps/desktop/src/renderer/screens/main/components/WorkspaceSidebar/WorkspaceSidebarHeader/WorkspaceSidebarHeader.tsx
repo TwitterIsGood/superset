@@ -1,8 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { useMatchRoute, useNavigate } from "@tanstack/react-router";
-import { HiOutlineClipboardDocumentList } from "react-icons/hi2";
-import { LuLayers } from "react-icons/lu";
+import { ClipboardList, Layers } from "lucide-react";
 import {
 	tasksSearchFromFilters,
 	useTasksFilterStore,
@@ -68,7 +67,7 @@ export function WorkspaceSidebarHeader({
 									: "text-muted-foreground hover:text-foreground hover:bg-accent/50",
 							)}
 						>
-							<LuLayers className="size-4" strokeWidth={STROKE_WIDTH} />
+							<Layers className="size-4" strokeWidth={STROKE_WIDTH} />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="right">Workspaces</TooltipContent>
@@ -86,10 +85,7 @@ export function WorkspaceSidebarHeader({
 									: "text-muted-foreground hover:text-foreground hover:bg-accent/50",
 							)}
 						>
-							<HiOutlineClipboardDocumentList
-								className="size-4"
-								strokeWidth={STROKE_WIDTH}
-							/>
+							<ClipboardList className="size-4" strokeWidth={STROKE_WIDTH} />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="right">Tasks & PRs</TooltipContent>
@@ -113,7 +109,7 @@ export function WorkspaceSidebarHeader({
 				)}
 			>
 				<div className="flex items-center justify-center size-5">
-					<LuLayers className="size-4" strokeWidth={STROKE_WIDTH} />
+					<Layers className="size-4" strokeWidth={STROKE_WIDTH} />
 				</div>
 				<span className="text-sm font-medium flex-1 text-left">Workspaces</span>
 			</button>
@@ -129,10 +125,7 @@ export function WorkspaceSidebarHeader({
 				)}
 			>
 				<div className="flex items-center justify-center size-5">
-					<HiOutlineClipboardDocumentList
-						className="size-4"
-						strokeWidth={STROKE_WIDTH}
-					/>
+					<ClipboardList className="size-4" strokeWidth={STROKE_WIDTH} />
 				</div>
 				<span className="text-sm font-medium flex-1 text-left">
 					Tasks & PRs

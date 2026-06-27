@@ -1,16 +1,30 @@
 import { useLocation, useParams } from "@tanstack/react-router";
-import { HiOutlineWifi } from "react-icons/hi2";
+import { Wifi } from "lucide-react";
+import { lazy, Suspense } from "react";
 import { useOnlineStatus } from "renderer/hooks/useOnlineStatus";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useWorkspaceSidebarStore } from "renderer/stores/workspace-sidebar-state";
 import { NavigationControls } from "../NavigationControls";
 import { SidebarToggle } from "../SidebarToggle";
-import { OpenInMenuButton } from "./components/OpenInMenuButton";
 import { ResourceConsumption } from "./components/ResourceConsumption";
-import { RightSidebarToggle } from "./components/RightSidebarToggle";
-import { V2WorkspaceOpenInButton } from "./components/V2WorkspaceOpenInButton";
-import { V2WorkspaceTitle } from "./components/V2WorkspaceTitle";
 import { WindowControls } from "./components/WindowControls";
+
+const LazyOpenInMenuButton = lazy(async () => ({
+	default: (await import("./components/OpenInMenuButton")).OpenInMenuButton,
+}));
+
+const LazyRightSidebarToggle = lazy(async () => ({
+	default: (await import("./components/RightSidebarToggle")).RightSidebarToggle,
+}));
+
+const LazyV2WorkspaceOpenInButton = lazy(async () => ({
+	default: (await import("./components/V2WorkspaceOpenInButton"))
+		.V2WorkspaceOpenInButton,
+}));
+
+const LazyV2WorkspaceTitle = lazy(async () => ({
+	default: (await import("./components/V2WorkspaceTitle")).V2WorkspaceTitle,
+}));
 
 export function TopBar() {
 	const location = useLocation();
@@ -52,7 +66,9 @@ export function TopBar() {
 
 			<div className="flex min-w-0 flex-1 items-center justify-start">
 				{isV2WorkspaceRoute && v2WorkspaceId && (
-					<V2WorkspaceTitle workspaceId={v2WorkspaceId} />
+					<Suspense fallback={null}>
+						<LazyV2WorkspaceTitle workspaceId={v2WorkspaceId} />
+					</Suspense>
 				)}
 			</div>
 
@@ -60,20 +76,28 @@ export function TopBar() {
 				{!sidebarHostsChrome && <ResourceConsumption surface="v2" />}
 				{!isOnline && (
 					<div className="no-drag flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-						<HiOutlineWifi className="size-3.5" />
+						<Wifi className="size-3.5" />
 						<span>Offline</span>
 					</div>
 				)}
-				{isV2WorkspaceRoute ? (
-					<V2WorkspaceOpenInButton workspaceId={v2WorkspaceId} />
+				{isV2WorkspaceRoute && v2WorkspaceId ? (
+					<Suspense fallback={null}>
+						<LazyV2WorkspaceOpenInButton workspaceId={v2WorkspaceId} />
+					</Suspense>
 				) : workspace?.worktreePath ? (
-					<OpenInMenuButton
-						worktreePath={workspace.worktreePath}
-						branch={workspace.worktree?.branch}
-						projectId={workspace.project?.id}
-					/>
+					<Suspense fallback={null}>
+						<LazyOpenInMenuButton
+							worktreePath={workspace.worktreePath}
+							branch={workspace.worktree?.branch}
+							projectId={workspace.project?.id}
+						/>
+					</Suspense>
 				) : null}
-				{isV2WorkspaceRoute && <RightSidebarToggle />}
+				{isV2WorkspaceRoute && (
+					<Suspense fallback={null}>
+						<LazyRightSidebarToggle />
+					</Suspense>
+				)}
 				{!isMac && <WindowControls />}
 			</div>
 		</div>

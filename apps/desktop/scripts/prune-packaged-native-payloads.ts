@@ -12,6 +12,21 @@ export type NativePayloadPruneResult = {
 	removedPaths: string[];
 };
 
+export type ElectronLocalePruneResult = {
+	resourcesDir: string | null;
+	removedPaths: string[];
+};
+
+export type ElectronSoftwareRendererPruneResult = {
+	frameworkDir: string | null;
+	removedPaths: string[];
+};
+
+const DEFAULT_ELECTRON_LOCALES = new Set(["en", "en_GB", "zh_CN", "zh_TW"]);
+const MAC_ELECTRON_SOFTWARE_RENDERER_PAYLOADS = [
+	join("Libraries", "libvk_swiftshader.dylib"),
+];
+
 const builderArchNames: Record<number, string> = {
 	0: "ia32",
 	1: "x64",
@@ -75,6 +90,51 @@ function resolvePackagedNodeModulesDir(appOutDir: string): string | null {
 	}
 
 	return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
+
+function resolvePackagedMacAppBundleDir(appOutDir: string): string | null {
+	if (appOutDir.endsWith(".app") && existsSync(appOutDir)) {
+		return appOutDir;
+	}
+	for (const appBundleDir of listDirectories(appOutDir).filter((entry) =>
+		entry.endsWith(".app"),
+	)) {
+		return join(appOutDir, appBundleDir);
+	}
+	return null;
+}
+
+function resolvePackagedElectronFrameworkResourcesDir(
+	appOutDir: string,
+): string | null {
+	const appBundleDir = resolvePackagedMacAppBundleDir(appOutDir);
+	if (!appBundleDir) return null;
+
+	const resourcesDir = join(
+		appBundleDir,
+		"Contents",
+		"Frameworks",
+		"Electron Framework.framework",
+		"Versions",
+		"A",
+		"Resources",
+	);
+	return existsSync(resourcesDir) ? resourcesDir : null;
+}
+
+function resolvePackagedElectronFrameworkDir(appOutDir: string): string | null {
+	const appBundleDir = resolvePackagedMacAppBundleDir(appOutDir);
+	if (!appBundleDir) return null;
+
+	const frameworkDir = join(
+		appBundleDir,
+		"Contents",
+		"Frameworks",
+		"Electron Framework.framework",
+		"Versions",
+		"A",
+	);
+	return existsSync(frameworkDir) ? frameworkDir : null;
 }
 
 function listDirectories(path: string): string[] {
@@ -415,6 +475,63 @@ export async function prunePackagedNativePayloads({
 	return { nodeModulesDir, removedPaths };
 }
 
+export async function prunePackagedElectronLocales({
+	appOutDir,
+	locales = DEFAULT_ELECTRON_LOCALES,
+}: {
+	appOutDir: string;
+	locales?: Set<string>;
+}): Promise<ElectronLocalePruneResult> {
+	const resourcesDir = resolvePackagedElectronFrameworkResourcesDir(appOutDir);
+	if (!resourcesDir) {
+		console.warn(
+			`[prune:electron-locales] Electron Framework resources not found under ${appOutDir}; skipping`,
+		);
+		return { resourcesDir: null, removedPaths: [] };
+	}
+
+	const removedPaths: string[] = [];
+	for (const entry of listDirectories(resourcesDir)) {
+		if (!entry.endsWith(".lproj")) continue;
+		const locale = entry.slice(0, -".lproj".length);
+		if (locales.has(locale)) continue;
+		removePath(resourcesDir, join(resourcesDir, entry), removedPaths);
+	}
+
+	console.log(
+		`[prune:electron-locales] kept ${[...locales].join(", ")}; removed ${removedPaths.length} locale path(s)`,
+	);
+
+	return { resourcesDir, removedPaths };
+}
+
+export async function prunePackagedElectronSoftwareRenderer({
+	appOutDir,
+}: {
+	appOutDir: string;
+}): Promise<ElectronSoftwareRendererPruneResult> {
+	const frameworkDir = resolvePackagedElectronFrameworkDir(appOutDir);
+	if (!frameworkDir) {
+		console.warn(
+			`[prune:electron-software-renderer] Electron Framework not found under ${appOutDir}; skipping`,
+		);
+		return { frameworkDir: null, removedPaths: [] };
+	}
+
+	const removedPaths: string[] = [];
+	for (const payloadPath of MAC_ELECTRON_SOFTWARE_RENDERER_PAYLOADS) {
+		removePath(frameworkDir, join(frameworkDir, payloadPath), removedPaths);
+	}
+
+	if (removedPaths.length > 0) {
+		console.log(
+			`[prune:electron-software-renderer] removed ${removedPaths.length} packaged fallback payload(s)`,
+		);
+	}
+
+	return { frameworkDir, removedPaths };
+}
+
 if (import.meta.main) {
 	const appOutDir = process.argv[2];
 	if (!appOutDir) {
@@ -429,4 +546,6 @@ if (import.meta.main) {
 		targetArch: process.env.TARGET_ARCH ?? process.arch,
 		targetPlatform: process.env.TARGET_PLATFORM ?? process.platform,
 	});
+	await prunePackagedElectronLocales({ appOutDir });
+	await prunePackagedElectronSoftwareRenderer({ appOutDir });
 }

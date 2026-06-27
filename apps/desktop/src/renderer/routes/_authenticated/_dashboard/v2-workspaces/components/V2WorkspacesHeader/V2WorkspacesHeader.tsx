@@ -14,14 +14,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@superset/ui/select";
-import {
-	LuFolders,
-	LuLaptop,
-	LuLayers,
-	LuMonitor,
-	LuSearch,
-	LuX,
-} from "react-icons/lu";
+import { Folders, Laptop, Layers, Monitor, Search, X } from "lucide-react";
 import type {
 	V2WorkspaceDeviceCounts,
 	V2WorkspaceHostOption,
@@ -125,7 +118,7 @@ export function V2WorkspacesHeader({
 				<div className="flex flex-wrap items-center gap-2">
 					<InputGroup className="w-72">
 						<InputGroupAddon align="inline-start">
-							<LuSearch className="size-4" />
+							<Search className="size-4" />
 						</InputGroupAddon>
 						<InputGroupInput
 							type="text"
@@ -140,7 +133,7 @@ export function V2WorkspacesHeader({
 									aria-label="Clear search"
 									onClick={() => setSearchQuery("")}
 								>
-									<LuX />
+									<X />
 								</InputGroupButton>
 							</InputGroupAddon>
 						) : null}
@@ -159,7 +152,7 @@ export function V2WorkspacesHeader({
 							<SelectGroup>
 								<SelectItem value={PROJECT_FILTER_ALL}>
 									<span className="flex w-full min-w-0 items-center gap-2">
-										<LuFolders className="size-3.5" />
+										<Folders className="size-3.5" />
 										<span className="min-w-0 flex-1 truncate">
 											All projects
 										</span>
@@ -213,14 +206,14 @@ export function V2WorkspacesHeader({
 							<SelectGroup>
 								<SelectItem value={DEVICE_FILTER_THIS_DEVICE}>
 									<DeviceOptionLabel
-										icon={<LuLaptop className="size-3.5" />}
+										icon={<Laptop className="size-3.5" />}
 										label="This device"
 										count={counts.thisDevice}
 									/>
 								</SelectItem>
 								<SelectItem value={DEVICE_FILTER_ALL}>
 									<DeviceOptionLabel
-										icon={<LuLayers className="size-3.5" />}
+										icon={<Layers className="size-3.5" />}
 										label="All devices"
 										count={counts.all}
 									/>
@@ -237,7 +230,7 @@ export function V2WorkspacesHeader({
 										{remoteHosts.map((host) => (
 											<SelectItem key={host.hostId} value={host.hostId}>
 												<DeviceOptionLabel
-													icon={<LuMonitor className="size-3.5" />}
+													icon={<Monitor className="size-3.5" />}
 													label={host.hostName}
 													count={host.count}
 													isOnline={host.isOnline}

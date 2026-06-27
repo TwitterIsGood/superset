@@ -1,9 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
-import {
-	LuPanelRight,
-	LuPanelRightClose,
-	LuPanelRightOpen,
-} from "react-icons/lu";
+import { PanelRight, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useV2UserPreferences } from "renderer/hooks/useV2UserPreferences";
 import { HotkeyLabel } from "renderer/hotkeys";
 
@@ -16,15 +12,15 @@ export function RightSidebarToggle() {
 	const getToggleIcon = (isHovering: boolean) => {
 		if (!isOpen) {
 			return isHovering ? (
-				<LuPanelRightOpen className="size-4" strokeWidth={1.5} />
+				<PanelRightOpen className="size-4" strokeWidth={1.5} />
 			) : (
-				<LuPanelRight className="size-4" strokeWidth={1.5} />
+				<PanelRight className="size-4" strokeWidth={1.5} />
 			);
 		}
 		return isHovering ? (
-			<LuPanelRightClose className="size-4" strokeWidth={1.5} />
+			<PanelRightClose className="size-4" strokeWidth={1.5} />
 		) : (
-			<LuPanelRight className="size-4" strokeWidth={1.5} />
+			<PanelRight className="size-4" strokeWidth={1.5} />
 		);
 	};
 

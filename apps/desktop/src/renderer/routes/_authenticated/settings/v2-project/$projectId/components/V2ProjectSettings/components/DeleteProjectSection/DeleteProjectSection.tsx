@@ -10,13 +10,13 @@ import {
 	AlertDialogTrigger,
 } from "@superset/ui/alert-dialog";
 import { Button } from "@superset/ui/button";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { authClient } from "renderer/lib/auth-client";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { showHostServiceUnavailableToast } from "renderer/lib/host-service-unavailable";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 
 interface DeleteProjectSectionProps {

@@ -122,17 +122,7 @@ function copyModuleIfSymlink(
 	return true;
 }
 
-function readInstalledModuleVersion(modulePath: string): string | null {
-	const packageJsonPath = join(modulePath, "package.json");
-	if (!existsSync(packageJsonPath)) return null;
-	type PackageJson = { version?: string };
-	const packageJson = JSON.parse(
-		readFileSync(packageJsonPath, "utf8"),
-	) as PackageJson;
-	return packageJson.version ?? null;
-}
-
-function copyExactModuleVersion(
+function _copyExactModuleVersion(
 	nodeModulesDir: string,
 	moduleName: string,
 	version: string,
@@ -174,68 +164,6 @@ function copyExactModuleVersion(
 	return false;
 }
 
-function copyDependencyForPackage(
-	nodeModulesDir: string,
-	parentModuleName: string,
-	dependencyName: string,
-	dependencyRange: string,
-	required: boolean,
-): string | null {
-	const topLevelDependencyPath = join(nodeModulesDir, dependencyName);
-	const topLevelVersion = readInstalledModuleVersion(topLevelDependencyPath);
-
-	if (topLevelVersion && satisfies(topLevelVersion, dependencyRange)) {
-		copyModuleIfSymlink(nodeModulesDir, dependencyName, required);
-		return topLevelDependencyPath;
-	}
-
-	if (!topLevelVersion) {
-		console.log(
-			`  ${dependencyName}: top-level version missing; materializing ${dependencyRange} at the workspace root`,
-		);
-		copyExactModuleVersion(
-			nodeModulesDir,
-			dependencyName,
-			dependencyRange,
-			topLevelDependencyPath,
-			required,
-		);
-		return topLevelDependencyPath;
-	}
-
-	const nestedDependencyPath = join(
-		nodeModulesDir,
-		parentModuleName,
-		"node_modules",
-		dependencyName,
-	);
-	const nestedVersion = readInstalledModuleVersion(nestedDependencyPath);
-	if (nestedVersion && satisfies(nestedVersion, dependencyRange)) {
-		const nestedStats = lstatSync(nestedDependencyPath);
-		if (nestedStats.isSymbolicLink()) {
-			const realPath = realpathSync(nestedDependencyPath);
-			rmSync(nestedDependencyPath);
-			cpSync(realPath, nestedDependencyPath, {
-				recursive: true,
-			});
-		}
-		return nestedDependencyPath;
-	}
-
-	console.log(
-		`  ${dependencyName}: top-level version ${topLevelVersion ?? "missing"} does not satisfy ${dependencyRange}; materializing nested copy for ${parentModuleName}`,
-	);
-
-	copyExactModuleVersion(
-		nodeModulesDir,
-		dependencyName,
-		dependencyRange,
-		nestedDependencyPath,
-		required,
-	);
-	return nestedDependencyPath;
-}
-
 /**
  * Fetch an npm package tarball and extract it to destPath.
  * Used when cross-compiling and the target platform package isn't in the Bun store.
@@ -266,149 +194,6 @@ function fetchNpmPackage(
 			`  [ERROR] Failed to fetch ${packageName}@${version}: ${err}`,
 		);
 		return false;
-	}
-}
-
-function copyAstGrepPlatformPackages(nodeModulesDir: string): void {
-	const astGrepNapiPath = join(nodeModulesDir, "@ast-grep", "napi");
-	if (!existsSync(astGrepNapiPath)) return;
-
-	const astGrepPkgJsonPath = join(astGrepNapiPath, "package.json");
-	if (!existsSync(astGrepPkgJsonPath)) return;
-
-	type AstGrepPackageJson = {
-		optionalDependencies?: Record<string, string>;
-	};
-	const astGrepPkg = JSON.parse(
-		readFileSync(astGrepPkgJsonPath, "utf8"),
-	) as AstGrepPackageJson;
-	const optionalDeps = astGrepPkg.optionalDependencies ?? {};
-	const platformPackages = Object.entries(optionalDeps)
-		.filter(([name]) => name.startsWith("@ast-grep/napi-"))
-		.map(([name, version]) => ({ name, version }));
-
-	if (platformPackages.length === 0) return;
-
-	// Determine which platform package we need for the target arch
-	const targetPlatformSuffix = `${TARGET_PLATFORM === "darwin" ? "darwin" : TARGET_PLATFORM === "win32" ? "win32" : "linux"}-${TARGET_ARCH}`;
-	const targetPkg = platformPackages.find((pkg) =>
-		pkg.name.includes(targetPlatformSuffix),
-	);
-
-	// Bun isolated installs keep package payloads in workspaceRoot/node_modules/.bun
-	const bunStoreDir = getBunStoreDir(nodeModulesDir);
-	let resolvedTargetPackage = false;
-
-	for (const platformPkg of platformPackages) {
-		const isTargetPkg = targetPkg && platformPkg.name === targetPkg.name;
-		const destPath = join(nodeModulesDir, platformPkg.name);
-		if (existsSync(destPath)) {
-			const copied = copyModuleIfSymlink(
-				nodeModulesDir,
-				platformPkg.name,
-				false,
-			);
-			if (isTargetPkg && copied) resolvedTargetPackage = true;
-			continue;
-		}
-
-		const bunStoreFolderName = findBunStoreFolderName(
-			bunStoreDir,
-			platformPkg.name,
-			platformPkg.version,
-		);
-		if (bunStoreFolderName) {
-			const sourcePath = join(
-				bunStoreDir,
-				bunStoreFolderName,
-				"node_modules",
-				platformPkg.name,
-			);
-			if (existsSync(sourcePath)) {
-				console.log(`  ${platformPkg.name}: copying from Bun store`);
-				mkdirSync(dirname(destPath), { recursive: true });
-				cpSync(sourcePath, destPath, { recursive: true });
-				if (isTargetPkg) resolvedTargetPackage = true;
-				continue;
-			}
-		}
-
-		// If this is the target platform package and it's not in the Bun store,
-		// fetch it from npm (cross-compilation scenario)
-		if (isTargetPkg) {
-			if (fetchNpmPackage(platformPkg.name, platformPkg.version, destPath)) {
-				resolvedTargetPackage = true;
-				continue;
-			}
-		}
-
-		console.warn(
-			`  ${platformPkg.name}: not found in Bun store or node_modules`,
-		);
-	}
-
-	if (!resolvedTargetPackage) {
-		console.error(
-			`  [ERROR] Target platform package ${targetPkg?.name ?? `@ast-grep/napi-${targetPlatformSuffix}`} was not materialized`,
-		);
-		process.exit(1);
-	}
-}
-
-function copyLibsqlDependencies(nodeModulesDir: string): void {
-	const libsqlPath = join(nodeModulesDir, "libsql");
-	const libsqlPkgJsonPath = join(libsqlPath, "package.json");
-	if (!existsSync(libsqlPkgJsonPath)) return;
-
-	type LibsqlPackageJson = {
-		dependencies?: Record<string, string>;
-		optionalDependencies?: Record<string, string>;
-	};
-	const libsqlPkg = JSON.parse(
-		readFileSync(libsqlPkgJsonPath, "utf8"),
-	) as LibsqlPackageJson;
-	const deps = libsqlPkg.dependencies ?? {};
-	const optionalDeps = libsqlPkg.optionalDependencies ?? {};
-
-	console.log("\nPreparing libsql runtime dependencies...");
-	for (const [dep, version] of Object.entries(deps)) {
-		copyDependencyForPackage(nodeModulesDir, "libsql", dep, version, true);
-	}
-
-	// Copy whichever optional native platform packages Bun installed for this platform.
-	for (const dep of Object.keys(optionalDeps)) {
-		copyModuleIfSymlink(nodeModulesDir, dep, false);
-	}
-
-	// Some Bun installs place optional deps under .bun/node_modules/@scope.
-	// Mirror discovered @libsql optional packages if present there.
-	const bunFlatLibsqlScopePath = join(
-		getBunFlatNodeModulesDir(nodeModulesDir),
-		"@libsql",
-	);
-	if (existsSync(bunFlatLibsqlScopePath)) {
-		for (const entry of readdirSync(bunFlatLibsqlScopePath)) {
-			if (
-				!entry.includes("darwin") &&
-				!entry.includes("linux") &&
-				!entry.includes("win32")
-			) {
-				continue;
-			}
-			copyModuleIfSymlink(nodeModulesDir, `@libsql/${entry}`, false);
-		}
-	}
-
-	// Cross-compilation: ensure the target platform's @libsql package is present
-	const targetSuffix = `${TARGET_PLATFORM}-${TARGET_ARCH}`;
-	const targetLibsqlPkgs = Object.entries(optionalDeps).filter(([name]) =>
-		name.includes(targetSuffix),
-	);
-	for (const [name, version] of targetLibsqlPkgs) {
-		const destPath = join(nodeModulesDir, name);
-		if (!existsSync(destPath)) {
-			fetchNpmPackage(name, version, destPath);
-		}
 	}
 }
 
@@ -496,10 +281,7 @@ function prepareNativeModules() {
 		copyModuleIfSymlink(nodeModulesDir, moduleName, true);
 	}
 
-	console.log("\nPreparing ast-grep platform package...");
-	copyAstGrepPlatformPackages(nodeModulesDir);
 	copyParcelWatcherPlatformPackages(nodeModulesDir);
-	copyLibsqlDependencies(nodeModulesDir);
 
 	console.log("\nDone!");
 }

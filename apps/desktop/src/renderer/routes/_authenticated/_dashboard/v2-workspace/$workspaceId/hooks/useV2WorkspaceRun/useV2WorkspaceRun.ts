@@ -1,11 +1,11 @@
 import type { CreatePaneInput, WorkspaceStore } from "@superset/panes";
-import { toast } from "@superset/ui/sonner";
 import { workspaceTrpc } from "@superset/workspace-client";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useWorkspaceEvent } from "renderer/hooks/host-service/useWorkspaceEvent";
 import { buildTerminalCommand } from "renderer/lib/terminal/launch-command";
+import { toast } from "renderer/lib/toast";
 import { useWorkspace } from "renderer/routes/_authenticated/_dashboard/v2-workspace/providers/WorkspaceProvider";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import type {

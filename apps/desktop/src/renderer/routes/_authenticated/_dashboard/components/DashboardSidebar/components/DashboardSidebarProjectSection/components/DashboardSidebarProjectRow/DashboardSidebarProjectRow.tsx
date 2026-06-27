@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
+import { ChevronRight, Plus } from "lucide-react";
 import { type ComponentPropsWithoutRef, forwardRef } from "react";
-import { HiChevronRight, HiMiniPlus } from "react-icons/hi2";
 import { ProjectThumbnail } from "renderer/routes/_authenticated/components/ProjectThumbnail";
 import { RenameInput } from "renderer/screens/main/components/WorkspaceSidebar/RenameInput";
 
@@ -76,7 +76,7 @@ export const DashboardSidebarProjectRow = forwardRef<
 							iconUrl={iconUrl}
 							className="size-4 group-hover:hidden"
 						/>
-						<HiChevronRight
+						<ChevronRight
 							className={cn(
 								"hidden size-4 text-muted-foreground transition-transform group-hover:block",
 								!isCollapsed && "rotate-90",
@@ -111,7 +111,7 @@ export const DashboardSidebarProjectRow = forwardRef<
 									aria-label="New workspace"
 									className="hidden size-full items-center justify-center rounded transition-colors hover:bg-muted group-hover:flex group-has-[:focus]:flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 								>
-									<HiMiniPlus className="size-4 text-muted-foreground" />
+									<Plus className="size-4 text-muted-foreground" />
 								</button>
 							</TooltipTrigger>
 							<TooltipContent side="bottom" sideOffset={4}>

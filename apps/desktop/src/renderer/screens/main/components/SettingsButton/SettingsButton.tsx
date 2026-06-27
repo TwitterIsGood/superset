@@ -1,7 +1,7 @@
 import { Button } from "@superset/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { useNavigate } from "@tanstack/react-router";
-import { CiSettings } from "react-icons/ci";
+import { Settings } from "lucide-react";
 import { HotkeyLabel } from "renderer/hotkeys";
 
 export function SettingsButton() {
@@ -17,7 +17,7 @@ export function SettingsButton() {
 					aria-label="Open settings"
 					className="no-drag"
 				>
-					<CiSettings className="size-5" />
+					<Settings className="size-5" />
 				</Button>
 			</TooltipTrigger>
 			<TooltipContent side="bottom" sideOffset={8}>

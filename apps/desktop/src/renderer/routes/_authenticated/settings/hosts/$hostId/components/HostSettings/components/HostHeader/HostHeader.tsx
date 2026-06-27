@@ -1,6 +1,6 @@
 import { cn } from "@superset/ui/utils";
+import { Pencil } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { LuPencil } from "react-icons/lu";
 import { useOptimisticCollectionActions } from "renderer/routes/_authenticated/hooks/useOptimisticCollectionActions";
 
 interface HostHeaderProps {
@@ -99,7 +99,7 @@ export function HostHeader({
 						title="Rename host"
 					>
 						<h2 className="text-xl font-semibold">{name}</h2>
-						<LuPencil className="size-4 text-muted-foreground" />
+						<Pencil className="size-4 text-muted-foreground" />
 					</button>
 				) : (
 					<h2 className="text-xl font-semibold">{name}</h2>

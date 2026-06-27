@@ -12,18 +12,18 @@ import {
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import {
-	LuArrowRightLeft,
-	LuArrowUp,
-	LuCopy,
-	LuEye,
-	LuEyeOff,
-	LuFolderOpen,
-	LuFolderPlus,
-	LuGitBranch,
-	LuPencil,
-	LuTrash2,
-	LuX,
-} from "react-icons/lu";
+	ArrowRightLeft,
+	ArrowUp,
+	Copy,
+	Eye,
+	EyeOff,
+	FolderOpen,
+	FolderPlus,
+	GitBranch,
+	Pencil,
+	Trash2,
+	X,
+} from "lucide-react";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { useDashboardSidebarHover } from "../../../../providers/DashboardSidebarHoverProvider";
@@ -91,37 +91,37 @@ export function DashboardSidebarWorkspaceContextMenu({
 			<ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
 			<ContextMenuContent onCloseAutoFocus={(event) => event.preventDefault()}>
 				<ContextMenuItem onSelect={onRename}>
-					<LuPencil className="size-4 mr-2" />
+					<Pencil className="size-4 mr-2" />
 					Rename
 				</ContextMenuItem>
 				{isLocalWorkspace && (
 					<>
 						<ContextMenuSeparator />
 						<ContextMenuItem onSelect={onOpenInFinder}>
-							<LuFolderOpen className="size-4 mr-2" />
+							<FolderOpen className="size-4 mr-2" />
 							Open in Finder
 						</ContextMenuItem>
 						<ContextMenuItem onSelect={onCopyPath}>
-							<LuCopy className="size-4 mr-2" />
+							<Copy className="size-4 mr-2" />
 							Copy Path
 						</ContextMenuItem>
 					</>
 				)}
 				{!isLocalWorkspace && <ContextMenuSeparator />}
 				<ContextMenuItem onSelect={onCopyBranchName}>
-					<LuGitBranch className="size-4 mr-2" />
+					<GitBranch className="size-4 mr-2" />
 					Copy Branch Name
 				</ContextMenuItem>
 				<ContextMenuSeparator />
 				<ContextMenuItem onSelect={onToggleUnread}>
 					{isUnread ? (
 						<>
-							<LuEye className="size-4 mr-2" />
+							<Eye className="size-4 mr-2" />
 							Mark as Read
 						</>
 					) : (
 						<>
-							<LuEyeOff className="size-4 mr-2" />
+							<EyeOff className="size-4 mr-2" />
 							Mark as Unread
 						</>
 					)}
@@ -130,14 +130,14 @@ export function DashboardSidebarWorkspaceContextMenu({
 					<>
 						<ContextMenuSeparator />
 						<ContextMenuItem onSelect={onCreateSection}>
-							<LuFolderPlus className="size-4 mr-2" />
+							<FolderPlus className="size-4 mr-2" />
 							New group from workspace
 						</ContextMenuItem>
 						{(sections.length > 0 || isInSection) && <ContextMenuSeparator />}
 						{sections.length > 0 && (
 							<ContextMenuSub>
 								<ContextMenuSubTrigger>
-									<LuArrowRightLeft className="size-4 mr-2" />
+									<ArrowRightLeft className="size-4 mr-2" />
 									Move to group
 								</ContextMenuSubTrigger>
 								<ContextMenuSubContent>
@@ -160,7 +160,7 @@ export function DashboardSidebarWorkspaceContextMenu({
 						)}
 						{isInSection && (
 							<ContextMenuItem onSelect={() => onMoveToSection(null)}>
-								<LuArrowUp className="size-4 mr-2" />
+								<ArrowUp className="size-4 mr-2" />
 								Ungroup
 							</ContextMenuItem>
 						)}
@@ -171,7 +171,7 @@ export function DashboardSidebarWorkspaceContextMenu({
 					onSelect={onRemoveFromSidebar}
 					className="text-destructive focus:text-destructive"
 				>
-					<LuX className="size-4 mr-2 text-destructive" />
+					<X className="size-4 mr-2 text-destructive" />
 					Remove from Sidebar
 				</ContextMenuItem>
 				{onDelete ? (
@@ -179,7 +179,7 @@ export function DashboardSidebarWorkspaceContextMenu({
 						onSelect={onDelete}
 						className="text-destructive focus:text-destructive"
 					>
-						<LuTrash2 className="size-4 mr-2 text-destructive" />
+						<Trash2 className="size-4 mr-2 text-destructive" />
 						Delete
 						{showDeleteShortcut && (
 							<ContextMenuShortcut>{deleteHotkeyText}</ContextMenuShortcut>

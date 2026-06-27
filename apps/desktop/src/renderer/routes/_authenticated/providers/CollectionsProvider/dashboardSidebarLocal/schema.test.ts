@@ -3,6 +3,7 @@ import {
 	DEFAULT_V2_USER_PREFERENCES,
 	healV2UserPreferences,
 	healWorkspaceLocalState,
+	workspaceLocalStateSchema,
 } from "./schema";
 
 describe("healV2UserPreferences", () => {
@@ -175,5 +176,108 @@ describe("healWorkspaceLocalState", () => {
 		expect(() => healWorkspaceLocalState(undefined)).not.toThrow();
 		expect(() => healWorkspaceLocalState("garbage")).not.toThrow();
 		expect(() => healWorkspaceLocalState(42)).not.toThrow();
+	});
+
+	it("strips inline chat launch attachments from healed pane layout state", () => {
+		const largeDataUrl = `data:text/plain;base64,${"a".repeat(100_000)}`;
+		const healed = healWorkspaceLocalState({
+			...baseStored,
+			paneLayout: {
+				version: 1,
+				activeTabId: "tab-1",
+				tabs: [
+					{
+						id: "tab-1",
+						createdAt: 1,
+						activePaneId: "pane-1",
+						layout: { type: "pane", paneId: "pane-1" },
+						panes: {
+							"pane-1": {
+								id: "pane-1",
+								kind: "chat",
+								data: {
+									sessionId: null,
+									launchConfig: {
+										initialPrompt: "Review this patch",
+										model: "claude",
+										initialFiles: [
+											{
+												data: largeDataUrl,
+												mediaType: "text/plain",
+												filename: "patch.txt",
+											},
+										],
+									},
+								},
+							},
+						},
+					},
+				],
+			},
+		});
+
+		const pane = healed.paneLayout.tabs[0]?.panes["pane-1"];
+		expect(JSON.stringify(healed.paneLayout)).not.toContain(largeDataUrl);
+		expect(
+			(pane?.data as { launchConfig?: { initialFiles?: unknown } }).launchConfig
+				?.initialFiles,
+		).toBeUndefined();
+		expect(
+			(pane?.data as { launchConfig?: { initialPrompt?: string } }).launchConfig
+				?.initialPrompt,
+		).toBe("Review this patch");
+	});
+
+	it("strips inline chat launch attachments from schema output", () => {
+		const largeDataUrl = `data:text/plain;base64,${"b".repeat(100_000)}`;
+		const parsed = workspaceLocalStateSchema.parse({
+			workspaceId: "11111111-1111-4111-8111-111111111111",
+			createdAt: new Date("2026-01-01T00:00:00.000Z"),
+			sidebarState: {
+				projectId: "22222222-2222-4222-8222-222222222222",
+			},
+			paneLayout: {
+				version: 1,
+				activeTabId: "tab-1",
+				tabs: [
+					{
+						id: "tab-1",
+						createdAt: 1,
+						activePaneId: "pane-1",
+						layout: { type: "pane", paneId: "pane-1" },
+						panes: {
+							"pane-1": {
+								id: "pane-1",
+								kind: "chat",
+								data: {
+									sessionId: null,
+									launchConfig: {
+										initialPrompt: "Use this context",
+										model: "claude",
+										initialFiles: [
+											{
+												data: largeDataUrl,
+												mediaType: "text/plain",
+												filename: "context.txt",
+											},
+										],
+									},
+								},
+							},
+						},
+					},
+				],
+			},
+		});
+
+		const pane = parsed.paneLayout.tabs[0]?.panes["pane-1"];
+		expect(JSON.stringify(parsed.paneLayout)).not.toContain(largeDataUrl);
+		expect(
+			(pane?.data as { launchConfig?: { initialFiles?: unknown } }).launchConfig
+				?.initialFiles,
+		).toBeUndefined();
+		expect(
+			(pane?.data as { launchConfig?: { model?: string } }).launchConfig?.model,
+		).toBe("claude");
 	});
 });

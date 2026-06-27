@@ -1,10 +1,10 @@
-import { toast } from "@superset/ui/sonner";
 import { workspaceTrpc } from "@superset/workspace-client";
 import { useCallback } from "react";
 import type {
 	McpOverviewPayload,
 	ModelOption,
 } from "renderer/components/Chat/ChatInterface/types";
+import { toast } from "renderer/lib/toast";
 import {
 	findModelByQuery,
 	normalizeModelQueryFromActionArgument,

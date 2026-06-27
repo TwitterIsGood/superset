@@ -3,13 +3,12 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@superset/ui/collapsible";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { workspaceTrpc } from "@superset/workspace-client";
-import { ChevronRight, Minus, Plus } from "lucide-react";
+import { ChevronRight, Minus, Plus, Undo2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { LuUndo2 } from "react-icons/lu";
+import { toast } from "renderer/lib/toast";
 import { DiscardConfirmDialog } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/components/DiscardConfirmDialog";
 
 type SectionKind = "unstaged" | "staged";
@@ -136,7 +135,7 @@ export function ChangesSection({
 									onClick={() => setShowConfirm(true)}
 									className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-destructive"
 								>
-									<LuUndo2 className="size-3.5" />
+									<Undo2 className="size-3.5" />
 								</button>
 							</TooltipTrigger>
 							<TooltipContent side="bottom">

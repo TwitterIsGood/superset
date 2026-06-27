@@ -1,5 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
-import { VscGitPullRequest, VscLoading } from "react-icons/vsc";
+import { GitPullRequest, LoaderCircle } from "lucide-react";
 import type { PRFlowDispatch } from "../../hooks/usePRFlowDispatch";
 import { PRStatusGroup } from "./components/PRStatusGroup";
 import {
@@ -99,7 +99,7 @@ function ActionSlot({
 						workspaceId={workspaceId}
 						onRefresh={onRetry}
 					/>
-					<VscLoading className="ml-1.5 size-4 animate-spin text-muted-foreground" />
+					<LoaderCircle className="ml-1.5 size-4 animate-spin text-muted-foreground" />
 				</>
 			);
 
@@ -111,7 +111,7 @@ function ActionSlot({
 					aria-label="Retry loading pull request"
 					className="flex items-center text-muted-foreground/60 transition-colors hover:text-muted-foreground"
 				>
-					<VscGitPullRequest className="size-4" />
+					<GitPullRequest className="size-4" />
 				</button>
 			);
 	}
@@ -129,7 +129,7 @@ function UnavailableIcon({
 		<Tooltip>
 			<TooltipTrigger asChild>
 				<span className="flex items-center text-muted-foreground/40">
-					<VscGitPullRequest className="size-4" />
+					<GitPullRequest className="size-4" />
 				</span>
 			</TooltipTrigger>
 			<TooltipContent side="bottom">{tooltipText}</TooltipContent>
@@ -168,7 +168,7 @@ function CreatePRIconButton({
 					aria-label="Create pull request"
 					className="flex items-center text-muted-foreground transition-colors hover:text-foreground"
 				>
-					<VscGitPullRequest className="size-4" />
+					<GitPullRequest className="size-4" />
 				</button>
 			</TooltipTrigger>
 			<TooltipContent side="bottom">Create Pull Request</TooltipContent>
