@@ -9,10 +9,10 @@ const quickBudget = {
 	targetSeconds: 180,
 	criticalPathMaxSeconds: {
 		artifactUpload: 10,
-		compile: 90,
-		dependencyCache: 45,
+		compile: 120,
+		dependencyCache: 60,
 		electronBuilderZip: 45,
-		install: 45,
+		install: 90,
 	},
 };
 
@@ -39,6 +39,7 @@ describe("evaluateCanaryBuildDuration", () => {
 
 		expect(result.failures).toEqual([]);
 		expect(result.targetWarnings).toEqual([]);
+		expect(result.artifactReadySeconds).toBe(170);
 		expect(result.criticalPathSeconds).toBe(180);
 		expect(result.phases.map((phase) => phase.name)).toEqual([
 			"macArm64",
@@ -50,7 +51,7 @@ describe("evaluateCanaryBuildDuration", () => {
 		]);
 	});
 
-	test("fails the quick lane when total or a phase exceeds hard limits", () => {
+	test("fails the quick lane when artifact-ready time or a phase exceeds hard limits", () => {
 		const result = evaluateCanaryBuildDuration({
 			budget: quickBudget,
 			lane: "quick",
@@ -64,16 +65,59 @@ describe("evaluateCanaryBuildDuration", () => {
 						step("Compile app with electron-vite", 80, 260),
 						step("Build Electron app", 260, 330),
 						step("Upload ZIP artifact", 330, 340),
+						step("Post Cache dependencies", 340, 370),
 					],
 				},
 			],
 		});
 
 		expect(result.failures.map((failure) => failure.message)).toEqual([
-			expect.stringContaining("quick canary critical path"),
+			expect.stringContaining("quick canary artifact-ready path"),
 			expect.stringContaining("compile"),
 			expect.stringContaining("electronBuilderZip"),
-			expect.stringContaining("install"),
+		]);
+		expect(
+			result.phases.find((phase) => phase.name === "postCache")
+				?.durationSeconds,
+		).toBe(30);
+		expect(
+			result.phases.find((phase) => phase.name === "dependencyCache")
+				?.durationSeconds,
+		).toBeUndefined();
+	});
+
+	test("uses artifact-producing jobs for quick artifact-ready timing", () => {
+		const result = evaluateCanaryBuildDuration({
+			budget: quickBudget,
+			lane: "quick",
+			jobs: [
+				{
+					completed_at: "2026-06-27T00:00:15Z",
+					name: "Check for changes",
+					started_at: "2026-06-27T00:00:00Z",
+				},
+				{
+					completed_at: "2026-06-27T00:05:50Z",
+					name: "Build - macOS (arm64)",
+					started_at: "2026-06-27T00:00:20Z",
+					steps: [
+						step("Restore dependencies cache", 20, 62),
+						step("Install dependencies", 62, 137),
+						step("Compile app with electron-vite", 137, 257),
+						step("Build Electron app", 257, 285),
+						step("Upload ZIP artifact", 285, 289),
+						step("Upload auto-update manifest", 289, 290),
+						step("Post Cache dependencies", 290, 350),
+					],
+				},
+			],
+		});
+
+		expect(result.artifactReadySeconds).toBe(270);
+		expect(result.criticalPathSeconds).toBe(350);
+		expect(result.failures).toEqual([]);
+		expect(result.targetWarnings.map((warning) => warning.message)).toEqual([
+			expect.stringContaining("quick canary artifact-ready path"),
 		]);
 	});
 

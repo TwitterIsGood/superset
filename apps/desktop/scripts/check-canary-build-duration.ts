@@ -66,6 +66,7 @@ interface BuildDurationFinding {
 }
 
 interface BuildDurationResult {
+	artifactReadySeconds: number;
 	checkedJobs: number;
 	criticalPathSeconds: number;
 	failures: BuildDurationFinding[];
@@ -332,6 +333,7 @@ function isJobLike(value: unknown): value is GitHubJob {
 
 function phaseForStep(jobName: string, stepName: string): string | undefined {
 	const text = `${jobName} ${stepName}`.toLowerCase();
+	if (text.includes("post cache")) return "postCache";
 	if (text.includes("cache")) return "dependencyCache";
 	if (text.includes("install dependencies")) return "install";
 	if (
@@ -435,6 +437,44 @@ function criticalPathSeconds(jobs: GitHubJob[]): number {
 	return Math.max(0, ((completedAt ?? Date.now()) - startedAt) / 1000);
 }
 
+function artifactReadySeconds(jobs: GitHubJob[]): number {
+	let startedAt: number | undefined;
+	let artifactReadyAt: number | undefined;
+	for (const job of jobs) {
+		if (job.name?.toLowerCase().includes("canary build duration")) continue;
+		const isArtifactJob = (job.steps ?? []).some((step) => {
+			const stepName = (step.name ?? "").toLowerCase();
+			return (
+				stepName.includes("build electron app") ||
+				stepName.includes("upload zip artifact") ||
+				stepName.includes("upload auto-update manifest") ||
+				stepName.includes("update canary release")
+			);
+		});
+		if (!isArtifactJob) continue;
+		const jobStart = parseTimestamp(jobStartedAt(job));
+		if (jobStart !== undefined)
+			startedAt = Math.min(startedAt ?? jobStart, jobStart);
+		for (const step of job.steps ?? []) {
+			const stepName = (step.name ?? "").toLowerCase();
+			const stepStart = parseTimestamp(stepStartedAt(step));
+			if (stepStart !== undefined)
+				startedAt = Math.min(startedAt ?? stepStart, stepStart);
+			if (
+				stepName.includes("upload zip artifact") ||
+				stepName.includes("upload auto-update manifest") ||
+				stepName.includes("update canary release")
+			) {
+				const stepEnd = parseTimestamp(stepCompletedAt(step));
+				if (stepEnd !== undefined)
+					artifactReadyAt = Math.max(artifactReadyAt ?? stepEnd, stepEnd);
+			}
+		}
+	}
+	if (startedAt === undefined || artifactReadyAt === undefined) return 0;
+	return Math.max(0, ((artifactReadyAt ?? Date.now()) - startedAt) / 1000);
+}
+
 export function evaluateCanaryBuildDuration(args: {
 	budget: BuildDurationBudget;
 	jobs: GitHubJob[];
@@ -444,6 +484,7 @@ export function evaluateCanaryBuildDuration(args: {
 		(left, right) => right.durationSeconds - left.durationSeconds,
 	);
 	const criticalSeconds = criticalPathSeconds(args.jobs);
+	const readySeconds = artifactReadySeconds(args.jobs);
 	const failures: BuildDurationFinding[] = [];
 	const targetWarnings: BuildDurationFinding[] = [];
 
@@ -458,16 +499,24 @@ export function evaluateCanaryBuildDuration(args: {
 		});
 	}
 
-	if (criticalSeconds > args.budget.maxSeconds) {
+	const enforceArtifactReady = args.lane === "quick" && readySeconds > 0;
+	const hardBudgetSeconds = enforceArtifactReady
+		? readySeconds
+		: criticalSeconds;
+	const budgetLabel = enforceArtifactReady
+		? "artifact-ready path"
+		: "critical path";
+
+	if (hardBudgetSeconds > args.budget.maxSeconds) {
 		failures.push({
-			message: `${args.lane} canary critical path ${formatSeconds(criticalSeconds)} exceeds hard limit ${formatSeconds(args.budget.maxSeconds)}.`,
+			message: `${args.lane} canary ${budgetLabel} ${formatSeconds(hardBudgetSeconds)} exceeds hard limit ${formatSeconds(args.budget.maxSeconds)}.`,
 		});
 	} else if (
 		args.budget.targetSeconds !== undefined &&
-		criticalSeconds > args.budget.targetSeconds
+		hardBudgetSeconds > args.budget.targetSeconds
 	) {
 		targetWarnings.push({
-			message: `${args.lane} canary critical path ${formatSeconds(criticalSeconds)} exceeds target ${formatSeconds(args.budget.targetSeconds)}.`,
+			message: `${args.lane} canary ${budgetLabel} ${formatSeconds(hardBudgetSeconds)} exceeds target ${formatSeconds(args.budget.targetSeconds)}.`,
 		});
 	}
 
@@ -485,6 +534,7 @@ export function evaluateCanaryBuildDuration(args: {
 	}
 
 	return {
+		artifactReadySeconds: readySeconds,
 		checkedJobs: args.jobs.length,
 		criticalPathSeconds: criticalSeconds,
 		failures,
@@ -585,6 +635,9 @@ function printHumanReport(result: BuildDurationResult): void {
 	console.log("");
 	console.log(`- Lane: ${result.lane}`);
 	console.log(`- Checked jobs: ${result.checkedJobs}`);
+	console.log(
+		`- Artifact ready: ${formatSeconds(result.artifactReadySeconds)}`,
+	);
 	console.log(`- Critical path: ${formatSeconds(result.criticalPathSeconds)}`);
 	if (result.phases.length > 0) {
 		console.log("");

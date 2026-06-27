@@ -62,7 +62,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          fetch-depth: 0
+          fetch-depth: ${{ github.event.inputs.force_build == 'true' && 1 || 0 }}
 
       - name: Check for changes since last canary
         id: check

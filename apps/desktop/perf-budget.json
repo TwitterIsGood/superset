@@ -24,9 +24,9 @@
 				"maxSeconds": 300,
 				"targetSeconds": 180,
 				"criticalPathMaxSeconds": {
-					"dependencyCache": 45,
-					"install": 45,
-					"compile": 90,
+					"dependencyCache": 60,
+					"install": 90,
+					"compile": 120,
 					"electronBuilderZip": 45,
 					"artifactUpload": 10
 				}

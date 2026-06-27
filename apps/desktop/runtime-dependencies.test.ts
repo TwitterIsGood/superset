@@ -2045,6 +2045,14 @@ describe("Trellis runtime pack packaging", () => {
 		expect(buildWorkflow).toContain(
 			"hashFiles('bun.lock', 'package.json', 'apps/desktop/package.json', 'packages/*/package.json')",
 		);
+		expect(buildWorkflow).toContain("Restore dependencies cache");
+		expect(buildWorkflow).toContain("actions/cache/restore");
+		expect(buildWorkflow).toContain(
+			"if: inputs.macos_artifact_mode == 'zip_only'",
+		);
+		expect(buildWorkflow).toContain(
+			"if: inputs.macos_artifact_mode != 'zip_only'",
+		);
 		expect(buildWorkflow).not.toContain(
 			"$" +
 				"{{ runner.os }}-bun-" +
@@ -2056,6 +2064,10 @@ describe("Trellis runtime pack packaging", () => {
 		expect(buildWorkflow).not.toContain("bun run package -- --publish never");
 		expect(canaryWorkflow).toContain(
 			'BUILD_SCOPE" == "quick" && "$PUBLISH_RELEASE" == "false',
+		);
+		expect(canaryWorkflow).toContain(
+			"fetch-depth: $" +
+				"{{ github.event.inputs.force_build == 'true' && 1 || 0 }}",
 		);
 		expect(canaryWorkflow).toContain(
 			"Quick canary requested: macOS arm64 updater ZIP only.",
@@ -2113,10 +2125,10 @@ describe("Trellis runtime pack packaging", () => {
 			"bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files=false",
 		);
 		expect(canaryWorkflow).toContain(
-			"needs: [check-changes, build, resource-packs]",
+			"needs: [check-changes, build, resource-pack-release-preflight]",
 		);
 		expect(canaryWorkflow).toContain(
-			"needs.resource-packs.result == 'success' || needs.resource-packs.result == 'skipped'",
+			"needs.resource-pack-release-preflight.result == 'success' || needs.resource-pack-release-preflight.result == 'skipped'",
 		);
 		expect(canaryWorkflow).not.toContain("bundle_cli=true");
 		expect(canaryWorkflow).toContain(
