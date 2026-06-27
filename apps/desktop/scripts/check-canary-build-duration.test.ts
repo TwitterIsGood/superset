@@ -121,6 +121,33 @@ describe("evaluateCanaryBuildDuration", () => {
 		]);
 	});
 
+	test("warns instead of failing when cache restore exceeds its diagnostic phase budget", () => {
+		const result = evaluateCanaryBuildDuration({
+			budget: quickBudget,
+			lane: "quick",
+			jobs: [
+				{
+					completed_at: "2026-06-27T00:02:40Z",
+					name: "Build - macOS (arm64)",
+					started_at: "2026-06-27T00:00:00Z",
+					steps: [
+						step("Restore dependencies cache", 0, 84),
+						step("Install dependencies", 84, 96),
+						step("Compile app with electron-vite", 96, 146),
+						step("Build Electron app", 146, 156),
+						step("Upload ZIP artifact", 156, 160),
+					],
+				},
+			],
+		});
+
+		expect(result.failures).toEqual([]);
+		expect(result.artifactReadySeconds).toBe(160);
+		expect(result.targetWarnings.map((warning) => warning.message)).toContain(
+			"dependencyCache 1m 24s exceeds hard limit 1m 00s.",
+		);
+	});
+
 	test("warns when published quick exceeds target but stays under hard limit", () => {
 		const result = evaluateCanaryBuildDuration({
 			budget: {

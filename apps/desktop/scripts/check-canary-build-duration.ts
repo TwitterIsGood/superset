@@ -80,6 +80,7 @@ interface BuildDurationResult {
 	targetWarnings: BuildDurationFinding[];
 }
 
+const diagnosticPhaseNames = new Set(["dependencyCache", "postCache"]);
 const desktopDir = resolve(import.meta.dirname, "..");
 const rootDir = resolve(desktopDir, "../..");
 
@@ -606,10 +607,15 @@ export function evaluateCanaryBuildDuration(args: {
 		const summary = phases.find((candidate) => candidate.name === phase);
 		if (!summary) continue;
 		if (summary.durationSeconds > maxSeconds) {
-			failures.push({
+			const finding = {
 				phase,
 				message: `${phase} ${formatSeconds(summary.durationSeconds)} exceeds hard limit ${formatSeconds(maxSeconds)}.`,
-			});
+			};
+			if (diagnosticPhaseNames.has(phase)) {
+				targetWarnings.push(finding);
+			} else {
+				failures.push(finding);
+			}
 		}
 	}
 
