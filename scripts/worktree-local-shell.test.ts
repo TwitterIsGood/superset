@@ -115,13 +115,13 @@ describe("worktree local shell helpers", () => {
 			'NEXT_PUBLIC_API_URL="$SUPERSET_DESKTOP_TARGET_API_URL"',
 		);
 		expect(script).toContain(
-			"expected external loaded source: bun run online:start:loaded",
+			"expected external loaded source: bun run online:start:desktop:loaded",
 		);
 		expect(script).toContain(
-			"local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:loaded",
+			"local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:desktop:loaded",
 		);
 		expect(script).toContain(
-			'warn "local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:loaded"\n    stop_data_services',
+			'warn "local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:desktop:loaded"\n    stop_data_services',
 		);
 		expect(setupScript).toContain(
 			'WORKTREE_DEV_PROFILE="$' +

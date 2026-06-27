@@ -140,7 +140,7 @@ describe("desktop loaded UI verification helper", () => {
 		expect(source).toContain("getFixtureHostBackedWorkspaceId");
 		expect(source).toContain("fixtureHostBackedWorkspaceId");
 		expect(source).toContain("preferredWorkspaceId");
-		expect(source).toContain("host-backed workspace detail id");
+		expect(source).toContain("host-backed workspace detail route");
 		expect(source).toContain("waitForV2WorkspaceDetailShell");
 		expect(source).toContain("v2 workspace detail shell");
 		expect(source).toContain("open-v2-workspace-right-sidebar");

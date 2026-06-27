@@ -250,7 +250,19 @@ function V2WorkspaceContent({ search }: V2WorkspacePageContentProps) {
 	);
 	useEffect(() => {
 		if (sidebarSlotEl) return;
-		setSidebarSlotEl(document.getElementById("workspace-right-sidebar-slot"));
+		let animationFrameId = 0;
+		const syncSidebarSlot = () => {
+			const nextSlotEl = document.getElementById(
+				"workspace-right-sidebar-slot",
+			);
+			if (nextSlotEl) {
+				setSidebarSlotEl(nextSlotEl);
+				return;
+			}
+			animationFrameId = requestAnimationFrame(syncSidebarSlot);
+		};
+		syncSidebarSlot();
+		return () => cancelAnimationFrame(animationFrameId);
 	}, [sidebarSlotEl]);
 
 	useWorkspaceHotkeys({

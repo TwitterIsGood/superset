@@ -464,9 +464,15 @@ async function waitForV2WorkspaceDetailShell(
 	if (!expectedWorkspaceId) return;
 	await waitForRendererExpression(
 		automation,
-		`document.querySelector("[data-workspace-id]")?.getAttribute("data-workspace-id") === ${JSON.stringify(expectedWorkspaceId)}`,
+		`(() => {
+  const renderedWorkspaceId = document.querySelector("[data-workspace-id]")?.getAttribute("data-workspace-id");
+  return (
+    location.hash === ${JSON.stringify(`#/v2-workspace/${expectedWorkspaceId}`)} &&
+    (renderedWorkspaceId === undefined || renderedWorkspaceId === ${JSON.stringify(expectedWorkspaceId)})
+  );
+})()`,
 		options,
-		"host-backed workspace detail id",
+		"host-backed workspace detail route",
 	);
 }
 

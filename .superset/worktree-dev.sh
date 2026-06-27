@@ -388,7 +388,7 @@ print_desktop_perf_fixture_status() {
   if ! dense_fixture_database_available; then
     printf '  - %-24s %s\n' "desktop-perf-loaded" "database unavailable"
     if [ "$WORKTREE_DEV_USES_EXTERNAL_APP_SERVICES" = "1" ]; then
-      printf '  ! %-24s %s\n' "online-like data" "run: bun run online:start:loaded"
+      printf '  ! %-24s %s\n' "online-like data" "run: bun run online:start:desktop:loaded"
     fi
     return
   fi
@@ -421,7 +421,7 @@ print_desktop_perf_fixture_status() {
   printf '  %s\n' "$summary"
   if [ "$(printf '%s' "$output" | jq -r '.isLoaded')" != "true" ]; then
     if [ "$WORKTREE_DEV_USES_EXTERNAL_APP_SERVICES" = "1" ]; then
-      printf '  ! %-24s %s\n' "loaded data" "run: bun run online:start:loaded"
+      printf '  ! %-24s %s\n' "loaded data" "run: bun run online:start:desktop:loaded"
     else
       printf '  ! %-24s %s\n' "loaded data" "run: bun run dev:worktree:start:loaded"
     fi
@@ -1081,7 +1081,7 @@ start_all() {
     wait_for_db_query
     run_migrations_and_seed
   else
-    warn "local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:loaded"
+    warn "local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:desktop:loaded"
     stop_data_services
   fi
   ensure_desktop_perf_fixture_if_requested

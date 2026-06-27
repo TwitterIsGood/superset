@@ -84,6 +84,8 @@ describe("desktop perf fixture helpers", () => {
 	test("loaded stats require matching local host-service workspace rows", () => {
 		const source = readFileSync("scripts/desktop-perf-fixture.ts", "utf8");
 
+		expect(source).toContain("hasLocalHostFixtureTables");
+		expect(source).toContain("name in ('projects', 'workspaces')");
 		expect(source).toContain("countLocalHostFixtureWorkspaces");
 		expect(source).toContain("localHostBackedWorkspaceCount");
 		expect(source).toContain("hostBackedWorkspaceIds");

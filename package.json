@@ -66,6 +66,8 @@
 		"release:canary": "./scripts/release-canary.sh",
 		"online:start": "./scripts/superset-online.sh start",
 		"online:start:loaded": "SUPERSET_ONLINE_LOAD_FIXTURE=1 ./scripts/superset-online.sh start",
+		"online:start:desktop": "SUPERSET_ONLINE_PROFILE=desktop ./scripts/superset-online.sh start",
+		"online:start:desktop:loaded": "SUPERSET_ONLINE_PROFILE=desktop SUPERSET_ONLINE_LOAD_FIXTURE=1 ./scripts/superset-online.sh start",
 		"online:stop": "./scripts/superset-online.sh stop",
 		"online:status": "./scripts/superset-online.sh status",
 		"online:install-launchd": "./scripts/superset-online.sh install-launchd",

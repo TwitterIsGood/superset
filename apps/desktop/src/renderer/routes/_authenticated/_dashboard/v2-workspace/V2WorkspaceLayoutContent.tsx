@@ -41,18 +41,61 @@ function parseWorkspaceSearch(raw: Record<string, unknown>): WorkspaceSearch {
 	};
 }
 
+function normalizeRoutePath(path: string): string {
+	return path.replace(/[?#].*$/, "").replace(/\/$/, "");
+}
+
+export function isDefaultV2WorkspaceRoute(args: {
+	workspaceId: string | null;
+	pathname: string;
+	hash?: string;
+}): boolean {
+	if (!args.workspaceId) return false;
+	const expectedPath = `/v2-workspace/${args.workspaceId}`;
+	if (normalizeRoutePath(args.pathname) === expectedPath) return true;
+	const hashPath = args.hash?.startsWith("#")
+		? args.hash.slice(1)
+		: (args.hash ?? "");
+	return normalizeRoutePath(hashPath) === expectedPath;
+}
+
+export function extractV2WorkspaceId(args: {
+	matchedWorkspaceId?: string | null;
+	pathname: string;
+	hash?: string;
+}): string | null {
+	if (args.matchedWorkspaceId) return args.matchedWorkspaceId;
+	const paths = [
+		args.pathname,
+		args.hash?.startsWith("#") ? args.hash.slice(1) : args.hash,
+	].filter((path): path is string => Boolean(path));
+	for (const path of paths) {
+		const match = normalizeRoutePath(path).match(/^\/v2-workspace\/([^/]+)$/);
+		if (match?.[1]) return decodeURIComponent(match[1]);
+	}
+	return null;
+}
+
 export function V2WorkspaceLayoutContent() {
 	const matchRoute = useMatchRoute();
 	const workspaceMatch = matchRoute({
 		to: "/v2-workspace/$workspaceId",
 		fuzzy: true,
 	});
-	const workspaceId =
-		workspaceMatch !== false ? workspaceMatch.workspaceId : null;
 	const location = useRouterState({ select: (state) => state.location });
-	const isDefaultWorkspaceRoute =
-		workspaceId !== null &&
-		location.pathname.replace(/\/$/, "") === `/v2-workspace/${workspaceId}`;
+	const browserHash =
+		typeof window === "undefined" ? undefined : window.location.hash;
+	const workspaceId = extractV2WorkspaceId({
+		matchedWorkspaceId:
+			workspaceMatch !== false ? workspaceMatch.workspaceId : null,
+		pathname: location.pathname,
+		hash: browserHash,
+	});
+	const isDefaultWorkspaceRoute = isDefaultV2WorkspaceRoute({
+		workspaceId,
+		pathname: location.pathname,
+		hash: browserHash,
+	});
 	const workspaceSearch = parseWorkspaceSearch(
 		location.search as Record<string, unknown>,
 	);

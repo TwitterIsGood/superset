@@ -325,6 +325,16 @@ function getHostDbPath(organizationId: string): string {
 	return resolve(homeDir, "host", organizationId, "host.db");
 }
 
+function hasLocalHostFixtureTables(db: Database): boolean {
+	const rows = db
+		.query(
+			"select name from sqlite_master where type = 'table' and name in ('projects', 'workspaces')",
+		)
+		.all() as Array<{ name: string }>;
+	const tableNames = new Set(rows.map((row) => row.name));
+	return tableNames.has("projects") && tableNames.has("workspaces");
+}
+
 function cleanupLocalHostFixture(args: {
 	organizationId: string;
 	projectIds: string[];
@@ -332,8 +342,16 @@ function cleanupLocalHostFixture(args: {
 	if (args.projectIds.length === 0) return;
 	const dbPath = getHostDbPath(args.organizationId);
 	if (!existsSync(dbPath)) return;
-	const db = new Database(dbPath);
+	let db: Database;
 	try {
+		db = new Database(dbPath);
+	} catch (error) {
+		throw new Error(`Unable to open local host fixture database: ${dbPath}`, {
+			cause: error,
+		});
+	}
+	try {
+		if (!hasLocalHostFixtureTables(db)) return;
 		const deleteWorkspaces = db.prepare(
 			"delete from workspaces where project_id = ?",
 		);
@@ -366,7 +384,14 @@ function seedLocalHostFixture(args: {
 	}
 
 	mkdirSync(dirname(dbPath), { recursive: true });
-	const db = new Database(dbPath);
+	let db: Database;
+	try {
+		db = new Database(dbPath);
+	} catch (error) {
+		throw new Error(`Unable to open local host fixture database: ${dbPath}`, {
+			cause: error,
+		});
+	}
 	const repoPath = process.cwd();
 	try {
 		const insertProject = db.prepare(`
@@ -424,8 +449,16 @@ function countLocalHostFixtureWorkspaces(args: {
 	if (args.workspaceIds.length === 0) return 0;
 	const dbPath = getHostDbPath(args.organizationId);
 	if (!existsSync(dbPath)) return 0;
-	const db = new Database(dbPath, { readonly: true });
+	let db: Database;
 	try {
+		db = new Database(dbPath, { readonly: true });
+	} catch (error) {
+		throw new Error(`Unable to open local host fixture database: ${dbPath}`, {
+			cause: error,
+		});
+	}
+	try {
+		if (!hasLocalHostFixtureTables(db)) return 0;
 		const placeholders = args.workspaceIds.map(() => "?").join(",");
 		const row = db
 			.prepare(

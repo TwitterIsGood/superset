@@ -9,6 +9,7 @@ COMPOSE_PROJECT_NAME="${SUPERSET_ONLINE_COMPOSE_PROJECT:-superset-online}"
 ONLINE_BUILD_DIR="${SUPERSET_ONLINE_BUILD_DIR:-$ROOT_DIR/.online-build}"
 RUN_DIR="${SUPERSET_ONLINE_RUN_DIR:-$ROOT_DIR/.tmp/online-service}"
 MOBILE_ENV_PATH="${SUPERSET_ONLINE_MOBILE_ENV_FILE:-$ROOT_DIR/apps/mobile/.env.local}"
+ONLINE_PROFILE="${SUPERSET_ONLINE_PROFILE:-full}"
 
 LAUNCH_AGENT_LABEL="com.superset.online"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
@@ -262,6 +263,14 @@ write_mobile_env_file() {
 }
 
 prepare_env() {
+	case "$ONLINE_PROFILE" in
+		full|desktop)
+			;;
+		*)
+			fail "unknown SUPERSET_ONLINE_PROFILE: $ONLINE_PROFILE (expected full or desktop)"
+			;;
+	esac
+
 	load_base_env
 	apply_host_env
 	write_online_env_file
@@ -331,16 +340,20 @@ build_app_artifacts() {
 			bun run build
 	)
 
-	log "building Web standalone artifact"
-	(
-		cd "$ROOT_DIR/apps/web"
-		rm -rf .next-online
-		SUPERSET_ONLINE_SERVICE=1 \
-			SUPERSET_NEXT_DIST_DIR=.next-online \
-			NODE_ENV=production \
-			SKIP_ENV_VALIDATION=1 \
-			bun run build
-	)
+	if [[ "$ONLINE_PROFILE" == "full" ]]; then
+		log "building Web standalone artifact"
+		(
+			cd "$ROOT_DIR/apps/web"
+			rm -rf .next-online
+			SUPERSET_ONLINE_SERVICE=1 \
+				SUPERSET_NEXT_DIST_DIR=.next-online \
+				NODE_ENV=production \
+				SKIP_ENV_VALIDATION=1 \
+				bun run build
+		)
+	else
+		log "skipping Web standalone artifact build for SUPERSET_ONLINE_PROFILE=$ONLINE_PROFILE"
+	fi
 
 	log "building Relay bundle"
 	rm -rf "$ONLINE_BUILD_DIR/relay"
@@ -446,12 +459,14 @@ run_migrations_and_seed() {
 }
 
 desktop_perf_fixture_args() {
+	local default_host_backed_workspaces="0"
+
 	printf '%s\n' \
 		"--slug" "${SUPERSET_ONLINE_FIXTURE_SLUG:-desktop-perf-loaded}" \
 		"--projects" "${SUPERSET_ONLINE_FIXTURE_PROJECTS:-10}" \
 		"--workspaces-per-project" "${SUPERSET_ONLINE_FIXTURE_WORKSPACES_PER_PROJECT:-20}" \
 		"--tasks" "${SUPERSET_ONLINE_FIXTURE_TASKS:-300}" \
-		"--host-backed-workspaces" "${SUPERSET_ONLINE_FIXTURE_HOST_BACKED_WORKSPACES:-0}"
+		"--host-backed-workspaces" "${SUPERSET_ONLINE_FIXTURE_HOST_BACKED_WORKSPACES:-$default_host_backed_workspaces}"
 }
 
 ensure_desktop_perf_fixture_if_requested() {
@@ -524,16 +539,33 @@ start_data_services() {
 }
 
 start_app_services() {
-	log "building app images from prepared artifacts"
-	compose build api web relay electric-proxy
+	local services=(api relay electric-proxy)
+	if [[ "$ONLINE_PROFILE" == "full" ]]; then
+		services=(api web relay electric-proxy)
+	else
+		log "stopping web service for SUPERSET_ONLINE_PROFILE=$ONLINE_PROFILE"
+		compose stop web >/dev/null 2>&1 || true
+		compose rm -f web >/dev/null 2>&1 || true
+	fi
+
+	if [[ "${SUPERSET_ONLINE_SKIP_DOCKER_BUILD:-${SUPERSET_ONLINE_SKIP_BUILD:-0}}" == "1" ]]; then
+		log "skipping Docker app image build because SUPERSET_ONLINE_SKIP_DOCKER_BUILD/SUPERSET_ONLINE_SKIP_BUILD is set"
+	else
+		log "building app images from prepared artifacts"
+		compose build "${services[@]}"
+	fi
 	log "starting Docker app services"
-	compose up -d --remove-orphans api web relay electric-proxy
+	compose up -d --remove-orphans "${services[@]}"
 }
 
 wait_for_local_services() {
 	log "waiting for online app services to become ready"
 	wait_for_probe "api" "http://localhost:${ONLINE_API_PORT}/api/auth/get-session" "200" 90
-	wait_for_probe "web" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200" 90
+	if [[ "$ONLINE_PROFILE" == "full" ]]; then
+		wait_for_probe "web" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200" 90
+	else
+		log "web probe skipped (SUPERSET_ONLINE_PROFILE=$ONLINE_PROFILE)"
+	fi
 	wait_for_probe "electric-proxy" "http://localhost:${ONLINE_ELECTRIC_PROXY_PORT}/v1/shape" "401" 60
 	wait_for_probe "relay" "http://localhost:${ONLINE_RELAY_PORT}/health" "200" 60
 }
@@ -713,6 +745,8 @@ print_status() {
 		echo "  resource pack base URL: ${PUBLIC_RESOURCE_PACK_BASE_URL}"
 	fi
 	echo
+	echo "profile: $ONLINE_PROFILE"
+	echo
 	echo "docker compose project: $COMPOSE_PROJECT_NAME"
 	if docker info >/dev/null 2>&1; then
 		compose ps
@@ -730,12 +764,20 @@ print_status() {
 	fi
 	probe_url "object storage" "http://localhost:${ONLINE_S3_PORT}/minio/health/live" "200"
 	probe_url "api session" "http://localhost:${ONLINE_API_PORT}/api/auth/get-session" "200"
-	probe_url "web /sign-in" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200"
+	if [[ "$ONLINE_PROFILE" == "full" ]]; then
+		probe_url "web /sign-in" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200"
+	else
+		printf '  - %-24s skipped SUPERSET_ONLINE_PROFILE=%s\n' "web /sign-in" "$ONLINE_PROFILE"
+	fi
 	probe_url "electric auth gate" "http://localhost:${ONLINE_ELECTRIC_PROXY_PORT}/v1/shape" "401"
 	probe_url "relay health" "http://localhost:${ONLINE_RELAY_PORT}/health" "200"
 	echo
 	echo "public probes:"
-	probe_url "public web /sign-in" "${PUBLIC_WEB_URL}/sign-in" "200"
+	if [[ "$ONLINE_PROFILE" == "full" ]]; then
+		probe_url "public web /sign-in" "${PUBLIC_WEB_URL}/sign-in" "200"
+	else
+		printf '  - %-24s skipped SUPERSET_ONLINE_PROFILE=%s\n' "public web /sign-in" "$ONLINE_PROFILE"
+	fi
 	probe_url "public api session" "${PUBLIC_API_URL}/api/auth/get-session" "200"
 	probe_url "public electric" "${PUBLIC_ELECTRIC_URL}/v1/shape" "401"
 	probe_url "public relay health" "${PUBLIC_RELAY_URL}/health" "200"
@@ -784,6 +826,8 @@ Usage: $0 <command>
 
 Commands:
   start              Build artifacts and start the full Docker online stack
+                     Set SUPERSET_ONLINE_PROFILE=desktop to skip the web app
+                     for low-memory Desktop development.
   stop               Stop the Docker online stack (volumes are preserved)
   restart            Stop and start the Docker online stack
   status             Print compose status and probes
@@ -817,7 +861,11 @@ main() {
 			ensure_prereqs
 			wait_for_docker "${ONLINE_DOCKER_WAIT_ATTEMPTS:-300}"
 			build_app_artifacts
-			compose build api web relay electric-proxy
+			if [[ "$ONLINE_PROFILE" == "full" ]]; then
+				compose build api web relay electric-proxy
+			else
+				compose build api relay electric-proxy
+			fi
 			;;
 		uninstall-launchd)
 			stop_legacy_host_services

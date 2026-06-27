@@ -13,4 +13,10 @@ describe("v2 workspace route runtime cleanup", () => {
 		expect(pageSource).not.toContain("terminalRuntimeRegistry");
 		expect(pageSource).not.toContain("killTerminalSessionSilently");
 	});
+
+	test("keeps looking for the dashboard sidebar portal slot after first render", () => {
+		expect(pageSource).toContain("syncSidebarSlot");
+		expect(pageSource).toContain("requestAnimationFrame(syncSidebarSlot)");
+		expect(pageSource).toContain("cancelAnimationFrame(animationFrameId)");
+	});
 });

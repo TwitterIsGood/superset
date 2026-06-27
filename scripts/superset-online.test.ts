@@ -74,6 +74,42 @@ describe("superset online public URL defaults", () => {
 		);
 	});
 
+	test("supports a lower-memory desktop online profile without the web app", () => {
+		const packageJson = readFileSync(
+			join(import.meta.dir, "..", "package.json"),
+			{
+				encoding: "utf8",
+			},
+		);
+
+		expect(SOURCE).toContain("SUPERSET_ONLINE_PROFILE");
+		expect(SOURCE).toContain("unknown SUPERSET_ONLINE_PROFILE");
+		expect(SOURCE).toContain(
+			"skipping Web standalone artifact build for SUPERSET_ONLINE_PROFILE=$ONLINE_PROFILE",
+		);
+		expect(SOURCE).toContain(
+			"stopping web service for SUPERSET_ONLINE_PROFILE=$ONLINE_PROFILE",
+		);
+		expect(SOURCE).toContain("services=(api relay electric-proxy)");
+		expect(SOURCE).toContain('if [[ "$ONLINE_PROFILE" == "full" ]]');
+		expect(SOURCE).toContain(
+			"web probe skipped (SUPERSET_ONLINE_PROFILE=$ONLINE_PROFILE)",
+		);
+		expect(SOURCE).toContain("SUPERSET_ONLINE_SKIP_DOCKER_BUILD");
+		expect(SOURCE).toContain(
+			"skipping Docker app image build because SUPERSET_ONLINE_SKIP_DOCKER_BUILD/SUPERSET_ONLINE_SKIP_BUILD is set",
+		);
+		expect(SOURCE).toContain(
+			'printf \'  - %-24s skipped SUPERSET_ONLINE_PROFILE=%s\\n\' "web /sign-in" "$ONLINE_PROFILE"',
+		);
+		expect(packageJson).toContain(
+			'online:start:desktop": "SUPERSET_ONLINE_PROFILE=desktop',
+		);
+		expect(packageJson).toContain(
+			'online:start:desktop:loaded": "SUPERSET_ONLINE_PROFILE=desktop SUPERSET_ONLINE_LOAD_FIXTURE=1',
+		);
+	});
+
 	test("keeps MinIO local by default and exposes only the API port when requested", () => {
 		const composeFile = readFileSync(
 			join(import.meta.dir, "..", "docker-compose.yml"),
