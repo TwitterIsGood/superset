@@ -1957,6 +1957,13 @@ describe("Trellis runtime pack packaging", () => {
 			"$" + "{{ inputs.artifact_prefix }}-mac-arm64-precompiled-dist",
 		);
 		expect(buildWorkflow).toContain("Download precompiled dist");
+		expect(buildWorkflow).toContain("Install desktop dependency graph");
+		expect(buildWorkflow).toContain(
+			"bun install --frozen --ignore-scripts --minimum-release-age=0 --filter @superset/desktop",
+		);
+		expect(buildWorkflow).toContain(
+			"Installing only the desktop workspace dependency graph for macOS arm64 ZIP-only packaging.",
+		);
 		expect(buildWorkflow).toContain(
 			"inputs.macos_artifact_mode == 'zip_only' && matrix.arch == 'arm64'",
 		);

@@ -135,8 +135,8 @@ jobs:
           restore-keys: |
             Linux-bun-${{ steps.setup-bun.outputs.bun-revision }}-
 
-      - name: Install dependencies
-        run: bun install --frozen --ignore-scripts --minimum-release-age=0
+      - name: Install desktop dependency graph
+        run: bun install --frozen --ignore-scripts --minimum-release-age=0 --filter @superset/desktop
 
       - name: Clean dev folder
         working-directory: apps/desktop
@@ -252,7 +252,16 @@ jobs:
             ${{ runner.os }}-${{ matrix.arch }}-electron-packaging-
 
       - name: Install dependencies
-        run: bun install --frozen --ignore-scripts --minimum-release-age=0
+        env:
+          MACOS_ARTIFACT_MODE: ${{ inputs.macos_artifact_mode }}
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          if [[ "$MACOS_ARTIFACT_MODE" == "zip_only" && "$TARGET_ARCH" == "arm64" ]]; then
+            echo "::notice::Installing only the desktop workspace dependency graph for macOS arm64 ZIP-only packaging."
+            bun install --frozen --ignore-scripts --minimum-release-age=0 --filter @superset/desktop
+            exit 0
+          fi
+          bun install --frozen --ignore-scripts --minimum-release-age=0
 
       - name: Cache desktop native dependencies
         id: cache-desktop-native-deps
