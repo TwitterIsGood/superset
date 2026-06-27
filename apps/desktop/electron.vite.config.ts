@@ -47,6 +47,7 @@ const buildSourcemap =
 	process.env.DESKTOP_INCLUDE_SOURCEMAPS === "true"
 		? "hidden"
 		: false;
+const targetPlatform = process.env.TARGET_PLATFORM ?? process.platform;
 
 // Sentry plugin for uploading sourcemaps (only in CI with auth token)
 const sentryPlugin = process.env.SENTRY_AUTH_TOKEN
@@ -303,7 +304,7 @@ export default defineConfig({
 				process.env.SKIP_ENV_VALIDATION,
 				"",
 			),
-			"process.platform": defineEnv(process.platform),
+			"process.platform": defineEnv(targetPlatform),
 			"process.env.NEXT_PUBLIC_API_URL": defineEnv(
 				process.env.NEXT_PUBLIC_API_URL,
 				"https://api.superset.sh",
@@ -457,7 +458,7 @@ export default defineConfig({
 				plugins: [
 					injectProcessEnvPlugin({
 						NODE_ENV: "production",
-						platform: process.platform,
+						platform: targetPlatform,
 					}),
 					sentryPlugin,
 					rendererBundleStatsPlugin,

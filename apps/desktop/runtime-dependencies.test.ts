@@ -461,6 +461,21 @@ describe("Trellis runtime pack packaging", () => {
 		expect(viteConfigSource).toContain("sourcemap: false");
 	});
 
+	test("lets CI precompile macOS renderer bundles from a non-macOS host", () => {
+		const viteConfigSource = readFileSync(
+			join(import.meta.dirname, "electron.vite.config.ts"),
+			"utf8",
+		);
+
+		expect(viteConfigSource).toContain(
+			"const targetPlatform = process.env.TARGET_PLATFORM ?? process.platform",
+		);
+		expect(viteConfigSource).toContain(
+			'"process.platform": defineEnv(targetPlatform)',
+		);
+		expect(viteConfigSource).toContain("platform: targetPlatform");
+	});
+
 	test("keeps lazy-only renderer dependencies out of the dev optimizer startup pass", () => {
 		const viteConfigSource = readFileSync(
 			join(import.meta.dirname, "electron.vite.config.ts"),
@@ -1934,6 +1949,21 @@ describe("Trellis runtime pack packaging", () => {
 
 		expect(buildWorkflow).toContain("macos_artifact_mode");
 		expect(buildWorkflow).toContain("macos_runner");
+		expect(buildWorkflow).toContain("compile-macos-zip-dist");
+		expect(buildWorkflow).toContain("Compile - macOS ZIP dist (arm64)");
+		expect(buildWorkflow).toContain("runs-on: ubuntu-latest");
+		expect(buildWorkflow).toContain("TARGET_PLATFORM: darwin");
+		expect(buildWorkflow).toContain(
+			"$" + "{{ inputs.artifact_prefix }}-mac-arm64-precompiled-dist",
+		);
+		expect(buildWorkflow).toContain("Download precompiled dist");
+		expect(buildWorkflow).toContain(
+			"inputs.macos_artifact_mode == 'zip_only' && matrix.arch == 'arm64'",
+		);
+		expect(buildWorkflow).toContain("needs: [compile-macos-zip-dist]");
+		expect(buildWorkflow).toContain(
+			"needs.compile-macos-zip-dist.result == 'success'",
+		);
 		expect(buildWorkflow).toContain("runs-on: $" + "{{ inputs.macos_runner }}");
 		expect(buildWorkflow).toContain("zip_only");
 		expect(buildWorkflow).toContain('PACKAGE_TARGET_ARGS=("--mac" "zip"');

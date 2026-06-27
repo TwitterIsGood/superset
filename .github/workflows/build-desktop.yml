@@ -110,9 +110,98 @@ env:
   DESKTOP_PRODUCTION_RELAY_URL: http://bj1.v.lhb.ink:63013
 
 jobs:
+  compile-macos-zip-dist:
+    name: Compile - macOS ZIP dist (arm64)
+    if: ${{ inputs.build_macos && inputs.macos_artifact_mode == 'zip_only' && inputs.macos_arches_json == '["arm64"]' }}
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        id: setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Restore dependencies cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.bun/install/cache
+          key: Linux-bun-${{ steps.setup-bun.outputs.bun-revision }}-${{ hashFiles('bun.lock', 'package.json', 'apps/desktop/package.json', 'packages/*/package.json') }}
+          restore-keys: |
+            Linux-bun-${{ steps.setup-bun.outputs.bun-revision }}-
+
+      - name: Install dependencies
+        run: bun install --frozen --ignore-scripts --minimum-release-age=0
+
+      - name: Clean dev folder
+        working-directory: apps/desktop
+        run: bun run clean:dev
+
+      - name: Ensure file icons
+        working-directory: apps/desktop
+        run: bun run ensure:icons
+
+      - name: Compile app with electron-vite
+        working-directory: apps/desktop
+        env:
+          NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
+          NEXT_PUBLIC_WEB_URL: ${{ env.DESKTOP_PRODUCTION_WEB_URL }}
+          NEXT_PUBLIC_API_URL: ${{ env.DESKTOP_PRODUCTION_API_URL }}
+          NEXT_PUBLIC_DOCS_URL: ${{ secrets.NEXT_PUBLIC_DOCS_URL }}
+          NEXT_PUBLIC_STREAMS_URL: ${{ secrets.NEXT_PUBLIC_STREAMS_URL }}
+          NEXT_PUBLIC_ELECTRIC_URL: ${{ env.DESKTOP_PRODUCTION_ELECTRIC_URL }}
+          SENTRY_DSN_DESKTOP: ${{ secrets.SENTRY_DSN_DESKTOP }}
+          SENTRY_AUTH_TOKEN: ""
+          RELAY_URL: ${{ env.DESKTOP_PRODUCTION_RELAY_URL }}
+          SUPERSET_WORKSPACE_NAME: superset
+          TARGET_ARCH: arm64
+          TARGET_PLATFORM: darwin
+          DESKTOP_BUNDLE_CLI: ${{ inputs.bundle_cli }}
+          DESKTOP_COMPILE_PARALLEL: ${{ inputs.parallel_compile }}
+          DESKTOP_COMPILE_QUIET: ${{ inputs.parallel_compile }}
+          DESKTOP_BUILD_STATS: ${{ inputs.capture_compile_bundle_stats }}
+          DESKTOP_BUILD_STATS_DIR: performance-reports/build-stats
+          DESKTOP_COMPILE_TIMINGS_DIR: performance-reports/compile-timings
+        run: bun run compile:app
+
+      - name: Upload precompiled dist
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.artifact_prefix }}-mac-arm64-precompiled-dist
+          path: apps/desktop/dist/**
+          retention-days: ${{ inputs.artifact_retention_days }}
+          if-no-files-found: error
+
+      - name: Upload compile bundle stats
+        if: inputs.capture_compile_bundle_stats
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.artifact_prefix }}-mac-arm64-compile-bundle-stats
+          path: apps/desktop/performance-reports/build-stats/**
+          retention-days: ${{ inputs.artifact_retention_days }}
+          if-no-files-found: error
+
+      - name: Upload compile timing report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.artifact_prefix }}-mac-arm64-compile-timings
+          path: apps/desktop/performance-reports/compile-timings/**
+          retention-days: ${{ inputs.artifact_retention_days }}
+          if-no-files-found: warn
+
   build-macos:
     name: Build - macOS (${{ matrix.arch }})
-    if: ${{ inputs.build_macos }}
+    if: ${{ always() && inputs.build_macos && (needs.compile-macos-zip-dist.result == 'success' || needs.compile-macos-zip-dist.result == 'skipped') }}
+    needs: [compile-macos-zip-dist]
     runs-on: ${{ inputs.macos_runner }}
     environment: production
 
@@ -206,6 +295,13 @@ jobs:
         working-directory: apps/desktop
         run: bun run ensure:icons
 
+      - name: Download precompiled dist
+        if: inputs.macos_artifact_mode == 'zip_only' && matrix.arch == 'arm64'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: ${{ inputs.artifact_prefix }}-mac-arm64-precompiled-dist
+          path: apps/desktop/dist
+
       - name: Cache desktop resource packs
         if: inputs.upload_resource_pack_artifacts
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -218,6 +314,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.arch }}-desktop-resource-packs-
 
       - name: Compile app with electron-vite
+        if: ${{ inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64' }}
         working-directory: apps/desktop
         env:
           NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
@@ -234,6 +331,7 @@ jobs:
           RELAY_URL: ${{ env.DESKTOP_PRODUCTION_RELAY_URL }}
           SUPERSET_WORKSPACE_NAME: superset
           TARGET_ARCH: ${{ matrix.arch }}
+          TARGET_PLATFORM: darwin
           DESKTOP_BUNDLE_CLI: ${{ inputs.bundle_cli }}
           DESKTOP_COMPILE_PARALLEL: ${{ inputs.parallel_compile }}
           DESKTOP_COMPILE_QUIET: ${{ inputs.parallel_compile }}
@@ -248,7 +346,7 @@ jobs:
         run: bun run report:size --top=15
 
       - name: Upload compile bundle stats
-        if: inputs.capture_compile_bundle_stats
+        if: inputs.capture_compile_bundle_stats && (inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.artifact_prefix }}-mac-${{ matrix.arch }}-compile-bundle-stats
@@ -257,7 +355,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload compile timing report
-        if: always()
+        if: ${{ always() && (inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.artifact_prefix }}-mac-${{ matrix.arch }}-compile-timings
