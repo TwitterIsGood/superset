@@ -1443,7 +1443,8 @@ cd packages/host-service && bun test
   - The run failed only in `Check Canary build duration budget` because the checker treated `dependencyCache` as a hard failure phase and GitHub cache restore took `1m24s` against a `1m00s` phase limit. This contradicted the product requirement: the user-facing quick Canary artifact path was still below the 3-minute target, while cache restore is external infrastructure variance.
   - Changed `check-canary-build-duration` so diagnostic phases (`dependencyCache`, `postCache`) emit target warnings rather than failures. Product-controlled phases such as compile, Electron ZIP packaging, install, resource-pack build/upload/verify, and the overall artifact-ready/critical path budgets remain hard gates.
   - Replayed the real failed run JSON locally after the fix: `bun run --cwd apps/desktop check:canary-build-duration -- --input /tmp/run-28298011810.json --lane quick` now exits 0, reports artifact ready `2m23s`, critical path `2m38s`, and preserves `dependencyCache 1m24s exceeds hard limit 1m00s` under Target Warnings.
-  - Validation passed: `bun test apps/desktop/scripts/check-canary-build-duration.test.ts`, `bun run lint`, and `bun run typecheck`.
+  - Re-triggered artifact-only quick Canary on current commit `54e0355bd`: GitHub Actions run `28298171300` passed in `2m29s` total. The duration budget job reports artifact ready `1m59s`, critical path `2m13s`, compile `50s`, dependency cache `43s`, Electron ZIP `29s`, install `10s`, and artifact upload `3s`.
+  - Validation passed: `bun test apps/desktop/scripts/check-canary-build-duration.test.ts`, real failed-run replay, current-HEAD GitHub Actions run `28298171300`, `bun run lint`, and `bun run typecheck`.
 
 ---
 
