@@ -200,8 +200,7 @@ jobs:
 
   build-macos:
     name: Build - macOS (${{ matrix.arch }})
-    if: ${{ always() && inputs.build_macos && (needs.compile-macos-zip-dist.result == 'success' || needs.compile-macos-zip-dist.result == 'skipped') }}
-    needs: [compile-macos-zip-dist]
+    if: ${{ inputs.build_macos }}
     runs-on: ${{ inputs.macos_runner }}
     environment: production
 
@@ -297,10 +296,24 @@ jobs:
 
       - name: Download precompiled dist
         if: inputs.macos_artifact_mode == 'zip_only' && matrix.arch == 'arm64'
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          name: ${{ inputs.artifact_prefix }}-mac-arm64-precompiled-dist
-          path: apps/desktop/dist
+        working-directory: apps/desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRECOMPILED_DIST_ARTIFACT: ${{ inputs.artifact_prefix }}-mac-arm64-precompiled-dist
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 120); do
+            if gh run download "$GITHUB_RUN_ID" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name "$PRECOMPILED_DIST_ARTIFACT" \
+              --dir dist; then
+              exit 0
+            fi
+            echo "::notice::Waiting for precompiled dist artifact $PRECOMPILED_DIST_ARTIFACT (attempt $attempt/120)."
+            sleep 5
+          done
+          echo "::error::Timed out waiting for precompiled dist artifact $PRECOMPILED_DIST_ARTIFACT."
+          exit 1
 
       - name: Cache desktop resource packs
         if: inputs.upload_resource_pack_artifacts

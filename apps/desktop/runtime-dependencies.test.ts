@@ -1960,9 +1960,9 @@ describe("Trellis runtime pack packaging", () => {
 		expect(buildWorkflow).toContain(
 			"inputs.macos_artifact_mode == 'zip_only' && matrix.arch == 'arm64'",
 		);
-		expect(buildWorkflow).toContain("needs: [compile-macos-zip-dist]");
+		expect(buildWorkflow).toContain('gh run download "$GITHUB_RUN_ID"');
 		expect(buildWorkflow).toContain(
-			"needs.compile-macos-zip-dist.result == 'success'",
+			"Waiting for precompiled dist artifact $PRECOMPILED_DIST_ARTIFACT",
 		);
 		expect(buildWorkflow).toContain("runs-on: $" + "{{ inputs.macos_runner }}");
 		expect(buildWorkflow).toContain("zip_only");
