@@ -17,9 +17,13 @@ describe("compile-electron-vite CI fast path", () => {
 		);
 
 		expect(script).toContain("DESKTOP_COMPILE_QUIET");
+		expect(script).toContain("DESKTOP_COMPILE_TIMINGS_DIR");
+		expect(script).toContain("compile-timings.json");
 		expect(script).toContain('logLevel: "warn"');
 		expect(workflow).toContain("DESKTOP_COMPILE_PARALLEL:");
 		expect(workflow).toContain("DESKTOP_COMPILE_QUIET:");
+		expect(workflow).toContain("DESKTOP_COMPILE_TIMINGS_DIR:");
+		expect(workflow).toContain("Upload compile timing report");
 		expect(workflow).toContain("$" + "{{ inputs.parallel_compile }}");
 	});
 

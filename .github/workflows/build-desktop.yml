@@ -239,6 +239,7 @@ jobs:
           DESKTOP_COMPILE_QUIET: ${{ inputs.parallel_compile }}
           DESKTOP_BUILD_STATS: ${{ inputs.capture_compile_bundle_stats }}
           DESKTOP_BUILD_STATS_DIR: performance-reports/build-stats
+          DESKTOP_COMPILE_TIMINGS_DIR: performance-reports/compile-timings
         run: bun run compile:app
 
       - name: Report package size after compile
@@ -254,6 +255,15 @@ jobs:
           path: apps/desktop/performance-reports/build-stats/**
           retention-days: ${{ inputs.artifact_retention_days }}
           if-no-files-found: error
+
+      - name: Upload compile timing report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.artifact_prefix }}-mac-${{ matrix.arch }}-compile-timings
+          path: apps/desktop/performance-reports/compile-timings/**
+          retention-days: ${{ inputs.artifact_retention_days }}
+          if-no-files-found: warn
 
       - name: Install target platform optional dependencies
         if: ${{ inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64' }}
@@ -709,6 +719,7 @@ jobs:
           DESKTOP_COMPILE_PARALLEL: ${{ inputs.parallel_compile }}
           DESKTOP_BUILD_STATS: ${{ inputs.capture_compile_bundle_stats }}
           DESKTOP_BUILD_STATS_DIR: performance-reports/build-stats
+          DESKTOP_COMPILE_TIMINGS_DIR: performance-reports/compile-timings
         run: bun run compile:app
 
       - name: Report package size after compile
@@ -724,6 +735,15 @@ jobs:
           path: apps/desktop/performance-reports/build-stats/**
           retention-days: ${{ inputs.artifact_retention_days }}
           if-no-files-found: error
+
+      - name: Upload compile timing report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.artifact_prefix }}-linux-compile-timings
+          path: apps/desktop/performance-reports/compile-timings/**
+          retention-days: ${{ inputs.artifact_retention_days }}
+          if-no-files-found: warn
 
       - name: Install target platform optional dependencies
         run: bun install --frozen --ignore-scripts --minimum-release-age=0 --cpu=x64 --os=linux
