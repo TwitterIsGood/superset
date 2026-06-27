@@ -43,6 +43,7 @@ mise.toml
 # Temporary files
 .tmp/
 tmp/
+.online-build/
 
 # Turbo
 .turbo

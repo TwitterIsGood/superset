@@ -1,28 +1,21 @@
-import { neon, Pool } from "@neondatabase/serverless";
 import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/neon-http";
-import { drizzle as drizzleWs } from "drizzle-orm/neon-serverless";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
 import { env } from "./env";
-import { configureLocalProxy, isLocalProxy } from "./local-proxy";
 import * as schema from "./schema";
 
 config({ path: ".env", quiet: true });
 
-if (isLocalProxy(env.DATABASE_URL)) {
-	configureLocalProxy();
-}
+const pool = new Pool({
+	connectionString: env.DATABASE_URL || undefined,
+});
 
-const sql = neon(env.DATABASE_URL);
-
-export const db = drizzle({
-	client: sql,
+const postgresDb = drizzle({
+	client: pool,
 	schema,
 	casing: "snake_case",
 });
 
-export const dbWs = drizzleWs({
-	client: new Pool({ connectionString: env.DATABASE_URL }),
-	schema,
-	casing: "snake_case",
-});
+export const db = postgresDb;
+export const dbWs = postgresDb;

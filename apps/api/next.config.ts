@@ -15,6 +15,7 @@ const config: NextConfig = {
 	reactCompiler: true,
 	typescript: { ignoreBuildErrors: true },
 	distDir: process.env.SUPERSET_NEXT_DIST_DIR,
+	output: "standalone",
 
 	images: {
 		remotePatterns: [

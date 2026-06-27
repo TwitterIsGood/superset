@@ -1,0 +1,6 @@
+{"path":".trellis/spec/guides/superset-engineering-guide.md","reason":"repo-wide engineering rules"}
+{"path":".trellis/spec/guides/database-and-migrations.md","reason":"database client and migration boundaries"}
+{"path":".trellis/spec/guides/backend-data-and-trpc.md","reason":"db/trpc/electric-proxy contracts"}
+{"path":".trellis/spec/guides/quality-and-testing.md","reason":"validation expectations for online/dev service changes"}
+{"path":".trellis/spec/db/backend/database-guidelines.md","reason":"packages/db implementation rules"}
+{"path":".trellis/spec/db/backend/quality-guidelines.md","reason":"db package validation rules"}

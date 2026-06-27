@@ -2,7 +2,7 @@
 # Local-development setup. Provisions a fully self-contained, PER-WORKSPACE
 # Superset stack backed by a local Postgres container + fake credentials — no
 # Neon account, no real third-party keys. Mirrors setup.sh, but replaces the
-# Neon branch with a docker-compose bundle (Postgres + neon-proxy + Electric)
+# Neon branch with a docker-compose bundle (Postgres + Electric)
 # on per-workspace allocated ports so multiple worktrees never collide.
 set -uo pipefail
 
@@ -25,7 +25,6 @@ SUPERSET_WORKTREE_ID=""
 SUPERSET_WORKTREE_ROOT=""
 LOCAL_DB_PROJECT=""
 LOCAL_PG_PORT=""
-LOCAL_NEON_PROXY_PORT=""
 LOCAL_ELECTRIC_PORT=""
 LOCAL_REDIS_PORT=""
 LOCAL_KV_REST_PORT=""
@@ -90,7 +89,6 @@ local_allocate_ports() {
   # DB stack host ports live in the free tail of the 25-port window
   # (app ports use +0..+13; Electric reuses the +9 ELECTRIC_PORT slot).
   LOCAL_PG_PORT=$((base + 14))
-  LOCAL_NEON_PROXY_PORT=$((base + 15))
   LOCAL_ELECTRIC_PORT=$((base + 9))
   LOCAL_REDIS_PORT=$((base + 16))
   LOCAL_KV_REST_PORT=$((base + 17))
@@ -101,16 +99,14 @@ local_allocate_ports() {
   # If this workspace already has a Docker stack, the existing published ports
   # are the source of truth. This prevents .env from drifting away from long-lived
   # containers after a reboot or repeated setup runs.
-  local existing_pg existing_proxy existing_electric existing_redis existing_kv existing_s3 existing_s3_console
+  local existing_pg existing_electric existing_redis existing_kv existing_s3 existing_s3_console
   existing_pg="$(local_existing_host_port postgres 5432/tcp)"
-  existing_proxy="$(local_existing_host_port neon-proxy 4444/tcp)"
   existing_electric="$(local_existing_host_port electric 3000/tcp)"
   existing_redis="$(local_existing_host_port redis 6379/tcp)"
   existing_kv="$(local_existing_host_port kv-rest 80/tcp)"
   existing_s3="$(local_existing_host_port minio 9000/tcp)"
   existing_s3_console="$(local_existing_host_port minio 9001/tcp)"
   [ -n "$existing_pg" ] && LOCAL_PG_PORT="$existing_pg"
-  [ -n "$existing_proxy" ] && LOCAL_NEON_PROXY_PORT="$existing_proxy"
   [ -n "$existing_electric" ] && LOCAL_ELECTRIC_PORT="$existing_electric"
   [ -n "$existing_redis" ] && LOCAL_REDIS_PORT="$existing_redis"
   [ -n "$existing_kv" ] && LOCAL_KV_REST_PORT="$existing_kv"
@@ -118,14 +114,14 @@ local_allocate_ports() {
   [ -n "$existing_s3_console" ] && LOCAL_S3_CONSOLE_PORT="$existing_s3_console"
 
   export SUPERSET_WORKTREE_ID SUPERSET_WORKTREE_ROOT SUPERSET_WORKSPACE_NAME LOCAL_DB_PROJECT
-  export LOCAL_PG_PORT LOCAL_NEON_PROXY_PORT LOCAL_ELECTRIC_PORT
+  export LOCAL_PG_PORT LOCAL_ELECTRIC_PORT
   export LOCAL_REDIS_PORT LOCAL_KV_REST_PORT LOCAL_S3_PORT LOCAL_S3_CONSOLE_PORT
   export DESKTOP_AUTOMATION_PORT
   # Export so migrate/seed (child bun processes) use these — an inherited env
   # var beats the .env file, so this overrides any stale DATABASE_URL.
-  export DATABASE_URL="postgres://postgres:postgres@localhost:$LOCAL_NEON_PROXY_PORT/main"
+  export DATABASE_URL="postgres://postgres:postgres@localhost:$LOCAL_PG_PORT/main"
   export DATABASE_URL_UNPOOLED="postgres://postgres:postgres@localhost:$LOCAL_PG_PORT/main"
-  success "Base $base → pg=$LOCAL_PG_PORT proxy=$LOCAL_NEON_PROXY_PORT electric=$LOCAL_ELECTRIC_PORT redis=$LOCAL_REDIS_PORT kv=$LOCAL_KV_REST_PORT s3=$LOCAL_S3_PORT s3-console=$LOCAL_S3_CONSOLE_PORT cdp=$DESKTOP_AUTOMATION_PORT (project $LOCAL_DB_PROJECT)"
+  success "Base $base → pg=$LOCAL_PG_PORT electric=$LOCAL_ELECTRIC_PORT redis=$LOCAL_REDIS_PORT kv=$LOCAL_KV_REST_PORT s3=$LOCAL_S3_PORT s3-console=$LOCAL_S3_CONSOLE_PORT cdp=$DESKTOP_AUTOMATION_PORT (project $LOCAL_DB_PROJECT)"
   return 0
 }
 
@@ -165,27 +161,24 @@ local_db_up() {
     return 1
   fi
 
-  # Postgres health != proxy ready. migrate uses direct pg, but seed (and the
-  # app) query through the neon-http proxy, which starts + bootstraps a beat
-  # later. Probe a real query so the seed never races a cold proxy.
-  echo "  Waiting for neon-proxy to serve queries on :$LOCAL_NEON_PROXY_PORT..."
-  local j proxy_ready=0
+  # Postgres health can report before clients can run a query. Probe a real query
+  # so migrations and seed never race a cold database.
+  echo "  Waiting for Postgres to serve queries on :$LOCAL_PG_PORT..."
+  local j db_ready=0
   for j in $(seq 1 30); do
-    if curl -s --max-time 3 -X POST "http://localhost:$LOCAL_NEON_PROXY_PORT/sql" \
-        -H "Neon-Connection-String: postgres://postgres:postgres@localhost:$LOCAL_NEON_PROXY_PORT/main" \
-        -H "Content-Type: application/json" \
-        -d '{"query":"select 1","params":[]}' 2>/dev/null | grep -q '"command"'; then
-      proxy_ready=1
+    if docker compose -p "$LOCAL_DB_PROJECT" -f "$ROOT_DIR/docker-compose.yml" exec -T postgres \
+        psql -U postgres -d main -At -v ON_ERROR_STOP=1 -c "select 1" 2>/dev/null | grep -qx "1"; then
+      db_ready=1
       break
     fi
     sleep 1
   done
-  if [ "$proxy_ready" -ne 1 ]; then
-    error "neon-proxy did not become ready within 30s"
+  if [ "$db_ready" -ne 1 ]; then
+    error "Postgres did not become query-ready within 30s"
     return 1
   fi
 
-  success "DB stack ready (pg :$LOCAL_PG_PORT, proxy :$LOCAL_NEON_PROXY_PORT, electric :$LOCAL_ELECTRIC_PORT, redis :$LOCAL_REDIS_PORT, kv :$LOCAL_KV_REST_PORT)"
+  success "DB stack ready (pg :$LOCAL_PG_PORT, electric :$LOCAL_ELECTRIC_PORT, redis :$LOCAL_REDIS_PORT, kv :$LOCAL_KV_REST_PORT)"
   return 0
 }
 
@@ -211,7 +204,7 @@ local_seed_dev_account() {
 
 local_write_env() {
   echo "📝 Writing workspace .env (DB URLs + ports)..."
-  if [ -z "${SUPERSET_PORT_BASE:-}" ] || [ -z "$LOCAL_NEON_PROXY_PORT" ]; then
+  if [ -z "${SUPERSET_PORT_BASE:-}" ] || [ -z "$LOCAL_PG_PORT" ]; then
     error "Ports not allocated before writing .env"
     return 1
   fi
@@ -244,10 +237,9 @@ local_write_env() {
     write_env_var "SUPERSET_PORT_BASE" "$BASE"
     write_env_var "LOCAL_DB_PROJECT" "$LOCAL_DB_PROJECT"
     echo ""
-    echo "# Per-workspace local DB stack (docker compose project $LOCAL_DB_PROJECT)"
-    write_env_var "LOCAL_PG_PORT" "$LOCAL_PG_PORT"
-    write_env_var "LOCAL_NEON_PROXY_PORT" "$LOCAL_NEON_PROXY_PORT"
-    write_env_var "LOCAL_ELECTRIC_PORT" "$LOCAL_ELECTRIC_PORT"
+	    echo "# Per-workspace local DB stack (docker compose project $LOCAL_DB_PROJECT)"
+	    write_env_var "LOCAL_PG_PORT" "$LOCAL_PG_PORT"
+	    write_env_var "LOCAL_ELECTRIC_PORT" "$LOCAL_ELECTRIC_PORT"
     write_env_var "LOCAL_REDIS_PORT" "$LOCAL_REDIS_PORT"
     write_env_var "LOCAL_KV_REST_PORT" "$LOCAL_KV_REST_PORT"
     write_env_var "LOCAL_S3_PORT" "$LOCAL_S3_PORT"
@@ -339,10 +331,9 @@ DEVVARS
     { "port": $LOCAL_ELECTRIC_PORT, "label": "Electric" },
     { "port": $CADDY_ELECTRIC_PORT, "label": "Caddy Electric" },
     { "port": $WRANGLER_PORT, "label": "Electric Proxy (Wrangler)" },
-    { "port": $DESKTOP_AUTOMATION_PORT, "label": "Desktop Automation (CDP)" },
-    { "port": $LOCAL_PG_PORT, "label": "Postgres" },
-    { "port": $LOCAL_NEON_PROXY_PORT, "label": "Neon Proxy" },
-    { "port": $LOCAL_REDIS_PORT, "label": "Redis" },
+	    { "port": $DESKTOP_AUTOMATION_PORT, "label": "Desktop Automation (CDP)" },
+	    { "port": $LOCAL_PG_PORT, "label": "Postgres" },
+	    { "port": $LOCAL_REDIS_PORT, "label": "Redis" },
     { "port": $LOCAL_KV_REST_PORT, "label": "KV REST" },
     { "port": $LOCAL_S3_PORT, "label": "S3" },
     { "port": $LOCAL_S3_CONSOLE_PORT, "label": "S3 Console" }

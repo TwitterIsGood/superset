@@ -229,14 +229,15 @@ describe("worktree local shell helpers", () => {
 			"docker image inspect superset-local-kv-rest:latest",
 		);
 		expect(worktreeScript).toContain(
-			'local services=("postgres" "neon-proxy" "electric" "redis" "kv-rest" "minio")',
+			'local services=("postgres" "electric" "redis" "kv-rest" "minio")',
 		);
 
-		expect(onlineScript).not.toContain("compose up -d --build --wait");
 		expect(onlineScript).not.toContain("compose up -d --build postgres");
-		expect(onlineScript).toContain("SUPERSET_ONLINE_REBUILD_DATA");
 		expect(onlineScript).toContain(
-			"docker image inspect superset-local-kv-rest:latest",
+			"compose up -d --no-build postgres electric redis minio",
+		);
+		expect(onlineScript).toContain(
+			'log "kv-rest image missing; building it once"',
 		);
 	});
 
@@ -336,7 +337,6 @@ SUPERSET_HOME_DIR="$(worktree_expected_home_dir "$root")"
 SUPERSET_PORT_BASE="3000"
 LOCAL_DB_PROJECT="$(worktree_default_db_project "$root")"
 LOCAL_PG_PORT="3014"
-LOCAL_NEON_PROXY_PORT="3015"
 LOCAL_ELECTRIC_PORT="3009"
 LOCAL_REDIS_PORT="3016"
 LOCAL_KV_REST_PORT="3017"
@@ -347,7 +347,7 @@ DESKTOP_VITE_PORT="3005"
 CADDY_ELECTRIC_PORT="3010"
 WRANGLER_PORT="3012"
 RELAY_PORT="3013"
-DATABASE_URL="postgres://postgres:postgres@localhost:3015/main"
+DATABASE_URL="postgres://postgres:postgres@localhost:3014/main"
 DATABASE_URL_UNPOOLED="postgres://postgres:postgres@localhost:3014/main"
 KV_REST_API_URL="http://localhost:3017"
 KV_URL="redis://localhost:3016"
@@ -397,7 +397,6 @@ ENV
 			export SUPERSET_PORT_BASE=3000
 			export LOCAL_DB_PROJECT="$(worktree_default_db_project "$root")"
 			export LOCAL_PG_PORT=3014
-			export LOCAL_NEON_PROXY_PORT=3015
 			export LOCAL_ELECTRIC_PORT=3009
 			export LOCAL_REDIS_PORT=3016
 			export LOCAL_KV_REST_PORT=3017
@@ -441,7 +440,6 @@ ENV
 			export SUPERSET_PORT_BASE=3000
 			export LOCAL_DB_PROJECT="$(worktree_default_db_project "$root")"
 			export LOCAL_PG_PORT=3014
-			export LOCAL_NEON_PROXY_PORT=3015
 			export LOCAL_ELECTRIC_PORT=3009
 			export LOCAL_REDIS_PORT=3016
 			export LOCAL_KV_REST_PORT=3017
@@ -450,7 +448,7 @@ ENV
 			export WRANGLER_PORT=3012
 			export CADDY_ELECTRIC_PORT=3010
 			export RELAY_PORT=3013
-			export DATABASE_URL="postgres://postgres:postgres@localhost:3015/main"
+			export DATABASE_URL="postgres://postgres:postgres@localhost:3014/main"
 			export DATABASE_URL_UNPOOLED="postgres://postgres:postgres@localhost:3014/main"
 			export KV_REST_API_URL="http://localhost:3017"
 			export KV_URL="redis://localhost:3016"

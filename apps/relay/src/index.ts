@@ -157,7 +157,11 @@ const authMiddleware: MiddlewareHandler<AppContext> = async (c, next) => {
 			? trpcErrorResponse(c, "UNAUTHORIZED", "Unauthorized")
 			: c.json({ error: "Unauthorized" }, 401);
 
-	const auth = await verifyJWT(token, env.NEXT_PUBLIC_API_URL);
+	const auth = await verifyJWT(
+		token,
+		env.NEXT_PUBLIC_API_URL,
+		env.RELAY_INTERNAL_API_URL,
+	);
 	if (!auth)
 		return wantsTrpc
 			? trpcErrorResponse(c, "UNAUTHORIZED", "Unauthorized")
@@ -211,7 +215,11 @@ app.get(
 					return;
 				}
 
-				const auth = await verifyJWT(token, env.NEXT_PUBLIC_API_URL);
+				const auth = await verifyJWT(
+					token,
+					env.NEXT_PUBLIC_API_URL,
+					env.RELAY_INTERNAL_API_URL,
+				);
 				if (!auth) {
 					ws.close(1008, "Unauthorized");
 					return;
@@ -257,7 +265,11 @@ app.get(
 app.get("/hosts/:hostId/_whoowns", async (c) => {
 	const token = extractToken(c);
 	if (!token) return c.json({ error: "Unauthorized" }, 401);
-	const auth = await verifyJWT(token, env.NEXT_PUBLIC_API_URL);
+	const auth = await verifyJWT(
+		token,
+		env.NEXT_PUBLIC_API_URL,
+		env.RELAY_INTERNAL_API_URL,
+	);
 	if (!auth) return c.json({ error: "Unauthorized" }, 401);
 
 	const hostId = c.req.param("hostId");

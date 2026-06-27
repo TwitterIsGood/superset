@@ -1,23 +1,15 @@
 import { Toaster } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, Inter } from "next/font/google";
+
+// Use CSS fallback fonts instead of next/font/google to avoid runtime
+// Google Fonts fetches that fail on offline servers.
+const inter = { variable: "--font-inter" };
+const ibmPlexMono = { variable: "--font-ibm-plex-mono" };
 
 import "./globals.css";
 
 import { Providers } from "./providers";
-
-const ibmPlexMono = IBM_Plex_Mono({
-	weight: ["300", "400", "500"],
-	subsets: ["latin"],
-	variable: "--font-ibm-plex-mono",
-});
-
-const inter = Inter({
-	weight: ["300", "400", "500"],
-	subsets: ["latin"],
-	variable: "--font-inter",
-});
 
 export const metadata: Metadata = {
 	title: "Superset",

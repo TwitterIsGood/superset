@@ -23,16 +23,6 @@ services:
       timeout: 5s
       retries: 10
 
-  neon-proxy:
-    image: ghcr.io/timowilhelm/local-neon-http-proxy:main
-    environment:
-      PG_CONNECTION_STRING: postgres://postgres:postgres@postgres:5432/main
-    ports:
-      - "${LOCAL_NEON_PROXY_PORT:-4444}:4444"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   electric:
     image: electricsql/electric:1.4.13
     environment:
@@ -78,8 +68,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-superset}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-superset-local-artifacts}
     ports:
-      - "127.0.0.1:${LOCAL_S3_PORT:-9000}:9000"
-      - "127.0.0.1:${LOCAL_S3_CONSOLE_PORT:-9001}:9001"
+      - "${LOCAL_S3_BIND_HOST:-127.0.0.1}:${LOCAL_S3_PORT:-9000}:9000"
+      - "${LOCAL_S3_CONSOLE_BIND_HOST:-127.0.0.1}:${LOCAL_S3_CONSOLE_PORT:-9001}:9001"
     volumes:
       - superset_minio_data:/data
 

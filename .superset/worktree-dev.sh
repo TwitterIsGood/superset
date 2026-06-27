@@ -88,9 +88,9 @@ apply_profile_target_env() {
   WORKTREE_DEV_EXTERNAL_API_URL="${WORKTREE_DEV_EXTERNAL_API_URL:-http://localhost:43001}"
   WORKTREE_DEV_EXTERNAL_ELECTRIC_URL="${WORKTREE_DEV_EXTERNAL_ELECTRIC_URL:-http://localhost:43012}"
   WORKTREE_DEV_EXTERNAL_RELAY_URL="${WORKTREE_DEV_EXTERNAL_RELAY_URL:-http://localhost:43013}"
-  WORKTREE_DEV_EXTERNAL_NEON_PROXY_PORT="${WORKTREE_DEV_EXTERNAL_NEON_PROXY_PORT:-43015}"
   WORKTREE_DEV_EXTERNAL_PG_PORT="${WORKTREE_DEV_EXTERNAL_PG_PORT:-43014}"
-  WORKTREE_DEV_EXTERNAL_DATABASE_URL="${WORKTREE_DEV_EXTERNAL_DATABASE_URL:-postgres://postgres:postgres@localhost:${WORKTREE_DEV_EXTERNAL_NEON_PROXY_PORT}/main}"
+  WORKTREE_DEV_EXTERNAL_COMPOSE_PROJECT="${WORKTREE_DEV_EXTERNAL_COMPOSE_PROJECT:-superset-online}"
+  WORKTREE_DEV_EXTERNAL_DATABASE_URL="${WORKTREE_DEV_EXTERNAL_DATABASE_URL:-postgres://postgres:postgres@localhost:${WORKTREE_DEV_EXTERNAL_PG_PORT}/main}"
   WORKTREE_DEV_EXTERNAL_DATABASE_URL_UNPOOLED="${WORKTREE_DEV_EXTERNAL_DATABASE_URL_UNPOOLED:-postgres://postgres:postgres@localhost:${WORKTREE_DEV_EXTERNAL_PG_PORT}/main}"
   WORKTREE_DEV_EXTERNAL_TRUSTED_ORIGIN="${WORKTREE_DEV_EXTERNAL_TRUSTED_ORIGIN:-http://bj1.v.lhb.ink:63000}"
   SUPERSET_DESKTOP_PROXY_API_TARGET="${SUPERSET_DESKTOP_PROXY_API_TARGET:-$WORKTREE_DEV_EXTERNAL_API_URL}"
@@ -105,7 +105,7 @@ apply_profile_target_env() {
   NEXT_PUBLIC_RELAY_URL="$WORKTREE_DEV_EXTERNAL_RELAY_URL"
 
   export WORKTREE_DEV_EXTERNAL_WEB_URL WORKTREE_DEV_EXTERNAL_API_URL WORKTREE_DEV_EXTERNAL_ELECTRIC_URL WORKTREE_DEV_EXTERNAL_RELAY_URL
-  export WORKTREE_DEV_EXTERNAL_NEON_PROXY_PORT WORKTREE_DEV_EXTERNAL_PG_PORT WORKTREE_DEV_EXTERNAL_DATABASE_URL WORKTREE_DEV_EXTERNAL_DATABASE_URL_UNPOOLED WORKTREE_DEV_EXTERNAL_TRUSTED_ORIGIN
+  export WORKTREE_DEV_EXTERNAL_PG_PORT WORKTREE_DEV_EXTERNAL_COMPOSE_PROJECT WORKTREE_DEV_EXTERNAL_DATABASE_URL WORKTREE_DEV_EXTERNAL_DATABASE_URL_UNPOOLED WORKTREE_DEV_EXTERNAL_TRUSTED_ORIGIN
   export SUPERSET_DESKTOP_PROXY_API_TARGET SUPERSET_DESKTOP_PROXY_ORIGIN SUPERSET_DESKTOP_TARGET_API_URL
   export NEXT_PUBLIC_WEB_URL NEXT_PUBLIC_API_URL NEXT_PUBLIC_ELECTRIC_URL NEXT_PUBLIC_ELECTRIC_PROXY_URL RELAY_URL NEXT_PUBLIC_RELAY_URL
 }
@@ -126,7 +126,6 @@ load_env() {
   LOCAL_DB_PROJECT="${LOCAL_DB_PROJECT:-$(worktree_default_db_project "$ROOT_DIR")}"
 
   LOCAL_PG_PORT="${LOCAL_PG_PORT:-$((SUPERSET_PORT_BASE + 14))}"
-  LOCAL_NEON_PROXY_PORT="${LOCAL_NEON_PROXY_PORT:-$((SUPERSET_PORT_BASE + 15))}"
   LOCAL_ELECTRIC_PORT="${LOCAL_ELECTRIC_PORT:-$((SUPERSET_PORT_BASE + 9))}"
   LOCAL_REDIS_PORT="${LOCAL_REDIS_PORT:-$((SUPERSET_PORT_BASE + 16))}"
   LOCAL_KV_REST_PORT="${LOCAL_KV_REST_PORT:-$((SUPERSET_PORT_BASE + 17))}"
@@ -142,7 +141,7 @@ load_env() {
   RELAY_PORT="${RELAY_PORT:-$((SUPERSET_PORT_BASE + 13))}"
   DESKTOP_AUTOMATION_PORT="${DESKTOP_AUTOMATION_PORT:-$((SUPERSET_PORT_BASE + 18))}"
 
-  DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@localhost:$LOCAL_NEON_PROXY_PORT/main}"
+  DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@localhost:$LOCAL_PG_PORT/main}"
   DATABASE_URL_UNPOOLED="${DATABASE_URL_UNPOOLED:-postgres://postgres:postgres@localhost:$LOCAL_PG_PORT/main}"
   KV_REST_API_TOKEN="${KV_REST_API_TOKEN:-local-kv-token}"
   KV_REST_API_URL="${KV_REST_API_URL:-http://localhost:$LOCAL_KV_REST_PORT}"
@@ -159,7 +158,7 @@ load_env() {
   configure_profile
 
   export SUPERSET_WORKTREE_ID SUPERSET_WORKTREE_ROOT SUPERSET_WORKSPACE_NAME SUPERSET_HOME_DIR SUPERSET_PORT_BASE LOCAL_DB_PROJECT
-  export LOCAL_PG_PORT LOCAL_NEON_PROXY_PORT LOCAL_ELECTRIC_PORT LOCAL_REDIS_PORT LOCAL_KV_REST_PORT LOCAL_S3_PORT LOCAL_S3_CONSOLE_PORT
+  export LOCAL_PG_PORT LOCAL_ELECTRIC_PORT LOCAL_REDIS_PORT LOCAL_KV_REST_PORT LOCAL_S3_PORT LOCAL_S3_CONSOLE_PORT
   export WEB_PORT API_PORT DESKTOP_VITE_PORT DESKTOP_NOTIFICATIONS_PORT CADDY_ELECTRIC_PORT WRANGLER_PORT RELAY_PORT DESKTOP_AUTOMATION_PORT
   export DATABASE_URL DATABASE_URL_UNPOOLED KV_REST_API_TOKEN KV_REST_API_URL KV_URL
   export ELECTRIC_SECRET ELECTRIC_URL NEXT_PUBLIC_ELECTRIC_URL NEXT_PUBLIC_ELECTRIC_PROXY_URL
@@ -281,7 +280,7 @@ start_data_services() {
     [ -n "$build_arg" ] && build_args+=("$build_arg")
   done < <(compose_build_args_for_data_services)
 
-  local services=("postgres" "neon-proxy" "electric" "redis" "kv-rest" "minio")
+  local services=("postgres" "electric" "redis" "kv-rest" "minio")
   local up_ok=0
   if [ "${#build_args[@]}" -gt 0 ]; then
     compose up -d "${build_args[@]}" --wait "${services[@]}" || up_ok=$?
@@ -303,29 +302,25 @@ start_data_services() {
   cleanup_stale_minio_init_containers
 }
 
-db_proxy_query_ok() {
-  curl -sS --max-time 5 \
-    -X POST "http://localhost:${LOCAL_NEON_PROXY_PORT}/sql" \
-    -H "Neon-Connection-String: ${DATABASE_URL}" \
-    -H "Content-Type: application/json" \
-    -d '{"query":"select 1","params":[]}' 2>/dev/null |
-    grep -q '"command"'
+db_query_ok() {
+  compose exec -T postgres psql -U postgres -d main -At -v ON_ERROR_STOP=1 -c "select 1" 2>/dev/null |
+    grep -qx "1"
 }
 
-wait_for_db_proxy_query() {
+wait_for_db_query() {
   local max_attempts="${1:-60}"
   local attempt=1
   while true; do
-    if db_proxy_query_ok; then
-      success "neon proxy query ready"
+    if db_query_ok; then
+      success "postgres query ready"
       return
     fi
     if [ "$attempt" -ge "$max_attempts" ]; then
-      error "neon proxy did not serve SQL queries after ${max_attempts} attempts"
+      error "postgres did not serve SQL queries after ${max_attempts} attempts"
       exit 1
     fi
     if [ "$attempt" -eq 1 ]; then
-      warn "waiting for neon proxy SQL queries..."
+      warn "waiting for postgres SQL queries..."
     fi
     sleep 2
     attempt=$((attempt + 1))
@@ -371,20 +366,20 @@ ensure_desktop_perf_fixture_if_requested() {
   fi
 }
 
-external_db_proxy_query_ok() {
-  curl -sS --max-time 5 \
-    -X POST "http://localhost:${WORKTREE_DEV_EXTERNAL_NEON_PROXY_PORT}/sql" \
-    -H "Neon-Connection-String: ${WORKTREE_DEV_EXTERNAL_DATABASE_URL}" \
-    -H "Content-Type: application/json" \
-    -d '{"query":"select 1","params":[]}' 2>/dev/null |
-    grep -q '"command"'
+external_db_query_ok() {
+  docker compose \
+    -f "$ROOT_DIR/docker-compose.yml" \
+    -f "$ROOT_DIR/docker-compose.online.yml" \
+    -p "$WORKTREE_DEV_EXTERNAL_COMPOSE_PROJECT" \
+    exec -T postgres psql -U postgres -d main -At -v ON_ERROR_STOP=1 -c "select 1" 2>/dev/null |
+    grep -qx "1"
 }
 
 dense_fixture_database_available() {
   if [ "$WORKTREE_DEV_USES_EXTERNAL_APP_SERVICES" = "1" ]; then
-    external_db_proxy_query_ok
+    external_db_query_ok
   else
-    db_proxy_query_ok
+    db_query_ok
   fi
 }
 
@@ -777,7 +772,6 @@ print_status() {
   echo "  desktop vite     http://localhost:${DESKTOP_VITE_PORT}"
   echo "  desktop cdp      http://localhost:${DESKTOP_AUTOMATION_PORT}"
   echo "  postgres         localhost:${LOCAL_PG_PORT}"
-  echo "  neon-proxy       localhost:${LOCAL_NEON_PROXY_PORT}"
   echo "  electric         localhost:${LOCAL_ELECTRIC_PORT}"
   echo "  redis            localhost:${LOCAL_REDIS_PORT}"
   echo "  kv-rest          localhost:${LOCAL_KV_REST_PORT}"
@@ -790,7 +784,7 @@ print_status() {
     echo "  api              ${WORKTREE_DEV_EXTERNAL_API_URL}"
     echo "  electric         ${WORKTREE_DEV_EXTERNAL_ELECTRIC_URL}"
     echo "  relay            ${WORKTREE_DEV_EXTERNAL_RELAY_URL}"
-    echo "  neon-proxy       localhost:${WORKTREE_DEV_EXTERNAL_NEON_PROXY_PORT}"
+    echo "  postgres         localhost:${WORKTREE_DEV_EXTERNAL_PG_PORT}"
   fi
   echo
   print_tmux_status
@@ -805,18 +799,18 @@ print_status() {
   echo
   echo "probes:"
   if [ "$WORKTREE_DEV_USES_EXTERNAL_APP_SERVICES" = "1" ]; then
-    if external_db_proxy_query_ok; then
-      printf '  ✓ %-24s %s\n' "external neon SQL" "SELECT"
+    if external_db_query_ok; then
+      printf '  ✓ %-24s %s\n' "external postgres SQL" "SELECT"
     else
-      printf '  ✗ %-24s failed %s\n' "external neon SQL" "http://localhost:${WORKTREE_DEV_EXTERNAL_NEON_PROXY_PORT}/sql"
+      printf '  ✗ %-24s failed %s\n' "external postgres SQL" "localhost:${WORKTREE_DEV_EXTERNAL_PG_PORT}"
     fi
     probe_url "external api session" "${WORKTREE_DEV_EXTERNAL_API_URL}/api/auth/get-session" "200"
     probe_url "external electric" "${WORKTREE_DEV_EXTERNAL_ELECTRIC_URL}/v1/shape" "401"
     probe_url "external relay health" "${WORKTREE_DEV_EXTERNAL_RELAY_URL}/health" "200"
-  elif db_proxy_query_ok; then
-    printf '  ✓ %-24s %s\n' "neon proxy SQL" "SELECT"
+  elif db_query_ok; then
+    printf '  ✓ %-24s %s\n' "postgres SQL" "SELECT"
   else
-    printf '  ✗ %-24s failed %s\n' "neon proxy SQL" "http://localhost:${LOCAL_NEON_PROXY_PORT}/sql"
+    printf '  ✗ %-24s failed %s\n' "postgres SQL" "localhost:${LOCAL_PG_PORT}"
   fi
   if [ "$WORKTREE_DEV_USES_EXTERNAL_APP_SERVICES" = "1" ]; then
     :
@@ -965,7 +959,7 @@ start_all() {
   ensure_prereqs
   if [ "$WORKTREE_DEV_REQUIRES_LOCAL_DATA" = "1" ]; then
     start_data_services
-    wait_for_db_proxy_query
+    wait_for_db_query
     run_migrations_and_seed
   else
     warn "local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:loaded"

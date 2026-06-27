@@ -96,7 +96,6 @@ worktree_env_requires_local_setup() {
   for required_key in \
     SUPERSET_PORT_BASE \
     LOCAL_PG_PORT \
-    LOCAL_NEON_PROXY_PORT \
     LOCAL_ELECTRIC_PORT \
     LOCAL_REDIS_PORT \
     LOCAL_KV_REST_PORT \
@@ -116,9 +115,8 @@ worktree_env_requires_local_setup() {
     [ -n "$(worktree_env_value "$env_path" "$required_key")" ] || return 0
   done
 
-  local local_pg local_neon local_electric local_redis local_kv local_s3 local_s3_console api_port desktop_port wrangler_port relay_port
+  local local_pg local_electric local_redis local_kv local_s3 local_s3_console api_port desktop_port wrangler_port relay_port
   local_pg="$(worktree_env_value "$env_path" LOCAL_PG_PORT)"
-  local_neon="$(worktree_env_value "$env_path" LOCAL_NEON_PROXY_PORT)"
   local_electric="$(worktree_env_value "$env_path" LOCAL_ELECTRIC_PORT)"
   local_redis="$(worktree_env_value "$env_path" LOCAL_REDIS_PORT)"
   local_kv="$(worktree_env_value "$env_path" LOCAL_KV_REST_PORT)"
@@ -133,7 +131,7 @@ worktree_env_requires_local_setup() {
   [ -n "$wrangler_port" ] || return 0
   [ -n "$relay_port" ] || return 0
 
-  worktree_url_uses_port "$(worktree_env_value "$env_path" DATABASE_URL)" "$local_neon" || return 0
+  worktree_url_uses_port "$(worktree_env_value "$env_path" DATABASE_URL)" "$local_pg" || return 0
   worktree_url_uses_port "$(worktree_env_value "$env_path" DATABASE_URL_UNPOOLED)" "$local_pg" || return 0
   worktree_url_uses_port "$(worktree_env_value "$env_path" KV_REST_API_URL)" "$local_kv" || return 0
   worktree_url_uses_port "$(worktree_env_value "$env_path" KV_URL)" "$local_redis" || return 0
@@ -209,7 +207,7 @@ worktree_assert_current_local_env() {
       ;;
   esac
 
-  worktree_assert_url_port DATABASE_URL "${DATABASE_URL:-}" "${LOCAL_NEON_PROXY_PORT:-}" || return 1
+  worktree_assert_url_port DATABASE_URL "${DATABASE_URL:-}" "${LOCAL_PG_PORT:-}" || return 1
   worktree_assert_url_port DATABASE_URL_UNPOOLED "${DATABASE_URL_UNPOOLED:-}" "${LOCAL_PG_PORT:-}" || return 1
   worktree_assert_url_port KV_REST_API_URL "${KV_REST_API_URL:-}" "${LOCAL_KV_REST_PORT:-}" || return 1
   worktree_assert_url_port KV_URL "${KV_URL:-}" "${LOCAL_REDIS_PORT:-}" || return 1

@@ -2,20 +2,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-ROOT_DIR="${SUPERSET_ONLINE_ROOT_DIR:-$DEFAULT_ROOT_DIR}"
-SCRIPT_PATH="${SUPERSET_ONLINE_SCRIPT_PATH:-$SCRIPT_DIR/superset-online.sh}"
+ROOT_DIR="${SUPERSET_ONLINE_ROOT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+BASE_ENV_PATH="${SUPERSET_ONLINE_BASE_ENV_FILE:-$ROOT_DIR/.env}"
+ONLINE_ENV_PATH="${SUPERSET_ONLINE_ENV_FILE:-$ROOT_DIR/.env.online}"
+COMPOSE_PROJECT_NAME="${SUPERSET_ONLINE_COMPOSE_PROJECT:-superset-online}"
+ONLINE_BUILD_DIR="${SUPERSET_ONLINE_BUILD_DIR:-$ROOT_DIR/.online-build}"
 RUN_DIR="${SUPERSET_ONLINE_RUN_DIR:-$ROOT_DIR/.tmp/online-service}"
-LOG_DIR="$RUN_DIR/logs"
-BASE_ENV_PATH="${SUPERSET_ONLINE_ENV_FILE:-$ROOT_DIR/.env}"
+MOBILE_ENV_PATH="${SUPERSET_ONLINE_MOBILE_ENV_FILE:-$ROOT_DIR/apps/mobile/.env.local}"
+
 LAUNCH_AGENT_LABEL="com.superset.online"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
 LAUNCH_SUPPORT_DIR="$HOME/Library/Application Support/Superset"
-LAUNCHER_PATH="$LAUNCH_SUPPORT_DIR/superset-online-launcher.sh"
-LAUNCH_SCRIPT_PATH="$LAUNCH_SUPPORT_DIR/superset-online.sh"
-LAUNCH_ENV_PATH="$LAUNCH_SUPPORT_DIR/superset-online.env"
 TMUX_SOCKET_PATH="${SUPERSET_ONLINE_TMUX_SOCKET:-$LAUNCH_SUPPORT_DIR/online-tmux.sock}"
-COMPOSE_PROJECT_NAME="superset-online"
 
 ONLINE_WEB_PORT="43000"
 ONLINE_API_PORT="43001"
@@ -23,24 +21,25 @@ ONLINE_ELECTRIC_PROXY_PORT="43012"
 ONLINE_RELAY_PORT="43013"
 ONLINE_ELECTRIC_PORT="43009"
 ONLINE_PG_PORT="43014"
-ONLINE_NEON_PROXY_PORT="43015"
 ONLINE_REDIS_PORT="43016"
 ONLINE_KV_REST_PORT="43017"
 ONLINE_S3_PORT="43018"
 ONLINE_S3_CONSOLE_PORT="43019"
 
 PUBLIC_DEFAULT_DOMAIN="bj1.v.lhb.ink"
-MOBILE_ENV_PATH="${SUPERSET_ONLINE_MOBILE_ENV_FILE:-$ROOT_DIR/apps/mobile/.env.local}"
+PUBLIC_SCHEME="${SUPERSET_PUBLIC_SCHEME:-http}"
+PUBLIC_DOMAIN="${SUPERSET_PUBLIC_DOMAIN:-$PUBLIC_DEFAULT_DOMAIN}"
+PUBLIC_WEB_URL="${SUPERSET_PUBLIC_WEB_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63000}"
+PUBLIC_API_URL="${SUPERSET_PUBLIC_API_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63001}"
+PUBLIC_ELECTRIC_URL="${SUPERSET_PUBLIC_ELECTRIC_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63012}"
+PUBLIC_RELAY_URL="${SUPERSET_PUBLIC_RELAY_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63013}"
+MOBILE_PROFILE="${SUPERSET_MOBILE_PROFILE:-online-canary}"
 
-ONLINE_SESSIONS=(
-	"superset-online-api"
-	"superset-online-web"
-	"superset-online-relay"
-	"superset-online-electric-proxy"
-)
+HOST_DATABASE_URL="postgres://postgres:postgres@localhost:${ONLINE_PG_PORT}/main"
+HOST_DATABASE_URL_UNPOOLED="postgres://postgres:postgres@localhost:${ONLINE_PG_PORT}/main"
+CONTAINER_DATABASE_URL="postgres://postgres:postgres@postgres:5432/main"
+CONTAINER_DATABASE_URL_UNPOOLED="postgres://postgres:postgres@postgres:5432/main"
 
-# launchd does not inherit the interactive shell PATH. Keep this list explicit so
-# Bun, Docker/OrbStack, and tmux resolve the same way after a Mac restart.
 export PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/OrbStack.app/Contents/MacOS/xbin:$PATH"
 
 log() {
@@ -56,6 +55,21 @@ require_command() {
 	command -v "$1" >/dev/null 2>&1 || fail "missing required command: $1"
 }
 
+escape_env_value() {
+	local value="$1"
+	value="${value//\\/\\\\}"
+	value="${value//\"/\\\"}"
+	value="${value//\$/\\\$}"
+	value="${value//\`/\\\`}"
+	printf '%s' "$value"
+}
+
+write_env_var() {
+	local key="$1"
+	local value="${2:-}"
+	printf '%s="%s"\n' "$key" "$(escape_env_value "$value")"
+}
+
 load_base_env() {
 	if [[ -f "$BASE_ENV_PATH" ]]; then
 		set -a
@@ -65,36 +79,29 @@ load_base_env() {
 	fi
 }
 
-apply_public_env_defaults() {
-	PUBLIC_SCHEME="${SUPERSET_PUBLIC_SCHEME:-http}"
-	PUBLIC_DOMAIN="${SUPERSET_PUBLIC_DOMAIN:-$PUBLIC_DEFAULT_DOMAIN}"
-	MOBILE_PROFILE="${SUPERSET_MOBILE_PROFILE:-online-canary}"
-	PUBLIC_WEB_URL="${SUPERSET_PUBLIC_WEB_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63000}"
-	PUBLIC_API_URL="${SUPERSET_PUBLIC_API_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63001}"
-	PUBLIC_ELECTRIC_URL="${SUPERSET_PUBLIC_ELECTRIC_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63012}"
-	PUBLIC_RELAY_URL="${SUPERSET_PUBLIC_RELAY_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63013}"
-}
-
-apply_online_env() {
-	export NODE_ENV="development"
+apply_host_env() {
+	export NODE_ENV="production"
 	export SUPERSET_ONLINE_SERVICE="1"
 	export SUPERSET_ALLOW_LOCALHOST_CORS="1"
 	export SUPERSET_HOME_DIR="${SUPERSET_ONLINE_HOME_DIR:-$RUN_DIR/superset-home}"
 	export SUPERSET_NEXT_DIST_DIR=".next-online"
-	export SKIP_ENV_VALIDATION="${SKIP_ENV_VALIDATION:-}"
-	export ONLINE_SEED_DEV="${ONLINE_SEED_DEV:-0}"
 
 	export LOCAL_PG_PORT="$ONLINE_PG_PORT"
-	export LOCAL_NEON_PROXY_PORT="$ONLINE_NEON_PROXY_PORT"
+	unset LOCAL_NEON_PROXY_PORT
 	export LOCAL_ELECTRIC_PORT="$ONLINE_ELECTRIC_PORT"
 	export LOCAL_REDIS_PORT="$ONLINE_REDIS_PORT"
 	export LOCAL_KV_REST_PORT="$ONLINE_KV_REST_PORT"
 	export LOCAL_S3_PORT="$ONLINE_S3_PORT"
 	export LOCAL_S3_CONSOLE_PORT="$ONLINE_S3_CONSOLE_PORT"
+	export LOCAL_S3_CONSOLE_BIND_HOST="${LOCAL_S3_CONSOLE_BIND_HOST:-127.0.0.1}"
+	if [[ "${SUPERSET_ONLINE_EXPOSE_RESOURCE_PACKS_PUBLIC:-0}" == "1" ]]; then
+		export LOCAL_S3_BIND_HOST="${LOCAL_S3_BIND_HOST:-0.0.0.0}"
+	else
+		export LOCAL_S3_BIND_HOST="${LOCAL_S3_BIND_HOST:-127.0.0.1}"
+	fi
 
-	export DATABASE_URL="postgres://postgres:postgres@localhost:${ONLINE_NEON_PROXY_PORT}/main"
-	export DATABASE_URL_UNPOOLED="postgres://postgres:postgres@localhost:${ONLINE_PG_PORT}/main"
-
+	export DATABASE_URL="$HOST_DATABASE_URL"
+	export DATABASE_URL_UNPOOLED="$HOST_DATABASE_URL_UNPOOLED"
 	export KV_REST_API_TOKEN="${KV_REST_API_TOKEN:-local-kv-token}"
 	export KV_REST_API_URL="http://localhost:${ONLINE_KV_REST_PORT}"
 	export KV_URL="redis://localhost:${ONLINE_REDIS_PORT}"
@@ -108,15 +115,18 @@ apply_online_env() {
 	export SUPERSET_OBJECT_STORAGE_SECRET_KEY="$MINIO_ROOT_PASSWORD"
 	export SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE="1"
 
+	export ELECTRIC_SECRET="${ELECTRIC_SECRET:-local_electric_dev_secret}"
+	export ELECTRIC_URL="http://localhost:${ONLINE_ELECTRIC_PORT}/v1/shape"
+	export ELECTRIC_SHAPE_URL="$ELECTRIC_URL"
+	export AUTH_URL="$PUBLIC_API_URL"
+	export AUTH_JWKS_URL="http://localhost:${ONLINE_API_PORT}"
+	export RELAY_INTERNAL_API_URL="http://localhost:${ONLINE_API_PORT}"
+
 	export WEB_PORT="$ONLINE_WEB_PORT"
 	export API_PORT="$ONLINE_API_PORT"
 	export WRANGLER_PORT="$ONLINE_ELECTRIC_PROXY_PORT"
 	export RELAY_PORT="$ONLINE_RELAY_PORT"
 	export ELECTRIC_PORT="$ONLINE_ELECTRIC_PORT"
-	export ELECTRIC_SECRET="${ELECTRIC_SECRET:-local_electric_dev_secret}"
-	export ELECTRIC_URL="http://localhost:${ONLINE_ELECTRIC_PORT}/v1/shape"
-	export ELECTRIC_SHAPE_URL="http://localhost:${ONLINE_ELECTRIC_PORT}/v1/shape"
-	export AUTH_URL="$PUBLIC_API_URL"
 
 	export NEXT_PUBLIC_WEB_URL="$PUBLIC_WEB_URL"
 	export NEXT_PUBLIC_API_URL="$PUBLIC_API_URL"
@@ -124,29 +134,136 @@ apply_online_env() {
 	export NEXT_PUBLIC_ELECTRIC_PROXY_URL="$PUBLIC_ELECTRIC_URL"
 	export RELAY_URL="$PUBLIC_RELAY_URL"
 	export NEXT_PUBLIC_RELAY_URL="$PUBLIC_RELAY_URL"
+	export NEXT_PUBLIC_COOKIE_DOMAIN="$PUBLIC_DOMAIN"
+	export SUPERSET_WEB_URL="$PUBLIC_WEB_URL"
+
 	export SUPERSET_MOBILE_PROFILE="$MOBILE_PROFILE"
 	export EXPO_PUBLIC_SUPERSET_PROFILE="$MOBILE_PROFILE"
 	export EXPO_PUBLIC_API_URL="$PUBLIC_API_URL"
 	export EXPO_PUBLIC_ELECTRIC_URL="$PUBLIC_ELECTRIC_URL"
 	export EXPO_PUBLIC_WEB_URL="$PUBLIC_WEB_URL"
 	export EXPO_PUBLIC_RELAY_URL="$PUBLIC_RELAY_URL"
-	export SUPERSET_WEB_URL="$PUBLIC_WEB_URL"
-	export NEXT_PUBLIC_COOKIE_DOMAIN="$PUBLIC_DOMAIN"
 
-	export NEXT_PUBLIC_MARKETING_URL="${NEXT_PUBLIC_MARKETING_URL:-http://localhost:3002}"
+	export NEXT_PUBLIC_MARKETING_URL="${NEXT_PUBLIC_MARKETING_URL:-$PUBLIC_WEB_URL}"
 	export NEXT_PUBLIC_ADMIN_URL="${NEXT_PUBLIC_ADMIN_URL:-http://localhost:3003}"
 	export NEXT_PUBLIC_DOCS_URL="${NEXT_PUBLIC_DOCS_URL:-http://localhost:3004}"
 	export NEXT_PUBLIC_DESKTOP_URL="${NEXT_PUBLIC_DESKTOP_URL:-http://localhost:3005}"
 	export NEXT_PUBLIC_STREAMS_URL="${NEXT_PUBLIC_STREAMS_URL:-http://localhost:3007}"
 	export STREAMS_URL="${STREAMS_URL:-http://localhost:3007}"
+
+	mkdir -p "$RUN_DIR" "$SUPERSET_HOME_DIR" "$(dirname "$ONLINE_ENV_PATH")"
+}
+
+write_online_env_file() {
+	local managed_keys_re
+	managed_keys_re='^(export[[:space:]]+)?(NODE_ENV|SUPERSET_ONLINE_SERVICE|SUPERSET_ALLOW_LOCALHOST_CORS|SUPERSET_HOME_DIR|SUPERSET_NEXT_DIST_DIR|LOCAL_PG_PORT|LOCAL_NEON_PROXY_PORT|LOCAL_ELECTRIC_PORT|LOCAL_REDIS_PORT|LOCAL_KV_REST_PORT|LOCAL_S3_PORT|LOCAL_S3_CONSOLE_PORT|LOCAL_S3_BIND_HOST|LOCAL_S3_CONSOLE_BIND_HOST|DATABASE_URL|DATABASE_URL_UNPOOLED|KV_REST_API_URL|KV_REST_API_TOKEN|KV_URL|MINIO_ROOT_USER|MINIO_ROOT_PASSWORD|SUPERSET_OBJECT_STORAGE_ENDPOINT|SUPERSET_OBJECT_STORAGE_BUCKET|SUPERSET_OBJECT_STORAGE_REGION|SUPERSET_OBJECT_STORAGE_ACCESS_KEY|SUPERSET_OBJECT_STORAGE_SECRET_KEY|SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE|ELECTRIC_SECRET|ELECTRIC_URL|ELECTRIC_SHAPE_URL|AUTH_URL|AUTH_JWKS_URL|RELAY_INTERNAL_API_URL|WEB_PORT|API_PORT|WRANGLER_PORT|RELAY_PORT|ELECTRIC_PORT|NEXT_PUBLIC_WEB_URL|NEXT_PUBLIC_API_URL|NEXT_PUBLIC_ELECTRIC_URL|NEXT_PUBLIC_ELECTRIC_PROXY_URL|NEXT_PUBLIC_RELAY_URL|RELAY_URL|NEXT_PUBLIC_COOKIE_DOMAIN|SUPERSET_WEB_URL|SUPERSET_MOBILE_PROFILE|EXPO_PUBLIC_SUPERSET_PROFILE|EXPO_PUBLIC_API_URL|EXPO_PUBLIC_ELECTRIC_URL|EXPO_PUBLIC_WEB_URL|EXPO_PUBLIC_RELAY_URL|NEXT_PUBLIC_MARKETING_URL|NEXT_PUBLIC_ADMIN_URL|NEXT_PUBLIC_DOCS_URL|NEXT_PUBLIC_DESKTOP_URL|NEXT_PUBLIC_STREAMS_URL|STREAMS_URL|FLY_REGION|FLY_MACHINE_ID|RELAY_PUBLIC_URL|RELAY_SYNTHETIC_JWT|NO_PROXY|no_proxy)='
+
+	{
+		if [[ -f "$BASE_ENV_PATH" ]]; then
+			awk -v pattern="$managed_keys_re" '$0 !~ pattern { print }' "$BASE_ENV_PATH"
+			printf '\n'
+		fi
+		printf '# --- Managed by scripts/superset-online.sh. Do not edit below. ---\n'
+		write_env_var "NODE_ENV" "production"
+		write_env_var "SUPERSET_ONLINE_SERVICE" "1"
+		write_env_var "SUPERSET_ALLOW_LOCALHOST_CORS" "1"
+		write_env_var "SUPERSET_HOME_DIR" "/var/lib/superset"
+		write_env_var "SUPERSET_NEXT_DIST_DIR" ".next-online"
+		write_env_var "LOCAL_PG_PORT" "$ONLINE_PG_PORT"
+		write_env_var "LOCAL_ELECTRIC_PORT" "$ONLINE_ELECTRIC_PORT"
+		write_env_var "LOCAL_REDIS_PORT" "$ONLINE_REDIS_PORT"
+		write_env_var "LOCAL_KV_REST_PORT" "$ONLINE_KV_REST_PORT"
+		write_env_var "LOCAL_S3_PORT" "$ONLINE_S3_PORT"
+		write_env_var "LOCAL_S3_CONSOLE_PORT" "$ONLINE_S3_CONSOLE_PORT"
+		write_env_var "LOCAL_S3_BIND_HOST" "$LOCAL_S3_BIND_HOST"
+		write_env_var "LOCAL_S3_CONSOLE_BIND_HOST" "$LOCAL_S3_CONSOLE_BIND_HOST"
+		write_env_var "DATABASE_URL" "$CONTAINER_DATABASE_URL"
+		write_env_var "DATABASE_URL_UNPOOLED" "$CONTAINER_DATABASE_URL_UNPOOLED"
+		write_env_var "KV_REST_API_TOKEN" "$KV_REST_API_TOKEN"
+		write_env_var "KV_REST_API_URL" "http://kv-rest:80"
+		write_env_var "KV_URL" "redis://redis:6379"
+		write_env_var "MINIO_ROOT_USER" "$MINIO_ROOT_USER"
+		write_env_var "MINIO_ROOT_PASSWORD" "$MINIO_ROOT_PASSWORD"
+		write_env_var "SUPERSET_OBJECT_STORAGE_ENDPOINT" "http://minio:9000"
+		write_env_var "SUPERSET_OBJECT_STORAGE_BUCKET" "$SUPERSET_OBJECT_STORAGE_BUCKET"
+		write_env_var "SUPERSET_OBJECT_STORAGE_REGION" "$SUPERSET_OBJECT_STORAGE_REGION"
+		write_env_var "SUPERSET_OBJECT_STORAGE_ACCESS_KEY" "$SUPERSET_OBJECT_STORAGE_ACCESS_KEY"
+		write_env_var "SUPERSET_OBJECT_STORAGE_SECRET_KEY" "$SUPERSET_OBJECT_STORAGE_SECRET_KEY"
+		write_env_var "SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE" "$SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE"
+		write_env_var "ELECTRIC_SECRET" "$ELECTRIC_SECRET"
+		write_env_var "ELECTRIC_URL" "http://electric:3000/v1/shape"
+		write_env_var "ELECTRIC_SHAPE_URL" "http://electric:3000/v1/shape"
+		write_env_var "AUTH_URL" "$PUBLIC_API_URL"
+		write_env_var "AUTH_JWKS_URL" "http://api:3001"
+		write_env_var "RELAY_INTERNAL_API_URL" "http://api:3001"
+		write_env_var "WEB_PORT" "$ONLINE_WEB_PORT"
+		write_env_var "API_PORT" "$ONLINE_API_PORT"
+		write_env_var "WRANGLER_PORT" "$ONLINE_ELECTRIC_PROXY_PORT"
+		write_env_var "RELAY_PORT" "8080"
+		write_env_var "ELECTRIC_PORT" "$ONLINE_ELECTRIC_PORT"
+		write_env_var "NEXT_PUBLIC_WEB_URL" "$PUBLIC_WEB_URL"
+		write_env_var "NEXT_PUBLIC_API_URL" "$PUBLIC_API_URL"
+		write_env_var "NEXT_PUBLIC_ELECTRIC_URL" "$PUBLIC_ELECTRIC_URL"
+		write_env_var "NEXT_PUBLIC_ELECTRIC_PROXY_URL" "$PUBLIC_ELECTRIC_URL"
+		write_env_var "NEXT_PUBLIC_RELAY_URL" "$PUBLIC_RELAY_URL"
+		write_env_var "RELAY_URL" "$PUBLIC_RELAY_URL"
+		write_env_var "NEXT_PUBLIC_COOKIE_DOMAIN" "$PUBLIC_DOMAIN"
+		write_env_var "SUPERSET_WEB_URL" "$PUBLIC_WEB_URL"
+		write_env_var "SUPERSET_MOBILE_PROFILE" "$MOBILE_PROFILE"
+		write_env_var "EXPO_PUBLIC_SUPERSET_PROFILE" "$MOBILE_PROFILE"
+		write_env_var "EXPO_PUBLIC_API_URL" "$PUBLIC_API_URL"
+		write_env_var "EXPO_PUBLIC_ELECTRIC_URL" "$PUBLIC_ELECTRIC_URL"
+		write_env_var "EXPO_PUBLIC_WEB_URL" "$PUBLIC_WEB_URL"
+		write_env_var "EXPO_PUBLIC_RELAY_URL" "$PUBLIC_RELAY_URL"
+		write_env_var "NEXT_PUBLIC_MARKETING_URL" "$NEXT_PUBLIC_MARKETING_URL"
+		write_env_var "NEXT_PUBLIC_ADMIN_URL" "$NEXT_PUBLIC_ADMIN_URL"
+		write_env_var "NEXT_PUBLIC_DOCS_URL" "$NEXT_PUBLIC_DOCS_URL"
+		write_env_var "NEXT_PUBLIC_DESKTOP_URL" "$NEXT_PUBLIC_DESKTOP_URL"
+		write_env_var "NEXT_PUBLIC_STREAMS_URL" "$NEXT_PUBLIC_STREAMS_URL"
+		write_env_var "STREAMS_URL" "$STREAMS_URL"
+		write_env_var "FLY_REGION" "local"
+		write_env_var "FLY_MACHINE_ID" "superset-online"
+		write_env_var "RELAY_PUBLIC_URL" "$PUBLIC_RELAY_URL"
+		write_env_var "NO_PROXY" "localhost,127.0.0.1,api,web,relay,electric-proxy,electric,postgres,redis,kv-rest,minio"
+		write_env_var "no_proxy" "localhost,127.0.0.1,api,web,relay,electric-proxy,electric,postgres,redis,kv-rest,minio"
+	} > "$ONLINE_ENV_PATH"
+	chmod 600 "$ONLINE_ENV_PATH"
+}
+
+write_mobile_env_file() {
+	local mobile_dir
+	mobile_dir="$(dirname "$MOBILE_ENV_PATH")"
+	if [[ ! -d "$mobile_dir" ]]; then
+		return
+	fi
+
+	local current=""
+	if [[ -f "$MOBILE_ENV_PATH" ]]; then
+		current="$(
+			awk '
+				/^[[:space:]]*(export[[:space:]]+)?(SUPERSET_MOBILE_PROFILE|EXPO_PUBLIC_SUPERSET_PROFILE|EXPO_PUBLIC_API_URL|EXPO_PUBLIC_ELECTRIC_URL|EXPO_PUBLIC_WEB_URL|EXPO_PUBLIC_RELAY_URL)=/ { next }
+				{ print }
+			' "$MOBILE_ENV_PATH"
+		)"
+	fi
+
+	{
+		if [[ -n "$current" ]]; then
+			printf '%s\n' "$current"
+		fi
+		write_env_var "SUPERSET_MOBILE_PROFILE" "$MOBILE_PROFILE"
+		write_env_var "EXPO_PUBLIC_SUPERSET_PROFILE" "$MOBILE_PROFILE"
+		write_env_var "EXPO_PUBLIC_API_URL" "$PUBLIC_API_URL"
+		write_env_var "EXPO_PUBLIC_ELECTRIC_URL" "$PUBLIC_ELECTRIC_URL"
+		write_env_var "EXPO_PUBLIC_WEB_URL" "$PUBLIC_WEB_URL"
+		write_env_var "EXPO_PUBLIC_RELAY_URL" "$PUBLIC_RELAY_URL"
+	} > "$MOBILE_ENV_PATH"
 }
 
 prepare_env() {
 	load_base_env
-	apply_public_env_defaults
-	apply_online_env
-	mkdir -p "$LOG_DIR" "$LAUNCH_SUPPORT_DIR" "$SUPERSET_HOME_DIR"
-	write_electric_proxy_env_file
+	apply_host_env
+	write_online_env_file
 	write_mobile_env_file
 }
 
@@ -154,11 +271,21 @@ ensure_prereqs() {
 	require_command bun
 	require_command curl
 	require_command docker
-	require_command tmux
+}
+
+compose() {
+	SUPERSET_ONLINE_ENV_FILE="$ONLINE_ENV_PATH" \
+	COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
+		docker compose \
+			--env-file "$ONLINE_ENV_PATH" \
+			-f "$ROOT_DIR/docker-compose.yml" \
+			-f "$ROOT_DIR/docker-compose.online.yml" \
+			-p "$COMPOSE_PROJECT_NAME" \
+			"$@"
 }
 
 wait_for_docker() {
-	local max_attempts="${1:-90}"
+	local max_attempts="${1:-120}"
 	local attempt=1
 	while ! docker info >/dev/null 2>&1; do
 		if (( attempt >= max_attempts )); then
@@ -172,23 +299,173 @@ wait_for_docker() {
 	done
 }
 
-compose() {
-	COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" docker compose \
-		-f "$ROOT_DIR/docker-compose.yml" \
-		-p "$COMPOSE_PROJECT_NAME" \
-		"$@"
+stop_legacy_host_services() {
+	if command -v tmux >/dev/null 2>&1 && [[ -S "$TMUX_SOCKET_PATH" ]]; then
+		log "stopping legacy tmux online services"
+		tmux -S "$TMUX_SOCKET_PATH" kill-server >/dev/null 2>&1 || true
+	fi
+
+	local domain="gui/$(id -u)"
+	if [[ -f "$LAUNCH_AGENT_PATH" ]]; then
+		log "removing legacy LaunchAgent $LAUNCH_AGENT_PATH"
+		launchctl bootout "$domain" "$LAUNCH_AGENT_PATH" >/dev/null 2>&1 || true
+		rm -f "$LAUNCH_AGENT_PATH"
+	fi
 }
 
-compose_build_args_for_data_services() {
-	if [[ "${SUPERSET_ONLINE_REBUILD_DATA:-0}" == "1" ]]; then
-		printf '%s\n' "--build"
+build_app_artifacts() {
+	if [[ "${SUPERSET_ONLINE_SKIP_BUILD:-0}" == "1" ]]; then
+		log "skipping app artifact build because SUPERSET_ONLINE_SKIP_BUILD=1"
 		return
 	fi
 
-	if ! docker image inspect superset-local-kv-rest:latest >/dev/null 2>&1; then
-		log "superset-local-kv-rest:latest is missing; building data service image" >&2
-		printf '%s\n' "--build"
+	log "building API standalone artifact"
+	(
+		cd "$ROOT_DIR/apps/api"
+		rm -rf .next-online
+		SUPERSET_ONLINE_SERVICE=1 \
+			SUPERSET_NEXT_DIST_DIR=.next-online \
+			NODE_ENV=production \
+			SKIP_ENV_VALIDATION=1 \
+			bun run build
+	)
+
+	log "building Web standalone artifact"
+	(
+		cd "$ROOT_DIR/apps/web"
+		rm -rf .next-online
+		SUPERSET_ONLINE_SERVICE=1 \
+			SUPERSET_NEXT_DIST_DIR=.next-online \
+			NODE_ENV=production \
+			SKIP_ENV_VALIDATION=1 \
+			bun run build
+	)
+
+	log "building Relay bundle"
+	rm -rf "$ONLINE_BUILD_DIR/relay"
+	mkdir -p "$ONLINE_BUILD_DIR/relay"
+	bun build "$ROOT_DIR/apps/relay/src/index.ts" \
+		--target=bun \
+		--outdir "$ONLINE_BUILD_DIR/relay" \
+		--entry-naming=index.js
+
+	log "building Electric Proxy bundle"
+	rm -rf "$ONLINE_BUILD_DIR/electric-proxy"
+	mkdir -p "$ONLINE_BUILD_DIR/electric-proxy"
+	bun build "$ROOT_DIR/apps/electric-proxy/src/server.ts" \
+		--target=bun \
+		--outdir "$ONLINE_BUILD_DIR/electric-proxy" \
+		--entry-naming=server.js
+}
+
+db_query_ok() {
+	compose exec -T postgres psql -U postgres -d main -At -v ON_ERROR_STOP=1 -c "select 1" 2>/dev/null |
+		grep -qx "1"
+}
+
+wait_for_db_query() {
+	local max_attempts="${1:-60}"
+	local attempt=1
+	while ! db_query_ok; do
+		if (( attempt >= max_attempts )); then
+			fail "postgres did not serve SQL queries after ${max_attempts} attempts"
+		fi
+		if (( attempt == 1 )); then
+			log "waiting for postgres SQL queries..."
+		fi
+		sleep 2
+		attempt=$((attempt + 1))
+	done
+	log "postgres query ready"
+}
+
+wait_for_probe() {
+	local label="$1"
+	local url="$2"
+	local expected="$3"
+	local max_attempts="${4:-60}"
+	local attempt=1
+	local status
+
+	while true; do
+		status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 "$url" 2>/dev/null || true)"
+		if [[ "$status" == "$expected" ]]; then
+			log "$label ready ($status)"
+			return
+		fi
+		if (( attempt >= max_attempts )); then
+			fail "$label did not become ready; got ${status:-000}, expected $expected at $url"
+		fi
+		sleep 2
+		attempt=$((attempt + 1))
+	done
+}
+
+wait_for_object_storage() {
+	wait_for_probe "object-storage" "http://localhost:${ONLINE_S3_PORT}/minio/health/live" "200" 60
+}
+
+query_online_schema_missing() {
+	compose exec -T postgres psql -U postgres -d main -At -v ON_ERROR_STOP=1 <<'SQL'
+WITH checks(name, ok) AS (
+	VALUES
+		('table public.automation_config_versions', to_regclass('public.automation_config_versions') IS NOT NULL),
+		('table public.control_chat_messages', to_regclass('public.control_chat_messages') IS NOT NULL),
+		('table public.control_chat_runs', to_regclass('public.control_chat_runs') IS NOT NULL),
+		('table public.control_chat_sessions', to_regclass('public.control_chat_sessions') IS NOT NULL),
+		('table public.control_chat_tool_calls', to_regclass('public.control_chat_tool_calls') IS NOT NULL)
+)
+SELECT COALESCE(string_agg(name, ', ' ORDER BY name), '')
+FROM checks
+WHERE NOT ok;
+SQL
+}
+
+assert_online_schema_ready() {
+	log "checking online database schema guard"
+	local missing
+	missing="$(query_online_schema_missing)"
+	if [[ -n "$missing" ]]; then
+		fail "online database schema is missing: $missing. Migration ledger may be out of sync; repair the online database before starting app services."
 	fi
+}
+
+run_migrations_and_seed() {
+	log "running database migrations against online database"
+	DATABASE_URL="$HOST_DATABASE_URL" \
+		DATABASE_URL_UNPOOLED="$HOST_DATABASE_URL_UNPOOLED" \
+		bun run --cwd "$ROOT_DIR/packages/db" migrate
+	assert_online_schema_ready
+	if [[ "${ONLINE_SEED_DEV:-0}" != "0" ]]; then
+		log "ensuring development admin account exists"
+		DATABASE_URL="$HOST_DATABASE_URL" \
+			DATABASE_URL_UNPOOLED="$HOST_DATABASE_URL_UNPOOLED" \
+			bun run --cwd "$ROOT_DIR" db:seed-dev
+	fi
+}
+
+desktop_perf_fixture_args() {
+	printf '%s\n' \
+		"--slug" "${SUPERSET_ONLINE_FIXTURE_SLUG:-desktop-perf-loaded}" \
+		"--projects" "${SUPERSET_ONLINE_FIXTURE_PROJECTS:-10}" \
+		"--workspaces-per-project" "${SUPERSET_ONLINE_FIXTURE_WORKSPACES_PER_PROJECT:-20}" \
+		"--tasks" "${SUPERSET_ONLINE_FIXTURE_TASKS:-300}" \
+		"--host-backed-workspaces" "${SUPERSET_ONLINE_FIXTURE_HOST_BACKED_WORKSPACES:-0}"
+}
+
+ensure_desktop_perf_fixture_if_requested() {
+	if [[ "${SUPERSET_ONLINE_LOAD_FIXTURE:-0}" != "1" ]]; then
+		return
+	fi
+
+	log "ensuring loaded desktop performance fixture"
+	local args=()
+	while IFS= read -r arg; do
+		args+=("$arg")
+	done < <(desktop_perf_fixture_args)
+	DATABASE_URL="$HOST_DATABASE_URL" \
+		DATABASE_URL_UNPOOLED="$HOST_DATABASE_URL_UNPOOLED" \
+		NODE_ENV=development bun run --cwd "$ROOT_DIR" desktop:perf-fixture -- ensure "${args[@]}"
 }
 
 cleanup_stale_minio_init_containers() {
@@ -233,28 +510,11 @@ exit 1
 }
 
 start_data_services() {
-	log "starting isolated Docker data services on 430xx ports"
-	wait_for_docker "${ONLINE_DOCKER_WAIT_ATTEMPTS:-300}"
-	local build_args=()
-	while IFS= read -r build_arg; do
-		[[ -n "$build_arg" ]] && build_args+=("$build_arg")
-	done < <(compose_build_args_for_data_services)
-
-	local services=("postgres" "neon-proxy" "electric" "redis" "kv-rest" "minio")
-	local up_ok=0
-	if [[ "${#build_args[@]}" -gt 0 ]]; then
-		compose up -d "${build_args[@]}" --wait "${services[@]}" || up_ok=$?
-	else
-		compose up -d --wait "${services[@]}" || up_ok=$?
-	fi
-
-	if [[ "$up_ok" -ne 0 ]]; then
-		log "docker compose --wait failed or is unsupported; falling back to detached startup"
-		if [[ "${#build_args[@]}" -gt 0 ]]; then
-			compose up -d "${build_args[@]}" "${services[@]}"
-		else
-			compose up -d "${services[@]}"
-		fi
+	log "starting Docker data services on 430xx ports"
+	compose up -d --no-build postgres electric redis minio
+	if ! compose up -d --no-build kv-rest; then
+		log "kv-rest image missing; building it once"
+		compose up -d --build kv-rest
 	fi
 	compose rm -sf minio-init >/dev/null 2>&1 || true
 	cleanup_stale_minio_init_containers
@@ -262,282 +522,19 @@ start_data_services() {
 	cleanup_stale_minio_init_containers
 }
 
-db_proxy_query_ok() {
-	curl -sS --max-time 5 \
-		-X POST "http://localhost:${ONLINE_NEON_PROXY_PORT}/sql" \
-		-H "Neon-Connection-String: ${DATABASE_URL}" \
-		-H "Content-Type: application/json" \
-		-d '{"query":"select 1","params":[]}' 2>/dev/null |
-		grep -q '"command":"SELECT"'
-}
-
-wait_for_db_proxy_query() {
-	local max_attempts="${1:-60}"
-	local attempt=1
-
-	while true; do
-		if db_proxy_query_ok; then
-			log "neon proxy query ready"
-			return
-		fi
-		if (( attempt >= max_attempts )); then
-			fail "neon proxy did not serve SQL queries after ${max_attempts} attempts"
-		fi
-		if (( attempt == 1 )); then
-			log "waiting for neon proxy SQL queries..."
-		fi
-		sleep 2
-		attempt=$((attempt + 1))
-	done
-}
-
-run_migrations_and_seed() {
-	log "running database migrations against online database"
-	bun run --cwd "$ROOT_DIR/packages/db" migrate
-	assert_online_schema_ready
-	if [[ "${ONLINE_SEED_DEV:-1}" != "0" ]]; then
-		log "ensuring development admin account exists"
-		bun run --cwd "$ROOT_DIR" db:seed-dev
-	fi
-}
-
-desktop_perf_fixture_args() {
-	printf '%s\n' \
-		"--slug" "${SUPERSET_ONLINE_FIXTURE_SLUG:-desktop-perf-loaded}" \
-		"--projects" "${SUPERSET_ONLINE_FIXTURE_PROJECTS:-10}" \
-		"--workspaces-per-project" "${SUPERSET_ONLINE_FIXTURE_WORKSPACES_PER_PROJECT:-20}" \
-		"--tasks" "${SUPERSET_ONLINE_FIXTURE_TASKS:-300}" \
-		"--host-backed-workspaces" "${SUPERSET_ONLINE_FIXTURE_HOST_BACKED_WORKSPACES:-0}"
-}
-
-ensure_desktop_perf_fixture_if_requested() {
-	if [[ "${SUPERSET_ONLINE_LOAD_FIXTURE:-0}" != "1" ]]; then
-		return
-	fi
-
-	log "ensuring loaded desktop performance fixture"
-	local args=()
-	while IFS= read -r arg; do
-		args+=("$arg")
-	done < <(desktop_perf_fixture_args)
-	NODE_ENV=development bun run --cwd "$ROOT_DIR" desktop:perf-fixture -- ensure "${args[@]}"
-}
-
-query_online_schema_missing() {
-	compose exec -T postgres psql -U postgres -d main -At -v ON_ERROR_STOP=1 <<'SQL'
-WITH checks(name, ok) AS (
-	VALUES
-		('table public.automation_config_versions', to_regclass('public.automation_config_versions') IS NOT NULL),
-		('table public.control_chat_messages', to_regclass('public.control_chat_messages') IS NOT NULL),
-		('table public.control_chat_runs', to_regclass('public.control_chat_runs') IS NOT NULL),
-		('table public.control_chat_sessions', to_regclass('public.control_chat_sessions') IS NOT NULL),
-		('table public.control_chat_tool_calls', to_regclass('public.control_chat_tool_calls') IS NOT NULL),
-		(
-			'column capability_package_versions.control_chat_run_id',
-			EXISTS (
-				SELECT 1
-				FROM information_schema.columns
-				WHERE table_schema = 'public'
-					AND table_name = 'capability_package_versions'
-					AND column_name = 'control_chat_run_id'
-			)
-		),
-		(
-			'column capability_package_versions.control_chat_session_id',
-			EXISTS (
-				SELECT 1
-				FROM information_schema.columns
-				WHERE table_schema = 'public'
-					AND table_name = 'capability_package_versions'
-					AND column_name = 'control_chat_session_id'
-			)
-		),
-		(
-			'column capability_package_versions.source_instruction',
-			EXISTS (
-				SELECT 1
-				FROM information_schema.columns
-				WHERE table_schema = 'public'
-					AND table_name = 'capability_package_versions'
-					AND column_name = 'source_instruction'
-			)
-		),
-		(
-			'column capability_package_versions.source_summary',
-			EXISTS (
-				SELECT 1
-				FROM information_schema.columns
-				WHERE table_schema = 'public'
-					AND table_name = 'capability_package_versions'
-					AND column_name = 'source_summary'
-			)
-		),
-		(
-			'enum control_chat_session_status.running',
-			EXISTS (
-				SELECT 1
-				FROM pg_type t
-				JOIN pg_enum e ON t.oid = e.enumtypid
-				WHERE t.typname = 'control_chat_session_status'
-					AND e.enumlabel = 'running'
-			)
-		),
-		(
-			'enum control_chat_run_status.aborted',
-			EXISTS (
-				SELECT 1
-				FROM pg_type t
-				JOIN pg_enum e ON t.oid = e.enumtypid
-				WHERE t.typname = 'control_chat_run_status'
-					AND e.enumlabel = 'aborted'
-			)
-		)
-)
-SELECT COALESCE(string_agg(name, ', ' ORDER BY name), '')
-FROM checks
-WHERE NOT ok;
-SQL
-}
-
-assert_online_schema_ready() {
-	log "checking online database schema guard"
-	local missing
-	missing="$(query_online_schema_missing)"
-	if [[ -n "$missing" ]]; then
-		fail "online database schema is missing: $missing. Migration ledger may be out of sync; repair the online database before starting app services."
-	fi
-}
-
-write_electric_proxy_env_file() {
-	mkdir -p "$RUN_DIR"
-	cat > "$RUN_DIR/electric-proxy.dev.vars" <<VARS
-AUTH_URL=$AUTH_URL
-ELECTRIC_SHAPE_URL=$ELECTRIC_SHAPE_URL
-ELECTRIC_SECRET=$ELECTRIC_SECRET
-ELECTRIC_SOURCE_ID=${ELECTRIC_SOURCE_ID:-}
-ELECTRIC_SOURCE_SECRET=${ELECTRIC_SOURCE_SECRET:-}
-VARS
-}
-
-escape_env_value() {
-	local value="$1"
-	value="${value//\\/\\\\}"
-	value="${value//\"/\\\"}"
-	value="${value//\$/\\\$}"
-	value="${value//\`/\\\`}"
-	printf '%s' "$value"
-}
-
-write_mobile_env_var() {
-	local key="$1"
-	local value="$2"
-	printf '%s="%s"\n' "$key" "$(escape_env_value "$value")"
-}
-
-write_mobile_env_file() {
-	local mobile_dir
-	mobile_dir="$(dirname "$MOBILE_ENV_PATH")"
-	if [[ ! -d "$mobile_dir" ]]; then
-		return
-	fi
-
-	local current=""
-	if [[ -f "$MOBILE_ENV_PATH" ]]; then
-		current="$(
-			awk '
-				/^[[:space:]]*(export[[:space:]]+)?(SUPERSET_MOBILE_PROFILE|EXPO_PUBLIC_SUPERSET_PROFILE|EXPO_PUBLIC_API_URL|EXPO_PUBLIC_ELECTRIC_URL|EXPO_PUBLIC_WEB_URL|EXPO_PUBLIC_RELAY_URL)=/ { next }
-				{ print }
-			' "$MOBILE_ENV_PATH"
-		)"
-	fi
-
-	{
-		if [[ -n "$current" ]]; then
-			printf '%s\n' "$current"
-		fi
-		write_mobile_env_var "SUPERSET_MOBILE_PROFILE" "$MOBILE_PROFILE"
-		write_mobile_env_var "EXPO_PUBLIC_SUPERSET_PROFILE" "$MOBILE_PROFILE"
-		write_mobile_env_var "EXPO_PUBLIC_API_URL" "$PUBLIC_API_URL"
-		write_mobile_env_var "EXPO_PUBLIC_ELECTRIC_URL" "$PUBLIC_ELECTRIC_URL"
-		write_mobile_env_var "EXPO_PUBLIC_WEB_URL" "$PUBLIC_WEB_URL"
-		write_mobile_env_var "EXPO_PUBLIC_RELAY_URL" "$PUBLIC_RELAY_URL"
-	} > "$MOBILE_ENV_PATH"
-}
-
-tmux_session_exists() {
-	tmux -S "$TMUX_SOCKET_PATH" has-session -t "$1" >/dev/null 2>&1
-}
-
-start_tmux_service() {
-	local session="$1"
-	local service="$2"
-
-	if tmux_session_exists "$session"; then
-		log "tmux session already running: $session"
-		return
-	fi
-
-	log "starting $service in tmux session $session"
-	tmux -S "$TMUX_SOCKET_PATH" new-session -d -s "$session" -c "$RUN_DIR" "exec '$SCRIPT_PATH' run-service '$service'"
-}
-
 start_app_services() {
-	start_tmux_service "superset-online-api" "api"
-	start_tmux_service "superset-online-web" "web"
-	start_tmux_service "superset-online-relay" "relay"
-	start_tmux_service "superset-online-electric-proxy" "electric-proxy"
+	log "building app images from prepared artifacts"
+	compose build api web relay electric-proxy
+	log "starting Docker app services"
+	compose up -d --remove-orphans api web relay electric-proxy
 }
 
-stop_app_services() {
-	local session
-	for session in "${ONLINE_SESSIONS[@]}"; do
-		if tmux_session_exists "$session"; then
-			log "stopping tmux session $session"
-			tmux -S "$TMUX_SOCKET_PATH" kill-session -t "$session"
-		fi
-	done
-}
-
-stop_data_services() {
-	log "stopping isolated Docker data services"
-	wait_for_docker 10
-	compose down
-}
-
-run_service() {
-	local service="${1:-}"
-	prepare_env
-	local log_file="$LOG_DIR/${service}.log"
-	exec > >(tee -a "$log_file") 2>&1
-	log "service=$service started at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-
-	case "$service" in
-		api)
-			cd "$ROOT_DIR/apps/api"
-			rm -rf "$SUPERSET_NEXT_DIST_DIR"
-			exec ./node_modules/.bin/next dev --port "$API_PORT"
-			;;
-		web)
-			cd "$ROOT_DIR/apps/web"
-			rm -rf "$SUPERSET_NEXT_DIST_DIR"
-			exec ./node_modules/.bin/next dev --port "$WEB_PORT"
-			;;
-		relay)
-			cd "$ROOT_DIR/apps/relay"
-			exec bun --hot src/index.ts
-			;;
-		electric-proxy)
-			cd "$ROOT_DIR/apps/electric-proxy"
-			exec bunx wrangler dev \
-				--ip 0.0.0.0 \
-				--port "$ONLINE_ELECTRIC_PROXY_PORT" \
-				--persist-to "$RUN_DIR/wrangler-state" \
-				--env-file "$RUN_DIR/electric-proxy.dev.vars"
-			;;
-		*)
-			fail "unknown service: $service"
-			;;
-	esac
+wait_for_local_services() {
+	log "waiting for online app services to become ready"
+	wait_for_probe "api" "http://localhost:${ONLINE_API_PORT}/api/auth/get-session" "200" 90
+	wait_for_probe "web" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200" 90
+	wait_for_probe "electric-proxy" "http://localhost:${ONLINE_ELECTRIC_PROXY_PORT}/v1/shape" "401" 60
+	wait_for_probe "relay" "http://localhost:${ONLINE_RELAY_PORT}/health" "200" 60
 }
 
 probe_url() {
@@ -547,114 +544,9 @@ probe_url() {
 	local status
 	status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 "$url" 2>/dev/null || true)"
 	if [[ "$status" == "$expected" ]]; then
-		printf '  ✓ %-24s %s %s\n' "$label" "$status" "$url"
+		printf '  OK   %-24s %s %s\n' "$label" "$status" "$url"
 	else
-		printf '  ✗ %-24s got %s expected %s %s\n' "$label" "${status:-000}" "$expected" "$url"
-	fi
-}
-
-probe_db_proxy_query() {
-	if db_proxy_query_ok; then
-		printf '  ✓ %-24s %s\n' "neon proxy SQL" "SELECT"
-	else
-		printf '  ✗ %-24s failed %s\n' "neon proxy SQL" "http://localhost:${ONLINE_NEON_PROXY_PORT}/sql"
-	fi
-}
-
-probe_online_schema_guard() {
-	local missing
-	if missing="$(query_online_schema_missing 2>/dev/null)" && [[ -z "$missing" ]]; then
-		printf '  ✓ %-24s %s\n' "schema guard" "ready"
-	else
-		printf '  ✗ %-24s %s\n' "schema guard" "${missing:-failed}"
-	fi
-}
-
-print_desktop_perf_fixture_status() {
-	echo "dense desktop fixture:"
-	if ! db_proxy_query_ok; then
-		printf '  - %-24s %s\n' "desktop-perf-loaded" "database unavailable"
-		return
-	fi
-
-	local args=()
-	while IFS= read -r arg; do
-		args+=("$arg")
-	done < <(desktop_perf_fixture_args)
-
-	local output
-	if ! output="$(NODE_ENV=development bun run --cwd "$ROOT_DIR" desktop:perf-fixture -- stats "${args[@]}" 2>/dev/null)"; then
-		printf '  ✗ %-24s %s\n' "desktop-perf-loaded" "stats failed"
-		return
-	fi
-
-	if command -v jq >/dev/null 2>&1; then
-		local summary
-		summary="$(
-			printf '%s' "$output" | jq -r \
-				'"\(.slug): \(.projectCount) projects / \(.workspaceCount) workspaces / \(.taskCount) tasks / \(.hostBackedWorkspaceCount) host-backed (loaded=\(.isLoaded))"'
-		)"
-		printf '  %s\n' "$summary"
-		if [[ "$(printf '%s' "$output" | jq -r '.isLoaded')" != "true" ]]; then
-			printf '  ! %-24s %s\n' "loaded data" "run: bun run online:start:loaded"
-		fi
-	else
-		printf '  %s\n' "$(printf '%s' "$output" | tr '\n' ' ' | sed 's/[[:space:]][[:space:]]*/ /g')"
-	fi
-}
-
-wait_for_probe() {
-	local label="$1"
-	local url="$2"
-	local expected="$3"
-	local max_attempts="${4:-60}"
-	local attempt=1
-	local status
-
-	while true; do
-		status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 "$url" 2>/dev/null || true)"
-		if [[ "$status" == "$expected" ]]; then
-			log "$label ready ($status)"
-			return
-		fi
-		if (( attempt >= max_attempts )); then
-			fail "$label did not become ready; got ${status:-000}, expected $expected at $url"
-		fi
-		sleep 2
-		attempt=$((attempt + 1))
-	done
-}
-
-wait_for_object_storage() {
-	wait_for_probe "object-storage" "http://localhost:${ONLINE_S3_PORT}/minio/health/live" "200"
-}
-
-wait_for_local_services() {
-	log "waiting for online app services to become ready"
-	wait_for_probe "web" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200"
-	wait_for_probe "api" "http://localhost:${ONLINE_API_PORT}/api/auth/get-session" "200"
-	wait_for_probe "electric-proxy" "http://localhost:${ONLINE_ELECTRIC_PROXY_PORT}/v1/shape" "401"
-	wait_for_probe "relay" "http://localhost:${ONLINE_RELAY_PORT}/health" "200"
-}
-
-print_tmux_status() {
-	echo "tmux sessions:"
-	local session
-	for session in "${ONLINE_SESSIONS[@]}"; do
-		if tmux_session_exists "$session"; then
-			printf '  ✓ %s\n' "$session"
-		else
-			printf '  ✗ %s\n' "$session"
-		fi
-	done
-}
-
-print_docker_status() {
-	echo "docker compose project: $COMPOSE_PROJECT_NAME"
-	if docker info >/dev/null 2>&1; then
-		compose ps
-	else
-		echo "  Docker/OrbStack is not reachable"
+		printf '  FAIL %-24s got %s expected %s %s\n' "$label" "${status:-000}" "$expected" "$url"
 	fi
 }
 
@@ -686,18 +578,6 @@ docker_mem_to_kib() {
 	'
 }
 
-online_app_memory_kib() {
-	ps -axo rss=,args= | awk -v run="$RUN_DIR" '
-		(index($0, run) > 0 || index($0, "superset-online") > 0) &&
-		$0 !~ /superset-online\.sh status/ &&
-		$0 !~ /ps -axo rss=,args=/ &&
-		$0 !~ /awk -v run/ {
-			total += $1
-		}
-		END { printf "%d", total }
-	'
-}
-
 online_docker_memory_kib() {
 	if ! docker info >/dev/null 2>&1; then
 		printf "0"
@@ -705,7 +585,7 @@ online_docker_memory_kib() {
 	fi
 
 	local total=0
-	local line name usage value kib
+	local name usage value kib
 	while IFS=$'\t' read -r name usage; do
 		case "$name" in
 			"$COMPOSE_PROJECT_NAME"-*)
@@ -719,43 +599,64 @@ online_docker_memory_kib() {
 	printf "%d" "$total"
 }
 
-print_online_top_process_memory() {
-	ps -axo rss=,pid=,comm=,args= | awk -v run="$RUN_DIR" '
-		(index($0, run) > 0 || index($0, "superset-online") > 0) &&
-		$0 !~ /superset-online\.sh status/ &&
-		$0 !~ /ps -axo rss=,pid=,comm=,args=/ &&
-		$0 !~ /awk -v run/ {
-			rss = $1
-			pid = $2
-			comm = $3
-			$1 = ""; $2 = ""; $3 = ""
-			gsub(/^[[:space:]]+/, "", $0)
-			printf "%012d\t%s\t%s\t%s\n", rss, pid, comm, $0
-		}
-	' | sort -r | head -8 | awk -F '\t' '
-		{
-			rss = $1 + 0
-			command = $4
-			if (length(command) > 110) {
-				command = substr(command, 1, 107) "..."
+print_online_top_container_memory() {
+	if ! docker info >/dev/null 2>&1; then
+		return
+	fi
+
+	docker stats --no-stream --format '{{.Name}}\t{{.MemUsage}}' 2>/dev/null |
+		awk -F '\t' -v project="$COMPOSE_PROJECT_NAME" '
+			index($1, project "-") == 1 {
+				print "  " $2 "  " $1
 			}
-			printf "  %8.1f MiB  pid %-7s %-18s %s\n", rss / 1024, $2, $3, command
-		}
-	'
+		' | head -8
 }
 
 print_memory_status() {
-	local app_kib docker_kib total_kib
-	app_kib="$(online_app_memory_kib)"
+	local docker_kib
 	docker_kib="$(online_docker_memory_kib)"
-	total_kib=$((app_kib + docker_kib))
 
 	echo "memory:"
-	printf '  %-24s %s\n' "app processes" "$(format_mib "$app_kib")"
 	printf '  %-24s %s\n' "docker compose" "$(format_mib "$docker_kib")"
-	printf '  %-24s %s\n' "tracked total" "$(format_mib "$total_kib")"
-	echo "top app processes:"
-	print_online_top_process_memory || true
+	echo "top containers:"
+	print_online_top_container_memory || true
+}
+
+print_desktop_perf_fixture_status() {
+	echo "dense desktop fixture:"
+	if ! db_query_ok; then
+		printf '  - %-24s %s\n' "desktop-perf-loaded" "database unavailable"
+		return
+	fi
+
+	local args=()
+	while IFS= read -r arg; do
+		args+=("$arg")
+	done < <(desktop_perf_fixture_args)
+
+	local output
+	if ! output="$(
+		DATABASE_URL="$HOST_DATABASE_URL" \
+			DATABASE_URL_UNPOOLED="$HOST_DATABASE_URL_UNPOOLED" \
+			NODE_ENV=development bun run --cwd "$ROOT_DIR" desktop:perf-fixture -- stats "${args[@]}" 2>/dev/null
+	)"; then
+		printf '  FAIL %-24s %s\n' "desktop-perf-loaded" "stats failed"
+		return
+	fi
+
+	if command -v jq >/dev/null 2>&1; then
+		local summary
+		summary="$(
+			printf '%s' "$output" | jq -r \
+				'"\(.slug): \(.projectCount) projects / \(.workspaceCount) workspaces / \(.taskCount) tasks / \(.hostBackedWorkspaceCount) host-backed (loaded=\(.isLoaded))"'
+		)"
+		printf '  %s\n' "$summary"
+		if [[ "$(printf '%s' "$output" | jq -r '.isLoaded')" != "true" ]]; then
+			printf '  ! %-24s %s\n' "loaded data" "run: bun run online:start:loaded"
+		fi
+	else
+		printf '  %s\n' "$(printf '%s' "$output" | tr '\n' ' ' | sed 's/[[:space:]][[:space:]]*/ /g')"
+	fi
 }
 
 print_status() {
@@ -766,35 +667,40 @@ print_status() {
 	echo "  electric-proxy   http://localhost:${ONLINE_ELECTRIC_PROXY_PORT}"
 	echo "  relay            http://localhost:${ONLINE_RELAY_PORT}"
 	echo "  postgres         localhost:${ONLINE_PG_PORT}"
-	echo "  neon-proxy       localhost:${ONLINE_NEON_PROXY_PORT}"
 	echo "  electric         localhost:${ONLINE_ELECTRIC_PORT}"
 	echo "  redis            localhost:${ONLINE_REDIS_PORT}"
 	echo "  kv-rest          localhost:${ONLINE_KV_REST_PORT}"
 	echo "  object-storage   localhost:${ONLINE_S3_PORT}"
 	echo "  object-console   localhost:${ONLINE_S3_CONSOLE_PORT}"
 	echo
-	echo "public router targets to configure:"
+	echo "public router targets:"
 	echo "  63000 -> ${ONLINE_WEB_PORT}"
 	echo "  63001 -> ${ONLINE_API_PORT}"
 	echo "  63012 -> ${ONLINE_ELECTRIC_PROXY_PORT}"
 	echo "  63013 -> ${ONLINE_RELAY_PORT}"
 	echo
-	print_tmux_status
-	echo
-	print_docker_status
+	echo "docker compose project: $COMPOSE_PROJECT_NAME"
+	if docker info >/dev/null 2>&1; then
+		compose ps
+	else
+		echo "  Docker/OrbStack is not reachable"
+	fi
 	echo
 	print_memory_status
 	echo
 	echo "local probes:"
-	probe_db_proxy_query
-	probe_online_schema_guard
+	if db_query_ok; then
+		printf '  OK   %-24s %s\n' "postgres SQL" "SELECT"
+	else
+		printf '  FAIL %-24s %s\n' "postgres SQL" "localhost:${ONLINE_PG_PORT}"
+	fi
 	probe_url "object storage" "http://localhost:${ONLINE_S3_PORT}/minio/health/live" "200"
-	probe_url "web /sign-in" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200"
 	probe_url "api session" "http://localhost:${ONLINE_API_PORT}/api/auth/get-session" "200"
+	probe_url "web /sign-in" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200"
 	probe_url "electric auth gate" "http://localhost:${ONLINE_ELECTRIC_PROXY_PORT}/v1/shape" "401"
 	probe_url "relay health" "http://localhost:${ONLINE_RELAY_PORT}/health" "200"
 	echo
-	echo "public probes (these reflect the soft-router mapping):"
+	echo "public probes:"
 	probe_url "public web /sign-in" "${PUBLIC_WEB_URL}/sign-in" "200"
 	probe_url "public api session" "${PUBLIC_API_URL}/api/auth/get-session" "200"
 	probe_url "public electric" "${PUBLIC_ELECTRIC_URL}/v1/shape" "401"
@@ -803,79 +709,14 @@ print_status() {
 	print_desktop_perf_fixture_status
 }
 
-write_launch_agent() {
-	mkdir -p "$(dirname "$LAUNCH_AGENT_PATH")" "$LAUNCH_SUPPORT_DIR/logs" "$LOG_DIR"
-	cp "$SCRIPT_PATH" "$LAUNCH_SCRIPT_PATH"
-	chmod +x "$LAUNCH_SCRIPT_PATH"
-	if [[ -f "$ROOT_DIR/.env" ]]; then
-		cp "$ROOT_DIR/.env" "$LAUNCH_ENV_PATH"
-		chmod 600 "$LAUNCH_ENV_PATH"
-	fi
-
-	cat > "$LAUNCHER_PATH" <<LAUNCHER
-#!/usr/bin/env bash
-set -euo pipefail
-export PATH="$PATH"
-export SUPERSET_ONLINE_ROOT_DIR="$ROOT_DIR"
-export SUPERSET_ONLINE_ENV_FILE="$LAUNCH_ENV_PATH"
-export SUPERSET_ONLINE_RUN_DIR="$LAUNCH_SUPPORT_DIR/runtime"
-exec /bin/bash "$LAUNCH_SCRIPT_PATH" start
-LAUNCHER
-	chmod +x "$LAUNCHER_PATH"
-
-	cat > "$LAUNCH_AGENT_PATH" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>${LAUNCH_AGENT_LABEL}</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/bin/bash</string>
-		<string>${LAUNCHER_PATH}</string>
-	</array>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>KeepAlive</key>
-	<dict>
-		<key>SuccessfulExit</key>
-		<false/>
-	</dict>
-	<key>ThrottleInterval</key>
-	<integer>60</integer>
-	<key>StandardOutPath</key>
-	<string>${LAUNCH_SUPPORT_DIR}/logs/launchd.out.log</string>
-	<key>StandardErrorPath</key>
-	<string>${LAUNCH_SUPPORT_DIR}/logs/launchd.err.log</string>
-</dict>
-</plist>
-PLIST
-}
-
-install_launchd() {
-	write_launch_agent
-	local domain="gui/$(id -u)"
-	launchctl bootout "$domain" "$LAUNCH_AGENT_PATH" >/dev/null 2>&1 || true
-	launchctl bootstrap "$domain" "$LAUNCH_AGENT_PATH"
-	launchctl enable "$domain/$LAUNCH_AGENT_LABEL" >/dev/null 2>&1 || true
-	log "installed LaunchAgent: $LAUNCH_AGENT_PATH"
-	launchctl print "$domain/$LAUNCH_AGENT_LABEL" >/dev/null
-}
-
-uninstall_launchd() {
-	local domain="gui/$(id -u)"
-	launchctl bootout "$domain" "$LAUNCH_AGENT_PATH" >/dev/null 2>&1 || true
-	rm -f "$LAUNCH_AGENT_PATH"
-	rm -f "$LAUNCHER_PATH" "$LAUNCH_SCRIPT_PATH" "$LAUNCH_ENV_PATH"
-	log "removed LaunchAgent: $LAUNCH_AGENT_PATH"
-}
-
 start_all() {
 	prepare_env
 	ensure_prereqs
+	wait_for_docker "${ONLINE_DOCKER_WAIT_ATTEMPTS:-300}"
+	stop_legacy_host_services
+	build_app_artifacts
 	start_data_services
-	wait_for_db_proxy_query
+	wait_for_db_query
 	wait_for_object_storage
 	run_migrations_and_seed
 	ensure_desktop_perf_fixture_if_requested
@@ -887,8 +728,20 @@ start_all() {
 stop_all() {
 	prepare_env
 	ensure_prereqs
-	stop_app_services
-	stop_data_services
+	stop_legacy_host_services
+	log "stopping Docker online stack"
+	compose down
+}
+
+restart_all() {
+	stop_all
+	start_all
+}
+
+logs() {
+	prepare_env
+	ensure_prereqs
+	compose logs -f "${@:2}"
 }
 
 usage() {
@@ -896,11 +749,13 @@ usage() {
 Usage: $0 <command>
 
 Commands:
-  start              Start isolated online Docker data services and app tmux sessions
-  stop               Stop only isolated online app sessions and Docker project
-  status             Print online service status and probes
-  install-launchd    Install and load user LaunchAgent for login startup
-  uninstall-launchd  Unload and remove user LaunchAgent
+  start              Build artifacts and start the full Docker online stack
+  stop               Stop the Docker online stack (volumes are preserved)
+  restart            Stop and start the Docker online stack
+  status             Print compose status and probes
+  logs [service...]  Follow Docker logs
+  build              Rebuild app artifacts and Docker images only
+  uninstall-launchd  Remove the old host LaunchAgent if it exists
 USAGE
 }
 
@@ -913,23 +768,25 @@ main() {
 		stop)
 			stop_all
 			;;
+		restart)
+			restart_all
+			;;
 		status)
-			prepare_env
 			ensure_prereqs
 			print_status
 			;;
-		install-launchd)
+		logs)
+			logs "$@"
+			;;
+		build)
 			prepare_env
 			ensure_prereqs
-			install_launchd
+			wait_for_docker "${ONLINE_DOCKER_WAIT_ATTEMPTS:-300}"
+			build_app_artifacts
+			compose build api web relay electric-proxy
 			;;
 		uninstall-launchd)
-			prepare_env
-			ensure_prereqs
-			uninstall_launchd
-			;;
-		run-service)
-			run_service "${2:-}"
+			stop_legacy_host_services
 			;;
 		help|-h|--help)
 			usage

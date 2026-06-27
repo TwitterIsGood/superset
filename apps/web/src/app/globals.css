@@ -3,6 +3,14 @@
 @import "@superset/ui/globals.css";
 @source "../../../../packages/ui/src/**/*.{ts,tsx}";
 
+:root {
+	--font-inter:
+		-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+		sans-serif;
+	--font-ibm-plex-mono:
+		ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+}
+
 @theme {
 	--font-family-mono: var(--font-ibm-plex-mono), ui-monospace, monospace;
 	--font-family-sans: var(--font-inter), ui-sans-serif, sans-serif;
