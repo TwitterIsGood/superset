@@ -43,6 +43,47 @@ Use it like this:
 
 Do not add Playwright, WebDriver, or another desktop driver for routine Trellis acceptance unless a specific task needs CI-style fully scripted execution that Desktop Automation cannot provide.
 
+## Visual Stability Gate
+
+Use `bun run desktop:automation -- visual-stability` for desktop user-visible UI behavior changes where a final screenshot can miss a transient regression. This gate samples the interaction window and fails on persistent selector removals, blank frames, layout movement or resize, configured DOM churn limits, and renderer console errors.
+
+Run this gate for changes that affect:
+
+- route transitions, authenticated shell structure, layout providers, or global boundaries;
+- loading, empty, cached, readiness, or optimistic states that can briefly blank a view;
+- sidebars, lists, tables, modals, panes, tabs, toolbars, and split views;
+- buttons or controls where disappearing, jumping, or double-rendered feedback would hurt UX.
+
+Do not require it for backend-only changes, packaging-only changes, dependency-only maintenance, or desktop code that has no visible UI behavior. If a desktop-facing task skips the gate, write the reason in validation notes.
+
+Example route-transition gate:
+
+```bash
+DESKTOP_AUTOMATION_PORT=<port> bun run desktop:automation -- visual-stability \
+  --click-text "Workspaces" \
+  --wait-url-includes "#/v2-workspaces" \
+  --persist-selector "app > div:nth-of-type(1)" \
+  --measure-selector "app > div:nth-of-type(1) > div:nth-of-type(1)" \
+  --sample-ms 800 \
+  --sample-interval-ms 50 \
+  --max-removals 0 \
+  --max-layout-shift-px 2 \
+  --max-blank-frames 0 \
+  --report .trellis/tasks/<task>/artifacts/workspace-to-workspaces-visual-stability.json \
+  --before-screenshot .trellis/tasks/<task>/artifacts/workspace-before.png \
+  --after-screenshot .trellis/tasks/<task>/artifacts/workspaces-after.png
+```
+
+Validation notes must record:
+
+- the command that ran;
+- persistent, measured, and churn selectors;
+- JSON report path and screenshot paths;
+- pass/fail summary and any accepted threshold overrides;
+- any renderer console errors or failed-frame artifacts.
+
+`visual-stability` is development-only Trellis quality tooling. It must not be exposed through product UI, shipped as a Canary/Release debug capability, imported by `apps/desktop/src/main`, `apps/desktop/src/preload`, or `apps/desktop/src/renderer`, or added as an `apps/desktop` runtime dependency.
+
 ## Local Desktop Startup Contract
 
 Use this contract before any desktop-facing Trellis acceptance run in a Superset git worktree. The desktop app is not a single process in development; V2 auth, live workspace data, relay, Electric, host-service panes, and Desktop Automation only work when the worktree-local service graph is up.

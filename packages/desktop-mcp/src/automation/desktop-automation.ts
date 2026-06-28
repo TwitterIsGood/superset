@@ -5,6 +5,26 @@ import { ConnectionManager } from "../mcp/connection/index.js";
 import { DOM_INSPECTOR_SCRIPT } from "../mcp/dom-inspector/index.js";
 import { resolveScreenshotPath } from "../mcp/tools/take-screenshot/take-screenshot.js";
 import type { ConsoleLogEntry } from "../zod.js";
+import {
+	type BlankFrameResult,
+	type BlankFrameSample,
+	buildVisualStabilityFailures,
+	classifyBlankFramePixels,
+	classifyDomChurn,
+	classifyLayoutSelector,
+	classifyPersistentSelector,
+	type DomChurnResult,
+	decodePngToRgba,
+	type LayoutSample,
+	type LayoutSelectorResult,
+	normalizeVisualStabilityThresholds,
+	type PersistentRemoval,
+	type PersistentSelectorResult,
+	type VisualStabilityAction,
+	type VisualStabilityArtifacts,
+	type VisualStabilityOptions,
+	type VisualStabilityReport,
+} from "./visual-stability.js";
 
 export interface ScreenshotRect {
 	x: number;
@@ -102,6 +122,29 @@ export interface WaitForResult {
 	url?: string;
 	selector?: string;
 	tag?: string;
+}
+
+interface RawPersistentSelectorState {
+	selector: string;
+	initialCount: number;
+	finalCount: number;
+	removals: PersistentRemoval[];
+}
+
+interface RawDomChurnState {
+	selector: string;
+	addedCount: number;
+	removedCount: number;
+	largestRemovedSummary?: string;
+}
+
+interface RawVisualStabilityObserverSnapshot {
+	persistent: RawPersistentSelectorState[];
+	layout: Array<{
+		selector: string;
+		samples: LayoutSample[];
+	}>;
+	domChurn: RawDomChurnState[];
 }
 
 const ROUTER_HISTORY_STORAGE_KEY = "router-history";
@@ -327,6 +370,249 @@ async function getPageSize(page: Page, rect?: ScreenshotRect) {
 	}));
 }
 
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
+}
+
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+async function writeScreenshotArtifact(
+	path: string,
+	base64Png: string,
+): Promise<string> {
+	const resolvedPath = resolveScreenshotPath(path);
+	await mkdir(dirname(resolvedPath), { recursive: true });
+	await writeFile(resolvedPath, Buffer.from(base64Png, "base64"));
+	return resolvedPath;
+}
+
+function getFailedFramePath(dir: string, index: number): string {
+	const normalizedDir = dir.endsWith("/") ? dir.slice(0, -1) : dir;
+	return `${normalizedDir}/blank-frame-${String(index).padStart(3, "0")}.png`;
+}
+
+function installVisualStabilityObserver({
+	persistSelectors,
+	measureSelectors,
+	churnRootSelectors,
+	sampleIntervalMs,
+}: {
+	persistSelectors: string[];
+	measureSelectors: string[];
+	churnRootSelectors: string[];
+	sampleIntervalMs: number;
+}): RawVisualStabilityObserverSnapshot {
+	type TrackedPersistentSelector = {
+		selector: string;
+		nodes: Array<{ node: Element; removed: boolean }>;
+		removals: PersistentRemoval[];
+	};
+	type TrackedLayoutSelector = {
+		selector: string;
+		samples: LayoutSample[];
+	};
+	type TrackedDomChurnRoot = {
+		selector: string;
+		addedCount: number;
+		removedCount: number;
+		largestRemovedSummary?: string;
+		largestRemovedSize: number;
+	};
+	type VisualStabilityState = {
+		collect: () => RawVisualStabilityObserverSnapshot;
+		cleanup: () => RawVisualStabilityObserverSnapshot;
+	};
+	type VisualStabilityWindow = typeof window & {
+		__supersetVisualStability?: VisualStabilityState;
+	};
+
+	const stabilityWindow = window as VisualStabilityWindow;
+	stabilityWindow.__supersetVisualStability?.cleanup();
+
+	const startedAt = performance.now();
+	const timestamp = () => performance.now() - startedAt;
+	const summarizeElement = (node: Node): string => {
+		if (!(node instanceof Element))
+			return node.textContent?.trim().slice(0, 120) ?? "";
+		const tag = node.tagName.toLowerCase();
+		const id = node.id ? `#${node.id}` : "";
+		const className =
+			node.classList.length > 0
+				? `.${Array.from(node.classList).slice(0, 3).join(".")}`
+				: "";
+		const text = (node.textContent ?? "")
+			.replace(/\s+/g, " ")
+			.trim()
+			.slice(0, 120);
+		return `${tag}${id}${className}${text ? ` "${text}"` : ""}`;
+	};
+	const elementCount = (node: Node): number => {
+		if (!(node instanceof Element)) return 0;
+		return 1 + node.querySelectorAll("*").length;
+	};
+	const nodeContainsTrackedElement = (
+		node: Node,
+		trackedNode: Element,
+	): boolean =>
+		node === trackedNode ||
+		(node instanceof Element && node.contains(trackedNode));
+	const rootContainsMutationTarget = (
+		selector: string,
+		target: Node,
+	): boolean => {
+		const root = document.querySelector(selector);
+		return Boolean(root && (root === target || root.contains(target)));
+	};
+
+	const persistent = persistSelectors.map<TrackedPersistentSelector>(
+		(selector) => ({
+			selector,
+			nodes: Array.from(document.querySelectorAll(selector)).map((node) => ({
+				node,
+				removed: false,
+			})),
+			removals: [],
+		}),
+	);
+	const layout = measureSelectors.map<TrackedLayoutSelector>((selector) => ({
+		selector,
+		samples: [],
+	}));
+	const domChurn = churnRootSelectors.map<TrackedDomChurnRoot>((selector) => ({
+		selector,
+		addedCount: 0,
+		removedCount: 0,
+		largestRemovedSize: 0,
+	}));
+
+	const sampleLayout = () => {
+		for (const entry of layout) {
+			const element = document.querySelector(entry.selector);
+			if (!(element instanceof HTMLElement)) {
+				entry.samples.push({ timestampMs: timestamp(), bounds: null });
+				continue;
+			}
+			const rect = element.getBoundingClientRect();
+			entry.samples.push({
+				timestampMs: timestamp(),
+				bounds: {
+					x: rect.x,
+					y: rect.y,
+					width: rect.width,
+					height: rect.height,
+				},
+			});
+		}
+	};
+
+	sampleLayout();
+
+	const observer = new MutationObserver((records) => {
+		for (const record of records) {
+			const addedElements = Array.from(record.addedNodes).reduce(
+				(sum, node) => sum + elementCount(node),
+				0,
+			);
+			for (const churnRoot of domChurn) {
+				if (!rootContainsMutationTarget(churnRoot.selector, record.target)) {
+					continue;
+				}
+				churnRoot.addedCount += addedElements;
+				for (const node of Array.from(record.removedNodes)) {
+					const removedSize = elementCount(node);
+					churnRoot.removedCount += removedSize;
+					if (removedSize > churnRoot.largestRemovedSize) {
+						churnRoot.largestRemovedSize = removedSize;
+						churnRoot.largestRemovedSummary = summarizeElement(node);
+					}
+				}
+			}
+
+			for (const node of Array.from(record.removedNodes)) {
+				for (const tracked of persistent) {
+					for (const trackedNode of tracked.nodes) {
+						if (trackedNode.removed) continue;
+						if (!nodeContainsTrackedElement(node, trackedNode.node)) continue;
+						trackedNode.removed = true;
+						tracked.removals.push({
+							timestampMs: timestamp(),
+							selector: tracked.selector,
+							summary: summarizeElement(trackedNode.node),
+						});
+					}
+				}
+			}
+		}
+	});
+
+	observer.observe(document.documentElement, {
+		childList: true,
+		subtree: true,
+	});
+	const interval = window.setInterval(sampleLayout, sampleIntervalMs);
+
+	const collect = (): RawVisualStabilityObserverSnapshot => ({
+		persistent: persistent.map((entry) => ({
+			selector: entry.selector,
+			initialCount: entry.nodes.length,
+			finalCount: document.querySelectorAll(entry.selector).length,
+			removals: entry.removals,
+		})),
+		layout: layout.map((entry) => ({
+			selector: entry.selector,
+			samples: entry.samples,
+		})),
+		domChurn: domChurn.map((entry) => ({
+			selector: entry.selector,
+			addedCount: entry.addedCount,
+			removedCount: entry.removedCount,
+			...(entry.largestRemovedSummary
+				? { largestRemovedSummary: entry.largestRemovedSummary }
+				: {}),
+		})),
+	});
+
+	stabilityWindow.__supersetVisualStability = {
+		collect,
+		cleanup: () => {
+			window.clearInterval(interval);
+			observer.disconnect();
+			sampleLayout();
+			const snapshot = collect();
+			delete stabilityWindow.__supersetVisualStability;
+			return snapshot;
+		},
+	};
+
+	return collect();
+}
+
+function collectVisualStabilityObserver(): RawVisualStabilityObserverSnapshot | null {
+	type VisualStabilityWindow = typeof window & {
+		__supersetVisualStability?: {
+			collect: () => RawVisualStabilityObserverSnapshot;
+		};
+	};
+	return (
+		(window as VisualStabilityWindow).__supersetVisualStability?.collect() ??
+		null
+	);
+}
+
+function cleanupVisualStabilityObserver(): RawVisualStabilityObserverSnapshot | null {
+	type VisualStabilityWindow = typeof window & {
+		__supersetVisualStability?: {
+			cleanup: () => RawVisualStabilityObserverSnapshot;
+		};
+	};
+	return (
+		(window as VisualStabilityWindow).__supersetVisualStability?.cleanup() ??
+		null
+	);
+}
+
 export class DesktopAutomation {
 	constructor(private readonly connection = new ConnectionManager()) {}
 
@@ -520,6 +806,216 @@ export class DesktopAutomation {
 			throw new Error("Must provide url or path");
 		}
 		return { url: page.url() };
+	}
+
+	async runVisualStabilityCheck(
+		options: VisualStabilityOptions,
+	): Promise<VisualStabilityReport> {
+		const page = await this.connection.getPage();
+		const thresholds = normalizeVisualStabilityThresholds(options.thresholds);
+		const startedAtDate = new Date();
+		const startedAtMs = Date.now();
+		const beforeUrl = page.url();
+		const windowInfo = await this.getWindowInfo();
+		const artifacts: VisualStabilityArtifacts = {};
+		const failedFramePaths: string[] = [];
+		let wait: WaitForResult | undefined;
+		let actionError: string | undefined;
+		let observerLost = false;
+		const blankFrameSamples: BlankFrameSample[] = [];
+
+		this.connection.consoleCapture.clear();
+
+		if (options.artifacts?.beforeScreenshotPath) {
+			const screenshot = await this.takeScreenshot({
+				path: options.artifacts.beforeScreenshotPath,
+			});
+			artifacts.beforeScreenshot = screenshot.path;
+		}
+
+		await page.evaluate(installVisualStabilityObserver, {
+			persistSelectors: options.persistSelectors,
+			measureSelectors: options.measureSelectors,
+			churnRootSelectors:
+				options.churnRootSelectors.length > 0
+					? options.churnRootSelectors
+					: ["body"],
+			sampleIntervalMs: Math.max(25, options.sampleIntervalMs),
+		});
+
+		const sampleBlankFrame = async (index: number): Promise<void> => {
+			const image = (await page.screenshot({
+				encoding: "base64",
+				type: "png",
+				clip: options.blankRect,
+			})) as string;
+			const decoded = decodePngToRgba(Buffer.from(image, "base64"));
+			const classified = classifyBlankFramePixels({
+				rgba: decoded.rgba,
+				width: decoded.width,
+				height: decoded.height,
+				threshold: thresholds.blankThreshold,
+			});
+			let artifactPath: string | undefined;
+			if (classified.blank && options.artifacts?.failedFrameDir) {
+				artifactPath = await writeScreenshotArtifact(
+					getFailedFramePath(options.artifacts.failedFrameDir, index),
+					image,
+				);
+				failedFramePaths.push(artifactPath);
+			}
+			blankFrameSamples.push({
+				...classified,
+				index,
+				timestampMs: Date.now() - startedAtMs,
+				...(artifactPath ? { artifactPath } : {}),
+			});
+		};
+
+		const executeAction = async (action: VisualStabilityAction) => {
+			switch (action.kind) {
+				case "click": {
+					const { kind: _kind, ...clickOptions } = action;
+					await this.click(clickOptions);
+					return;
+				}
+				case "navigate": {
+					const { kind: _kind, ...navigateOptions } = action;
+					await this.navigate(navigateOptions);
+					return;
+				}
+				case "evaluate-js":
+					await this.evaluateJs(action.code);
+					return;
+				default:
+					action satisfies never;
+			}
+		};
+
+		let actionSettled = false;
+		const actionPromise = (async () => {
+			try {
+				await executeAction(options.action);
+				if (options.wait) {
+					wait = await this.waitFor(options.wait);
+				}
+			} catch (error) {
+				actionError = errorMessage(error);
+			} finally {
+				actionSettled = true;
+			}
+		})();
+
+		const sampleIntervalMs = Math.max(25, options.sampleIntervalMs);
+		let frameIndex = 0;
+		do {
+			await sampleBlankFrame(frameIndex);
+			frameIndex += 1;
+			if (Date.now() - startedAtMs >= options.sampleMs) break;
+			await sleep(
+				Math.min(
+					sampleIntervalMs,
+					Math.max(0, options.sampleMs - (Date.now() - startedAtMs)),
+				),
+			);
+		} while (Date.now() - startedAtMs < options.sampleMs);
+
+		await actionPromise;
+		if (!actionSettled) {
+			await actionPromise;
+		}
+
+		let snapshot = await page
+			.evaluate(cleanupVisualStabilityObserver)
+			.catch(() => null);
+		if (!snapshot) {
+			observerLost = true;
+			snapshot = await page
+				.evaluate(collectVisualStabilityObserver)
+				.catch(() => null);
+		}
+
+		if (options.artifacts?.afterScreenshotPath) {
+			const screenshot = await this.takeScreenshot({
+				path: options.artifacts.afterScreenshotPath,
+			});
+			artifacts.afterScreenshot = screenshot.path;
+		}
+		if (failedFramePaths.length > 0) {
+			artifacts.failedFrames = failedFramePaths;
+		}
+
+		const persistent: PersistentSelectorResult[] = (
+			snapshot?.persistent ?? []
+		).map((entry) =>
+			classifyPersistentSelector({
+				...entry,
+				thresholds,
+			}),
+		);
+		const layout: LayoutSelectorResult[] = (snapshot?.layout ?? []).map(
+			(entry) =>
+				classifyLayoutSelector({
+					selector: entry.selector,
+					samples: entry.samples,
+					thresholds,
+				}),
+		);
+		const blankFrameCount = blankFrameSamples.filter(
+			(sample) => sample.blank,
+		).length;
+		const blankFrames: BlankFrameResult = {
+			...(options.blankRect ? { rect: options.blankRect } : {}),
+			threshold: thresholds.blankThreshold,
+			frameCount: blankFrameSamples.length,
+			blankFrameCount,
+			samples: blankFrameSamples,
+			failed: blankFrameCount > thresholds.maxBlankFrames,
+			...(blankFrameCount > thresholds.maxBlankFrames
+				? {
+						reason: `${blankFrameCount} blank frame(s), maximum allowed is ${thresholds.maxBlankFrames}`,
+					}
+				: {}),
+		};
+		const domChurn: DomChurnResult[] = (snapshot?.domChurn ?? []).map((entry) =>
+			classifyDomChurn({
+				...entry,
+				thresholds,
+			}),
+		);
+		const consoleLogs = await this.getConsoleLogs();
+		const failures = buildVisualStabilityFailures({
+			persistent,
+			layout,
+			blankFrames,
+			domChurn,
+			consoleLogs,
+			observerLost,
+			actionError,
+			thresholds,
+		});
+		const completedAt = new Date();
+
+		return {
+			command: "visual-stability",
+			passed: failures.length === 0,
+			startedAt: startedAtDate.toISOString(),
+			completedAt: completedAt.toISOString(),
+			durationMs: completedAt.getTime() - startedAtDate.getTime(),
+			windowInfo,
+			beforeUrl,
+			afterUrl: page.url(),
+			thresholds,
+			action: options.action,
+			...(wait ? { wait } : {}),
+			persistent,
+			layout,
+			blankFrames,
+			domChurn,
+			consoleLogs,
+			failures,
+			artifacts,
+		};
 	}
 
 	async waitFor(options: WaitForOptions): Promise<WaitForResult> {

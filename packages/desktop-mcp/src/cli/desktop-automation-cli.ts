@@ -11,12 +11,21 @@ import {
 	type WaitForResult,
 	type WindowInfo,
 } from "../automation/index.js";
+import {
+	formatVisualStabilityReport,
+	normalizeVisualStabilityThresholds,
+	type VisualStabilityAction,
+	type VisualStabilityOptions,
+	type VisualStabilityReport,
+	type VisualStabilityThresholdInput,
+} from "../automation/visual-stability.js";
 import type { ConsoleLogEntry } from "../zod.js";
 import {
 	getBooleanFlag,
 	getIntegerFlag,
 	getNumberFlag,
 	getStringFlag,
+	getStringListFlag,
 	type ParsedCliArgs,
 	parseCliArgs,
 } from "./args.js";
@@ -38,6 +47,7 @@ Commands:
   evaluate-js --code <js>             Evaluate JavaScript in the renderer
   navigate --path /settings           Navigate by hash path, or use --url
   smoke                               Run a Trellis-friendly desktop smoke
+  visual-stability                    Detect flicker, blanking, remounts, layout jumps
 
 Common:
   --json                              Print JSON instead of text
@@ -47,6 +57,70 @@ Smoke example:
     --url-includes "#/sign-in" \\
     --screenshot .trellis/tasks/<task>/artifacts/sign-in.png \\
     --report .trellis/tasks/<task>/artifacts/sign-in-smoke.json
+
+Visual stability example:
+  bun run desktop:automation -- visual-stability \\
+    --click-text "Workspaces" \\
+    --wait-url-includes "#/v2-workspaces" \\
+    --persist-selector "app > div:nth-of-type(1)" \\
+    --measure-selector "app > div:nth-of-type(1) > div:nth-of-type(1)" \\
+    --sample-ms 800 \\
+    --report .trellis/tasks/<task>/artifacts/workspaces-visual-stability.json
+`;
+
+const VISUAL_STABILITY_HELP = `Desktop automation visual-stability
+
+Usage:
+  bun run desktop:automation -- visual-stability [action] [observation] [thresholds] [artifacts]
+
+Actions, choose exactly one:
+  --click-selector <css>
+  --click-text <text>
+  --click-test-id <id>
+  --click-x <number> --click-y <number>
+  --navigate-path <path>
+  --navigate-url <url>
+  --action-js <code>
+
+Readiness:
+  --wait-url-includes <text>
+  --wait-selector <css>
+  --wait-text <text>
+  --wait-test-id <id>
+  --timeout-ms <ms>
+
+Observation:
+  --persist-selector <css>       Repeatable. Selector must stay mounted.
+  --measure-selector <css>       Repeatable. Bounds are sampled for movement/resize.
+  --churn-root-selector <css>    Repeatable. Defaults to body.
+  --blank-rect x,y,width,height  Optional screenshot region for blank-frame checks.
+  --sample-ms <ms>               Default 800.
+  --sample-interval-ms <ms>      Default 50.
+
+Thresholds:
+  --max-removals <n>             Default 0.
+  --max-layout-shift-px <n>      Default 2.
+  --max-size-shift-px <n>        Default 2.
+  --max-blank-frames <n>         Default 0.
+  --blank-threshold <ratio>      Default 0.985.
+  --max-dom-added <n>
+  --max-dom-removed <n>
+  --fail-on-console-error=false
+
+Artifacts:
+  --report <file.json>
+  --before-screenshot <file.png>
+  --after-screenshot <file.png>
+  --failed-frame-dir <dir>
+
+Example:
+  DESKTOP_AUTOMATION_PORT=<port> bun run desktop:automation -- visual-stability \\
+    --click-text "Workspaces" \\
+    --wait-url-includes "#/v2-workspaces" \\
+    --persist-selector "app > div:nth-of-type(1)" \\
+    --measure-selector "app > div:nth-of-type(1) > div:nth-of-type(1)" \\
+    --sample-ms 800 \\
+    --report .trellis/tasks/<task>/artifacts/workspaces-visual-stability.json
 `;
 
 interface CliIO {
@@ -71,7 +145,10 @@ const LEVEL_NAMES: Record<number, string> = {
 	3: "ERROR",
 };
 
-function resolveWorkspaceJsonPath(path: string, cwd = process.cwd()): string {
+export function resolveWorkspaceJsonPath(
+	path: string,
+	cwd = process.cwd(),
+): string {
 	const resolvedCwd = resolve(cwd);
 	const resolvedPath = isAbsolute(path)
 		? resolve(path)
@@ -217,6 +294,151 @@ async function writeJsonFile(path: string, data: unknown): Promise<string> {
 	return resolvedPath;
 }
 
+function requirePositiveInteger(
+	value: number | undefined,
+	fallback: number,
+): number {
+	const resolved = value ?? fallback;
+	if (!Number.isInteger(resolved) || resolved <= 0) {
+		throw new Error("visual-stability timing values must be positive integers");
+	}
+	return resolved;
+}
+
+function parseVisualStabilityAction(
+	args: ParsedCliArgs,
+): VisualStabilityAction {
+	const hasClickTarget = Boolean(
+		getStringFlag(args, "click-selector") ||
+			getStringFlag(args, "click-text") ||
+			getStringFlag(args, "click-test-id") ||
+			getNumberFlag(args, "click-x") !== undefined ||
+			getNumberFlag(args, "click-y") !== undefined,
+	);
+	const hasNavigateTarget = Boolean(
+		getStringFlag(args, "navigate-path") || getStringFlag(args, "navigate-url"),
+	);
+	const actionJs = getStringFlag(args, "action-js");
+	const actionCount =
+		(hasClickTarget ? 1 : 0) + (hasNavigateTarget ? 1 : 0) + (actionJs ? 1 : 0);
+	if (actionCount !== 1) {
+		throw new Error(
+			"visual-stability requires exactly one action: click, navigate, or --action-js",
+		);
+	}
+
+	if (hasClickTarget) {
+		const x = getNumberFlag(args, "click-x");
+		const y = getNumberFlag(args, "click-y");
+		if ((x === undefined) !== (y === undefined)) {
+			throw new Error(
+				"visual-stability coordinate clicks require both --click-x and --click-y",
+			);
+		}
+		return {
+			kind: "click",
+			selector: getStringFlag(args, "click-selector"),
+			text: getStringFlag(args, "click-text"),
+			testId: getStringFlag(args, "click-test-id"),
+			x,
+			y,
+			index: getIntegerFlag(args, "click-index"),
+			fuzzy: !getBooleanFlag(args, "exact"),
+		};
+	}
+
+	if (hasNavigateTarget) {
+		return {
+			kind: "navigate",
+			path: getStringFlag(args, "navigate-path"),
+			url: getStringFlag(args, "navigate-url"),
+		};
+	}
+
+	return {
+		kind: "evaluate-js",
+		code: actionJs ?? "",
+	};
+}
+
+function parseVisualStabilityWait(
+	args: ParsedCliArgs,
+): VisualStabilityOptions["wait"] {
+	const wait = {
+		selector: getStringFlag(args, "wait-selector"),
+		text: getStringFlag(args, "wait-text"),
+		testId: getStringFlag(args, "wait-test-id"),
+		urlIncludes: getStringFlag(args, "wait-url-includes"),
+		fuzzy: !getBooleanFlag(args, "wait-exact"),
+		timeoutMs: getIntegerFlag(args, "timeout-ms"),
+	};
+	return wait.selector || wait.text || wait.testId || wait.urlIncludes
+		? wait
+		: undefined;
+}
+
+function parseVisualStabilityThresholds(args: ParsedCliArgs) {
+	const input: VisualStabilityThresholdInput = {
+		maxRemovals: getIntegerFlag(args, "max-removals"),
+		maxLayoutShiftPx: getNumberFlag(args, "max-layout-shift-px"),
+		maxSizeShiftPx: getNumberFlag(args, "max-size-shift-px"),
+		maxBlankFrames: getIntegerFlag(args, "max-blank-frames"),
+		blankThreshold: getNumberFlag(args, "blank-threshold"),
+		maxDomAdded: getIntegerFlag(args, "max-dom-added"),
+		maxDomRemoved: getIntegerFlag(args, "max-dom-removed"),
+		failOnConsoleError: getBooleanFlag(args, "fail-on-console-error", true),
+	};
+	return normalizeVisualStabilityThresholds(input);
+}
+
+export function parseVisualStabilityCliOptions(args: ParsedCliArgs): {
+	options: VisualStabilityOptions;
+	reportPath?: string;
+} {
+	const reportPath = getStringFlag(args, "report");
+	return {
+		options: {
+			action: parseVisualStabilityAction(args),
+			wait: parseVisualStabilityWait(args),
+			persistSelectors: getStringListFlag(args, "persist-selector"),
+			measureSelectors: getStringListFlag(args, "measure-selector"),
+			churnRootSelectors: getStringListFlag(args, "churn-root-selector"),
+			blankRect: parseRect(getStringFlag(args, "blank-rect")),
+			sampleMs: requirePositiveInteger(getIntegerFlag(args, "sample-ms"), 800),
+			sampleIntervalMs: requirePositiveInteger(
+				getIntegerFlag(args, "sample-interval-ms"),
+				50,
+			),
+			thresholds: parseVisualStabilityThresholds(args),
+			artifacts: {
+				beforeScreenshotPath: getStringFlag(args, "before-screenshot"),
+				afterScreenshotPath: getStringFlag(args, "after-screenshot"),
+				failedFrameDir: getStringFlag(args, "failed-frame-dir"),
+			},
+		},
+		...(reportPath ? { reportPath } : {}),
+	};
+}
+
+async function runVisualStability(
+	automation: DesktopAutomation,
+	args: ParsedCliArgs,
+): Promise<VisualStabilityReport> {
+	const parsed = parseVisualStabilityCliOptions(args);
+	const report = await automation.runVisualStabilityCheck(parsed.options);
+	if (!parsed.reportPath) return report;
+	const reportPath = resolveWorkspaceJsonPath(parsed.reportPath);
+	const reportWithPath = {
+		...report,
+		artifacts: {
+			...report.artifacts,
+			reportPath,
+		},
+	};
+	await writeJsonFile(parsed.reportPath, reportWithPath);
+	return reportWithPath;
+}
+
 async function runSmoke(
 	automation: DesktopAutomation,
 	args: ParsedCliArgs,
@@ -317,6 +539,9 @@ async function runCommand(
 			});
 		case "smoke":
 			return runSmoke(automation, args);
+		case "visual-stability":
+			if (getBooleanFlag(args, "help")) return VISUAL_STABILITY_HELP;
+			return runVisualStability(automation, args);
 		default:
 			throw new Error(`Unknown command: ${args.command}\n\n${HELP}`);
 	}
@@ -380,9 +605,24 @@ function formatResult(args: ParsedCliArgs, result: unknown): string {
 				return lines.join("\n");
 			});
 		}
+		case "visual-stability": {
+			if (typeof result === "string") return result;
+			const report = result as VisualStabilityReport;
+			return textOrJson(args, report, () =>
+				formatVisualStabilityReport(report),
+			);
+		}
 		default:
 			return JSON.stringify(result, null, 2);
 	}
+}
+
+function resultExitCode(args: ParsedCliArgs, result: unknown): number {
+	if (args.command === "visual-stability") {
+		if (typeof result === "string") return 0;
+		return (result as VisualStabilityReport).passed ? 0 : 1;
+	}
+	return 0;
 }
 
 export async function runDesktopAutomationCli(
@@ -402,7 +642,7 @@ export async function runDesktopAutomationCli(
 	try {
 		const result = await runCommand(automation, args);
 		io.write(formatResult(args, result));
-		return 0;
+		return resultExitCode(args, result);
 	} catch (error) {
 		io.writeError(error instanceof Error ? error.message : String(error));
 		return 1;

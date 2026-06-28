@@ -489,6 +489,29 @@ describe("Trellis runtime pack packaging", () => {
 		expect(offenders).toEqual([]);
 	});
 
+	test("keeps desktop automation tooling out of packaged app runtime", () => {
+		const runtimeSources = [
+			...readSourceFiles(join(import.meta.dirname, "src", "main")),
+			...readSourceFiles(join(import.meta.dirname, "src", "preload")),
+			...readSourceFiles(join(import.meta.dirname, "src", "renderer")),
+		];
+		const offenders = runtimeSources
+			.filter(
+				({ source }) =>
+					source.includes("@superset/desktop-mcp") ||
+					source.includes("packages/desktop-mcp"),
+			)
+			.map(({ path }) => path);
+
+		expect(offenders).toEqual([]);
+		expect(packageJson.dependencies).not.toHaveProperty(
+			"@superset/desktop-mcp",
+		);
+		expect(packageJson.devDependencies).not.toHaveProperty(
+			"@superset/desktop-mcp",
+		);
+	});
+
 	test("cleans stale Vite optimizer cache when dev dependency inputs change", () => {
 		expect(packageJson.scripts["clean:dev"]).toContain(
 			"scripts/clean-stale-vite-cache.ts",
@@ -1038,7 +1061,7 @@ describe("Trellis runtime pack packaging", () => {
 		}
 	});
 
-	test("keeps React DnD off authenticated routes that do not need drag/drop", () => {
+	test("keeps React DnD boundary stable across authenticated dashboard routes", () => {
 		const authenticatedLayoutSource = readFileSync(
 			join(
 				import.meta.dirname,
@@ -1066,10 +1089,14 @@ describe("Trellis runtime pack packaging", () => {
 
 		expect(authenticatedLayoutSource).not.toContain('from "react-dnd"');
 		expect(authenticatedLayoutSource).not.toContain('from "renderer/lib/dnd"');
-		expect(authenticatedLayoutSource).toContain("routeUsesReactDnd");
 		expect(authenticatedLayoutSource).toContain(
-			'import("./components/ReactDndBoundary")',
+			'import { ReactDndBoundary } from "./components/ReactDndBoundary"',
 		);
+		expect(authenticatedLayoutSource).toContain(
+			"return <ReactDndBoundary>{content}</ReactDndBoundary>;",
+		);
+		expect(authenticatedLayoutSource).not.toContain("routeUsesReactDnd");
+		expect(authenticatedLayoutSource).not.toContain("LazyReactDndBoundary");
 		expect(reactDndBoundarySource).toContain('from "react-dnd"');
 		expect(reactDndBoundarySource).toContain('from "renderer/lib/dnd"');
 	});

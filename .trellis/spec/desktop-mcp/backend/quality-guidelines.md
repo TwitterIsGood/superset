@@ -98,3 +98,80 @@ bun run desktop:automation -- evaluate-js --code 'window.location.hash = "#/task
 bun run desktop:automation -- navigate --path /tasks
 bun run desktop:automation -- wait-for --text "Tasks & PRs"
 ```
+
+## Scenario: Visual Stability Gate
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing the `visual-stability` Desktop Automation CLI command, its report schema, observation thresholds, screenshot sampling, or Trellis desktop acceptance usage.
+- Scope: development-only desktop quality tooling. The command observes a running Electron renderer through CDP and must not become product runtime code.
+
+### 2. Signatures
+
+- CLI command: `bun run desktop:automation -- visual-stability [action] [observation] [thresholds] [artifacts]`.
+- Action flags, exactly one group required: `--click-selector`, `--click-text`, `--click-test-id`, `--click-x` plus `--click-y`, `--navigate-path`, `--navigate-url`, or `--action-js`.
+- Readiness flags: `--wait-url-includes`, `--wait-selector`, `--wait-text`, `--wait-test-id`, `--timeout-ms`.
+- Observation flags: repeatable `--persist-selector`, repeatable `--measure-selector`, repeatable `--churn-root-selector`, optional `--blank-rect x,y,width,height`, `--sample-ms`, and `--sample-interval-ms`.
+- Threshold flags: `--max-removals`, `--max-layout-shift-px`, `--max-size-shift-px`, `--max-blank-frames`, `--blank-threshold`, `--max-dom-added`, `--max-dom-removed`, and `--fail-on-console-error=false`.
+- Artifact flags: `--report <file.json>`, `--before-screenshot <file.png>`, `--after-screenshot <file.png>`, and `--failed-frame-dir <dir>`.
+
+### 3. Contracts
+
+- Report command field is exactly `"visual-stability"`.
+- Passing reports exit `0`; failed reports exit `1`.
+- Report paths must stay inside the repository workspace and end in `.json`.
+- Screenshot paths must stay inside the repository workspace and end in `.png`.
+- The injected observer reports persistent selector initial/final counts, removals, layout samples, DOM churn counts, blank frame samples, console logs, and actionable failures.
+- Defaults: `sampleMs=800`, `sampleIntervalMs=50`, `maxRemovals=0`, `maxLayoutShiftPx=2`, `maxSizeShiftPx=2`, `maxBlankFrames=0`, `blankThreshold=0.985`, `failOnConsoleError=true`, and churn root defaults to `body`.
+- The command must stay CDP-only. Do not add Playwright, WebDriver, browser downloads, Electron runtime imports, app menu entries, renderer routes, or packaged debug toggles.
+
+### 4. Validation & Error Matrix
+
+- No action or multiple action groups -> CLI error before connecting the action.
+- Only one coordinate flag -> CLI error requiring both `--click-x` and `--click-y`.
+- Report path outside workspace -> CLI error before writing.
+- Report path without `.json` -> CLI error before writing.
+- Screenshot artifact path outside workspace or not `.png` -> screenshot path validation error.
+- Persistent selector initial count `0` -> `persistent-missing` failure.
+- Persistent selector removed more than `maxRemovals` -> `persistent-removal` failure.
+- Measured selector disappears during sampling -> `layout-missing` failure.
+- Measured selector moves or resizes beyond thresholds -> `layout-shift` failure.
+- Blank frame count exceeds `maxBlankFrames` -> `blank-frame` failure.
+- Console error appears while `failOnConsoleError=true` -> `console-error` failure.
+- Renderer navigation destroys the injected observer -> `observer-lost` failure.
+
+### 5. Good/Base/Bad Cases
+
+- Good: run the command from a workspace detail page to `Workspaces`, with a stable shell selector and a sidebar measured selector; report shows zero removals, zero blank frames, and no console errors.
+- Base: use `--fail-on-console-error=false` only when the task explicitly records unrelated background console noise and still needs visual-only proof.
+- Bad: hiding a real console error by default, using deep CSS selectors without recording why no stable selector exists, adding a product UI for the gate, or importing `@superset/desktop-mcp` from `apps/desktop`.
+
+### 6. Tests Required
+
+- Unit test CLI parser behavior for action exclusivity, repeated selectors, artifact paths, and command-specific help.
+- Unit test blank-frame classification, PNG decode, persistent removal classification, layout delta classification, DOM churn thresholds, failure building, and report formatting.
+- Run `bun test packages/desktop-mcp`.
+- Run `bun run --cwd packages/desktop-mcp typecheck`.
+- Run `bun test apps/desktop/runtime-dependencies.test.ts` when packaging boundaries are touched.
+- Run root `bun run lint` before commit.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+bun run desktop:automation -- visual-stability \
+  --click-text "Workspaces" \
+  --report /tmp/visual.json
+```
+
+#### Correct
+
+```bash
+DESKTOP_AUTOMATION_PORT=<port> bun run desktop:automation -- visual-stability \
+  --click-text "Workspaces" \
+  --wait-url-includes "#/v2-workspaces" \
+  --persist-selector "app > div:nth-of-type(1)" \
+  --measure-selector "app > div:nth-of-type(1) > div:nth-of-type(1)" \
+  --report .trellis/tasks/<task>/artifacts/workspaces-visual-stability.json
+```
