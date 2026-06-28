@@ -12,6 +12,7 @@ import { builtinModules } from "node:module";
 import { join } from "node:path";
 import ts from "typescript";
 import {
+	getRequiredNativeRuntimeFiles,
 	mainExternalizedDependencies,
 	requiredMaterializedNodeModules,
 } from "../runtime-dependencies";
@@ -406,6 +407,33 @@ function validateParcelWatcherPrepared(): void {
 	);
 }
 
+function validateRequiredNativeBindingFiles(): void {
+	const nodeModulesDir = join(projectRoot, "node_modules");
+	const requiredFiles = getRequiredNativeRuntimeFiles({
+		targetArch: process.env.TARGET_ARCH ?? process.arch,
+		targetPlatform: process.env.TARGET_PLATFORM ?? process.platform,
+	});
+	const missingFiles = requiredFiles.filter(
+		(file) => !existsSync(join(nodeModulesDir, file.relativePath)),
+	);
+
+	if (missingFiles.length > 0) {
+		fail(
+			[
+				"Required native runtime binding file is missing.",
+				...missingFiles.map(
+					(file) => `${file.description}: ${file.relativePath}`,
+				),
+				"Run `bun run copy:native-modules` or `bun run install:deps` before packaging.",
+			].join("\n"),
+		);
+	}
+
+	console.log(
+		`[validate:native-runtime] OK: ${requiredFiles.length} native runtime binding file(s) present`,
+	);
+}
+
 function main(): void {
 	validateWorkspacePackagesBundled();
 	validateOnlyExpectedExternalRequires();
@@ -413,6 +441,7 @@ function main(): void {
 	validateParcelWatcherNotBundled();
 	validateNativeModulesPrepared();
 	validateParcelWatcherPrepared();
+	validateRequiredNativeBindingFiles();
 	console.log("[validate:native-runtime] All checks passed");
 }
 

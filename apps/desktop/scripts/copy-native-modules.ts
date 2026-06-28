@@ -26,7 +26,10 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { satisfies } from "semver";
-import { requiredMaterializedNodeModules } from "../runtime-dependencies";
+import {
+	getRequiredNativeRuntimeFiles,
+	requiredMaterializedNodeModules,
+} from "../runtime-dependencies";
 
 // Target architecture for cross-compilation. When set, platform-specific
 // packages for this arch are fetched from npm if not already present.
@@ -267,6 +270,50 @@ function copyParcelWatcherPlatformPackages(nodeModulesDir: string): void {
 	}
 }
 
+function getMissingNativeRuntimeFiles(nodeModulesDir: string): string[] {
+	return getRequiredNativeRuntimeFiles({
+		targetArch: TARGET_ARCH,
+		targetPlatform: TARGET_PLATFORM,
+	})
+		.map((file) => file.relativePath)
+		.filter((relativePath) => !existsSync(join(nodeModulesDir, relativePath)));
+}
+
+function ensureNativeRuntimeBindings(nodeModulesDir: string): void {
+	const missingBeforeRebuild = getMissingNativeRuntimeFiles(nodeModulesDir);
+	if (missingBeforeRebuild.length === 0) {
+		console.log("\nNative runtime bindings are present.");
+		return;
+	}
+
+	console.log(
+		[
+			"\nNative runtime bindings are missing; rebuilding Electron app dependencies...",
+			...missingBeforeRebuild.map((path) => `  missing: ${path}`),
+		].join("\n"),
+	);
+	execSync("node ./node_modules/electron-builder/cli.js install-app-deps", {
+		cwd: dirname(import.meta.dirname),
+		env: {
+			...process.env,
+			TARGET_ARCH,
+			TARGET_PLATFORM,
+		},
+		stdio: "inherit",
+	});
+
+	const missingAfterRebuild = getMissingNativeRuntimeFiles(nodeModulesDir);
+	if (missingAfterRebuild.length > 0) {
+		console.error(
+			[
+				"\n[ERROR] Native runtime bindings are still missing after rebuild.",
+				...missingAfterRebuild.map((path) => `  missing: ${path}`),
+			].join("\n"),
+		);
+		process.exit(1);
+	}
+}
+
 function prepareNativeModules() {
 	console.log("Preparing external runtime modules for electron-builder...");
 	console.log(
@@ -282,6 +329,7 @@ function prepareNativeModules() {
 	}
 
 	copyParcelWatcherPlatformPackages(nodeModulesDir);
+	ensureNativeRuntimeBindings(nodeModulesDir);
 
 	console.log("\nDone!");
 }

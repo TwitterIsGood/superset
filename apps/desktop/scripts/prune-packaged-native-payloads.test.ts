@@ -367,9 +367,8 @@ describe("prunePackagedElectronLocales", () => {
 		);
 
 		expect(builderConfig).toContain("prunePackagedElectronLocales");
-		expect(builderConfig).toContain(
-			'context.electronPlatformName === "darwin"',
-		);
+		expect(builderConfig).toContain("validatePackagedNativeRuntime");
+		expect(builderConfig).toContain('targetPlatform === "darwin"');
 	});
 });
 
@@ -422,9 +421,7 @@ describe("prunePackagedElectronSoftwareRenderer", () => {
 		);
 
 		expect(builderConfig).toContain("prunePackagedElectronSoftwareRenderer");
-		expect(builderConfig).toContain(
-			'context.electronPlatformName === "darwin"',
-		);
+		expect(builderConfig).toContain('targetPlatform === "darwin"');
 		expect(appSetupSource).toContain(
 			'app.commandLine.appendSwitch("disable-software-rasterizer")',
 		);

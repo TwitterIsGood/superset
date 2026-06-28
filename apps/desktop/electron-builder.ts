@@ -18,6 +18,7 @@ import {
 	prunePackagedElectronSoftwareRenderer,
 	prunePackagedNativePayloads,
 } from "./scripts/prune-packaged-native-payloads";
+import { validatePackagedNativeRuntime } from "./scripts/validate-packaged-native-runtime";
 
 const currentYear = new Date().getFullYear();
 const author = pkg.author?.name ?? pkg.author;
@@ -151,12 +152,19 @@ const config: Configuration = {
 	buildDependenciesFromSource,
 
 	afterPack: async (context) => {
+		const targetArch = normalizeBuilderArch(context.arch);
+		const targetPlatform = context.electronPlatformName;
 		await prunePackagedNativePayloads({
 			appOutDir: context.appOutDir,
-			targetArch: normalizeBuilderArch(context.arch),
-			targetPlatform: context.electronPlatformName,
+			targetArch,
+			targetPlatform,
 		});
-		if (context.electronPlatformName === "darwin") {
+		validatePackagedNativeRuntime({
+			appOutDir: context.appOutDir,
+			targetArch,
+			targetPlatform,
+		});
+		if (targetPlatform === "darwin") {
 			await prunePackagedElectronLocales({
 				appOutDir: context.appOutDir,
 			});

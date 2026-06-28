@@ -11,6 +11,11 @@ type ExternalizedRuntimeModule = {
 	specifier: string;
 };
 
+export type RequiredNativeRuntimeFile = {
+	description: string;
+	relativePath: string;
+};
+
 function copyWholeModule(moduleName: string): PackagedNodeModuleCopy {
 	return {
 		from: `node_modules/${moduleName}`,
@@ -132,3 +137,85 @@ export const requiredMaterializedNodeModules = [
 	"picomatch",
 	"node-addon-api",
 ];
+
+function normalizeRuntimePlatform(platform: string): NodeJS.Platform | string {
+	if (platform === "mac" || platform === "macos") return "darwin";
+	if (platform === "windows") return "win32";
+	return platform;
+}
+
+function normalizeRuntimeArch(arch: string): string {
+	if (arch === "universal") return process.arch;
+	return arch;
+}
+
+function getParcelWatcherRuntimePackage(
+	platform: string,
+	arch: string,
+): string | null {
+	if (platform === "darwin") {
+		return `@parcel/watcher-darwin-${arch}`;
+	}
+	if (platform === "linux") {
+		return `@parcel/watcher-linux-${arch}-glibc`;
+	}
+	if (platform === "win32") {
+		return `@parcel/watcher-win32-${arch}`;
+	}
+	return null;
+}
+
+export function getRequiredNativeRuntimeFiles({
+	targetArch = process.env.TARGET_ARCH ?? process.arch,
+	targetPlatform = process.env.TARGET_PLATFORM ?? process.platform,
+}: {
+	targetArch?: string;
+	targetPlatform?: string;
+} = {}): RequiredNativeRuntimeFile[] {
+	const platform = normalizeRuntimePlatform(targetPlatform);
+	const arch = normalizeRuntimeArch(targetArch);
+	const requiredFiles: RequiredNativeRuntimeFile[] = [
+		{
+			description: "better-sqlite3 native binding",
+			relativePath: "better-sqlite3/build/Release/better_sqlite3.node",
+		},
+		{
+			description: "native-keymap native binding",
+			relativePath: "native-keymap/build/Release/keymapping.node",
+		},
+	];
+
+	const parcelWatcherPackage = getParcelWatcherRuntimePackage(platform, arch);
+	if (parcelWatcherPackage) {
+		requiredFiles.push({
+			description: "@parcel/watcher platform binding",
+			relativePath: `${parcelWatcherPackage}/watcher.node`,
+		});
+	}
+
+	if (platform === "darwin") {
+		requiredFiles.push(
+			{
+				description: "node-pty macOS prebuild",
+				relativePath: `node-pty/prebuilds/darwin-${arch}/pty.node`,
+			},
+			{
+				description: "macOS process metrics native binding",
+				relativePath:
+					"@superset/macos-process-metrics/build/Release/macos_process_metrics.node",
+			},
+		);
+	} else if (platform === "linux") {
+		requiredFiles.push({
+			description: "node-pty Linux native binding",
+			relativePath: "node-pty/build/Release/pty.node",
+		});
+	} else if (platform === "win32") {
+		requiredFiles.push({
+			description: "node-pty Windows prebuild",
+			relativePath: `node-pty/prebuilds/win32-${arch}/pty.node`,
+		});
+	}
+
+	return requiredFiles;
+}
