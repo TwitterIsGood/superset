@@ -64,6 +64,13 @@
   arrives as `output[].content[].type = "output_text"`; translate it to
   Anthropic `{ type: "text" }` instead of returning a successful empty
   `content` array.
+- Host-service model gateway translation must also preserve Claude tool
+  declarations, tool choices, tool calls, and tool results for every translated
+  provider protocol. OpenAI Responses requests must carry function `tools`, use
+  typed `input_text` / `output_text` turns, and encode previous Claude
+  `tool_use` / `tool_result` blocks as `function_call` /
+  `function_call_output`. A translated Automation model route that drops tools
+  turns Claude Code into plain chat and is invalid even when text output works.
 - Run-scoped JWT access may only read/write its own run id. User JWT access must still respect organization membership and automation ownership.
 - Completed/failed/skipped rows are terminal. `completeRun` and `failRun` must be idempotent and return the existing terminal row when called again.
 - `reconcileRun` is conservative and idempotent. It may only move stale active statuses (`queued`, `dispatching`, `running`, or legacy `dispatched`) to `failed` with `resultSource = "system"`; it must return terminal rows unchanged.
@@ -138,6 +145,9 @@
 - Host-service model-gateway tests proving OpenAI Responses `output_text` blocks
   survive translation for automation gateway tokens, and unknown successful
   response shapes fail with sanitized 502 instead of empty success.
+- Host-service model-gateway tests proving translated OpenAI Responses
+  Automation requests keep Claude tools, tool choice, function calls, and
+  function outputs instead of degrading to a text-only model request.
 - Host-service tests proving `agents.runAutomation` uses a Superset-home run directory and does not require a workspace id.
 - Host-service tests proving Automation context materialization writes under the
   Automation task directory and per-run snapshots stay lightweight and secret-free.

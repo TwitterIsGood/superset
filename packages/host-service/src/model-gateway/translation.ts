@@ -65,11 +65,36 @@ function toOpenAITools(tools: unknown): unknown[] | undefined {
 	return mapped.length > 0 ? mapped : undefined;
 }
 
+function toOpenAIResponsesTools(tools: unknown): unknown[] | undefined {
+	if (!Array.isArray(tools)) return undefined;
+	const mapped = tools
+		.filter(isRecord)
+		.map((tool) => ({
+			type: "function",
+			name: typeof tool.name === "string" ? tool.name : "",
+			description:
+				typeof tool.description === "string" ? tool.description : undefined,
+			parameters: normalizeJsonObject(tool.input_schema),
+		}))
+		.filter((tool) => tool.name.length > 0);
+	return mapped.length > 0 ? mapped : undefined;
+}
+
 function toOpenAIToolChoice(toolChoice: unknown): unknown {
 	if (!isRecord(toolChoice)) return toolChoice;
 	if (toolChoice.type === "auto" || toolChoice.type === "any") return "auto";
 	if (toolChoice.type === "tool" && typeof toolChoice.name === "string") {
 		return { type: "function", function: { name: toolChoice.name } };
+	}
+	return undefined;
+}
+
+function toOpenAIResponsesToolChoice(toolChoice: unknown): unknown {
+	if (!isRecord(toolChoice)) return toolChoice;
+	if (toolChoice.type === "auto") return "auto";
+	if (toolChoice.type === "any") return "required";
+	if (toolChoice.type === "tool" && typeof toolChoice.name === "string") {
+		return { type: "function", name: toolChoice.name };
 	}
 	return undefined;
 }
@@ -139,6 +164,89 @@ function anthropicMessageToOpenAIMessages(
 	return messages;
 }
 
+function responseTextTurn(
+	role: "user" | "assistant",
+	text: string,
+): JsonRecord {
+	return {
+		role,
+		content: [
+			{
+				type: role === "assistant" ? "output_text" : "input_text",
+				text,
+			},
+		],
+	};
+}
+
+function anthropicMessageToOpenAIResponsesInput(
+	body: AnthropicMessageBody,
+): unknown[] {
+	const input: unknown[] = [];
+	if (!Array.isArray(body.messages)) return input;
+
+	for (const message of body.messages) {
+		if (!isRecord(message) || typeof message.role !== "string") continue;
+		const content = message.content;
+
+		if (message.role === "assistant" && Array.isArray(content)) {
+			const text = normalizeTextContent(
+				content.filter(
+					(block) => !isRecord(block) || block.type !== "tool_use",
+				),
+			);
+			if (text) input.push(responseTextTurn("assistant", text));
+			for (const block of content.filter(isRecord)) {
+				if (block.type !== "tool_use") continue;
+				if (typeof block.name !== "string" || block.name.length === 0) {
+					continue;
+				}
+				const id = typeof block.id === "string" ? block.id : randomUUID();
+				input.push({
+					type: "function_call",
+					call_id: id,
+					name: block.name,
+					arguments: JSON.stringify(normalizeJsonObject(block.input)),
+				});
+			}
+			continue;
+		}
+
+		if (message.role === "user" && Array.isArray(content)) {
+			const text = normalizeTextContent(
+				content.filter(
+					(block) => !isRecord(block) || block.type !== "tool_result",
+				),
+			);
+			if (text) input.push(responseTextTurn("user", text));
+			for (const block of content.filter(isRecord)) {
+				if (block.type !== "tool_result") continue;
+				input.push({
+					type: "function_call_output",
+					call_id:
+						typeof block.tool_use_id === "string"
+							? block.tool_use_id
+							: "tool_result",
+					output: normalizeTextContent(block.content),
+				});
+			}
+			continue;
+		}
+
+		const text = normalizeTextContent(content);
+		if (text) {
+			input.push(
+				responseTextTurn(
+					message.role === "assistant" ? "assistant" : "user",
+					text,
+				),
+			);
+		}
+	}
+
+	return input;
+}
+
 export function resolveUpstreamModelId(model: string): string {
 	return decodeProviderModelRef(model)?.modelId ?? model;
 }
@@ -162,25 +270,20 @@ export function buildOpenAIChatRequest(body: AnthropicMessageBody): JsonRecord {
 export function buildOpenAIResponsesRequest(
 	body: AnthropicMessageBody,
 ): JsonRecord {
-	const messages = anthropicMessageToOpenAIMessages(body);
-	const input = messages
-		.map((message) => (isRecord(message) ? message.content : ""))
-		.filter((content): content is string => typeof content === "string")
-		.join("\n\n");
-	const system = messages.find(
-		(message) => isRecord(message) && message.role === "system",
-	);
+	const input = anthropicMessageToOpenAIResponsesInput(body);
+	const systemText = normalizeTextContent(body.system);
+	const tools = toOpenAIResponsesTools(body.tools);
+	const toolChoice = toOpenAIResponsesToolChoice(body.tool_choice);
 	return {
 		model: resolveUpstreamModelId(body.model),
 		input,
-		instructions:
-			isRecord(system) && typeof system.content === "string"
-				? system.content
-				: undefined,
+		instructions: systemText || undefined,
 		max_output_tokens: body.max_tokens,
 		temperature: body.temperature,
 		top_p: body.top_p,
 		stream: false,
+		...(tools ? { tools } : {}),
+		...(toolChoice ? { tool_choice: toolChoice } : {}),
 	};
 }
 

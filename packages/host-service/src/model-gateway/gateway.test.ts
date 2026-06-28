@@ -364,6 +364,146 @@ describe("handleModelGatewayRequest", () => {
 		expect(parsed.content?.[0]?.text).toBe("Automation report body");
 	});
 
+	it("forwards Claude tools through OpenAI Responses automation gateway tokens", async () => {
+		const db = createTestDb();
+		const provider = upsertModelProvider(asHostDb(db), {
+			name: "Responses provider",
+			protocol: "openai-responses",
+			baseUrl: "http://upstream.test/v1",
+			enabled: true,
+			secret: "secret-key",
+			models: [{ modelId: "gpt-5.5" }],
+		});
+		db.insert(schema.automationAgentModelConfigs)
+			.values({
+				id: "automation-config-1",
+				automationId: "automation-1",
+				agent: "claude",
+				providerId: provider.id,
+				gatewayToken: "automation-token",
+				modelId: "gpt-5.5",
+			})
+			.run();
+
+		const response = await handleModelGatewayRequest({
+			db: asHostDb(db),
+			request: new Request("http://127.0.0.1/model-gateway/v1/messages", {
+				method: "POST",
+				headers: { authorization: "Bearer automation-token" },
+				body: JSON.stringify({
+					model: "gpt-5.5",
+					system: "Use tools when needed.",
+					messages: [
+						{ role: "user", content: "read package.json" },
+						{
+							role: "assistant",
+							content: [
+								{
+									type: "tool_use",
+									id: "toolu_1",
+									name: "read_file",
+									input: { path: "package.json" },
+								},
+							],
+						},
+						{
+							role: "user",
+							content: [
+								{
+									type: "tool_result",
+									tool_use_id: "toolu_1",
+									content: "contents",
+								},
+							],
+						},
+					],
+					tools: [
+						{
+							name: "read_file",
+							description: "Read a file",
+							input_schema: { type: "object" },
+						},
+					],
+					tool_choice: { type: "auto" },
+					max_tokens: 64,
+				}),
+			}),
+			fetchImpl: async (input, init): Promise<Response> => {
+				expect(String(input)).toBe("http://upstream.test/v1/responses");
+				const body =
+					typeof init?.body === "string"
+						? (JSON.parse(init.body) as {
+								input?: unknown;
+								instructions?: unknown;
+								tools?: unknown;
+								tool_choice?: unknown;
+							})
+						: {};
+				expect(body.instructions).toBe("Use tools when needed.");
+				expect(body.tools).toEqual([
+					{
+						type: "function",
+						name: "read_file",
+						description: "Read a file",
+						parameters: { type: "object" },
+					},
+				]);
+				expect(body.tool_choice).toBe("auto");
+				expect(body.input).toEqual([
+					{
+						role: "user",
+						content: [{ type: "input_text", text: "read package.json" }],
+					},
+					{
+						type: "function_call",
+						call_id: "toolu_1",
+						name: "read_file",
+						arguments: '{"path":"package.json"}',
+					},
+					{
+						type: "function_call_output",
+						call_id: "toolu_1",
+						output: "contents",
+					},
+				]);
+				return new Response(
+					JSON.stringify({
+						id: "resp_1",
+						output: [
+							{
+								type: "function_call",
+								call_id: "call_2",
+								name: "write_file",
+								arguments: '{"path":"report.md"}',
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				);
+			},
+		});
+
+		expect(response.status).toBe(200);
+		const parsed = (await response.json()) as {
+			content?: Array<{
+				type?: string;
+				id?: string;
+				name?: string;
+				input?: unknown;
+			}>;
+			stop_reason?: string;
+		};
+		expect(parsed.content).toEqual([
+			{
+				type: "tool_use",
+				id: "call_2",
+				name: "write_file",
+				input: { path: "report.md" },
+			},
+		]);
+		expect(parsed.stop_reason).toBe("tool_use");
+	});
+
 	it("rejects translated provider responses with no assistant content", async () => {
 		const db = createTestDb();
 		const provider = upsertModelProvider(asHostDb(db), {

@@ -71,8 +71,87 @@ describe("model gateway translation", () => {
 		});
 
 		expect(request.model).toBe("gpt-5.5");
-		expect(request.input).toContain("hello");
+		expect(request.input).toEqual([
+			{ role: "user", content: [{ type: "input_text", text: "hello" }] },
+		]);
 		expect(request.instructions).toBe("System text");
+	});
+
+	it("maps Anthropic tools and tool results to OpenAI Responses", () => {
+		const request = buildOpenAIResponsesRequest({
+			model: "gpt-5.5",
+			system: "You are useful.",
+			messages: [
+				{ role: "user", content: "read package.json" },
+				{
+					role: "assistant",
+					content: [
+						{ type: "text", text: "I will inspect the file." },
+						{
+							type: "tool_use",
+							id: "toolu_1",
+							name: "read_file",
+							input: { path: "package.json" },
+						},
+					],
+				},
+				{
+					role: "user",
+					content: [
+						{
+							type: "tool_result",
+							tool_use_id: "toolu_1",
+							content: '{"name":"superset"}',
+						},
+					],
+				},
+			],
+			tools: [
+				{
+					name: "read_file",
+					description: "Read a file",
+					input_schema: {
+						type: "object",
+						properties: { path: { type: "string" } },
+					},
+				},
+			],
+			tool_choice: { type: "auto" },
+		});
+
+		expect(request.tools).toEqual([
+			{
+				type: "function",
+				name: "read_file",
+				description: "Read a file",
+				parameters: {
+					type: "object",
+					properties: { path: { type: "string" } },
+				},
+			},
+		]);
+		expect(request.tool_choice).toBe("auto");
+		expect(request.input).toEqual([
+			{
+				role: "user",
+				content: [{ type: "input_text", text: "read package.json" }],
+			},
+			{
+				role: "assistant",
+				content: [{ type: "output_text", text: "I will inspect the file." }],
+			},
+			{
+				type: "function_call",
+				call_id: "toolu_1",
+				name: "read_file",
+				arguments: '{"path":"package.json"}',
+			},
+			{
+				type: "function_call_output",
+				call_id: "toolu_1",
+				output: '{"name":"superset"}',
+			},
+		]);
 	});
 
 	it("maps OpenAI Chat responses back to Anthropic message shape", () => {
