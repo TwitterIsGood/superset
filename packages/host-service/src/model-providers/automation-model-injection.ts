@@ -193,15 +193,20 @@ function writeClaudeAutomationConfig(args: {
 		modelId: args.selection.modelId,
 	});
 	const gatewayBaseUrl = `${args.hostServiceBaseUrl}/model-gateway`;
+	const env = claudeEnv({
+		gatewayToken,
+		gatewayBaseUrl,
+		modelId: args.selection.modelId,
+	});
 	const result = writeClaudeSettingsLocalJson({
 		worktreePath: args.runDirectory,
-		env: claudeEnv({
-			gatewayToken,
-			gatewayBaseUrl,
-			modelId: args.selection.modelId,
-		}),
+		env,
 	});
-	return { env: {}, family: "claude", configPath: result.settingsPath };
+	return {
+		env,
+		family: "claude",
+		configPath: result.settingsPath,
+	};
 }
 
 function writeCodexAutomationConfig(args: {

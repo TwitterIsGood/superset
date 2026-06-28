@@ -29,7 +29,10 @@ function normalizeTextContent(content: unknown): string {
 	return content
 		.map((block) => {
 			if (!isRecord(block)) return "";
-			if (block.type === "text" && typeof block.text === "string") {
+			if (
+				(block.type === "text" || block.type === "output_text") &&
+				typeof block.text === "string"
+			) {
 				return block.text;
 			}
 			if (block.type === "tool_result") {
@@ -251,6 +254,9 @@ function extractOpenAIResponsesContent(parsed: unknown): {
 		if (item.type === "message" && Array.isArray(item.content)) {
 			text += normalizeTextContent(item.content);
 		}
+		if (item.type === "output_text" && typeof item.text === "string") {
+			text += item.text;
+		}
 		if (item.type === "function_call") {
 			let input: Record<string, unknown> = {};
 			if (typeof item.arguments === "string") {
@@ -265,10 +271,16 @@ function extractOpenAIResponsesContent(parsed: unknown): {
 			});
 		}
 	}
+	const usage = isRecord(parsed) && isRecord(parsed.usage) ? parsed.usage : {};
 	return {
 		text,
 		toolUses: toolUses.filter((toolUse) => toolUse.name.length > 0),
-		usage: { input_tokens: 0, output_tokens: 0 },
+		usage: {
+			input_tokens:
+				typeof usage.input_tokens === "number" ? usage.input_tokens : 0,
+			output_tokens:
+				typeof usage.output_tokens === "number" ? usage.output_tokens : 0,
+		},
 	};
 }
 

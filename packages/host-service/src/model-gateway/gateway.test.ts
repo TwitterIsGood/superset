@@ -297,6 +297,73 @@ describe("handleModelGatewayRequest", () => {
 		expect(response.status).toBe(200);
 	});
 
+	it("preserves OpenAI Responses output text for automation gateway tokens", async () => {
+		const db = createTestDb();
+		const provider = upsertModelProvider(asHostDb(db), {
+			name: "Responses provider",
+			protocol: "openai-responses",
+			baseUrl: "http://upstream.test/v1",
+			enabled: true,
+			secret: "secret-key",
+			models: [{ modelId: "gpt-5.5" }],
+		});
+		db.insert(schema.automationAgentModelConfigs)
+			.values({
+				id: "automation-config-1",
+				automationId: "automation-1",
+				agent: "claude",
+				providerId: provider.id,
+				gatewayToken: "automation-token",
+				modelId: "gpt-5.5",
+			})
+			.run();
+
+		const response = await handleModelGatewayRequest({
+			db: asHostDb(db),
+			request: new Request("http://127.0.0.1/model-gateway/v1/messages", {
+				method: "POST",
+				headers: { authorization: "Bearer automation-token" },
+				body: JSON.stringify({
+					model: "gpt-5.5",
+					messages: [{ role: "user", content: "hello" }],
+					max_tokens: 64,
+				}),
+			}),
+			fetchImpl: async (input, init): Promise<Response> => {
+				expect(String(input)).toBe("http://upstream.test/v1/responses");
+				const body =
+					typeof init?.body === "string"
+						? (JSON.parse(init.body) as { model?: string })
+						: {};
+				expect(body.model).toBe("gpt-5.5");
+				return new Response(
+					JSON.stringify({
+						id: "resp_1",
+						output: [
+							{
+								type: "message",
+								role: "assistant",
+								content: [
+									{
+										type: "output_text",
+										text: "Automation report body",
+									},
+								],
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				);
+			},
+		});
+
+		expect(response.status).toBe(200);
+		const parsed = (await response.json()) as {
+			content?: Array<{ text?: string }>;
+		};
+		expect(parsed.content?.[0]?.text).toBe("Automation report body");
+	});
+
 	it("returns a sanitized provider failure when upstream fetch fails", async () => {
 		const db = createTestDb();
 		seedWorkspace(db);

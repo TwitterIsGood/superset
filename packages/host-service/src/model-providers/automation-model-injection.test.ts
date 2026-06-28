@@ -72,6 +72,12 @@ describe("prepareAutomationModelInjection", () => {
 			const settings = JSON.parse(readFileSync(settingsPath, "utf8")) as {
 				env: Record<string, string>;
 			};
+			expect(result?.env.ANTHROPIC_BASE_URL).toBe(
+				"http://127.0.0.1:4879/model-gateway",
+			);
+			expect(result?.env.ANTHROPIC_AUTH_TOKEN).toStartWith("superset_");
+			expect(result?.env.ANTHROPIC_AUTH_TOKEN).not.toBe("provider-secret");
+			expect(result?.env.ANTHROPIC_MODEL).toBe("gpt-5.5(xhigh)");
 			expect(settings.env.ANTHROPIC_BASE_URL).toBe(
 				"http://127.0.0.1:4879/model-gateway",
 			);

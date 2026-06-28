@@ -113,6 +113,35 @@ describe("model gateway translation", () => {
 		expect(response.stop_reason).toBe("tool_use");
 	});
 
+	it("maps OpenAI Responses output_text blocks back to Anthropic text", () => {
+		const response = buildAnthropicResponseFromUpstream({
+			protocol: "openai-responses",
+			requestModel: "gpt-5.5",
+			upstream: {
+				id: "resp_1",
+				output: [
+					{
+						type: "message",
+						role: "assistant",
+						content: [
+							{
+								type: "output_text",
+								text: "Automation report body",
+							},
+						],
+					},
+				],
+				usage: { input_tokens: 5, output_tokens: 7 },
+			},
+		});
+
+		expect(response.content).toEqual([
+			{ type: "text", text: "Automation report body" },
+		]);
+		expect(response.stop_reason).toBe("end_turn");
+		expect(response.usage).toEqual({ input_tokens: 5, output_tokens: 7 });
+	});
+
 	it("can synthesize Anthropic SSE from a translated message", () => {
 		const sse = buildAnthropicSseFromMessage({
 			type: "message",
