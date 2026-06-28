@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/desktop-mcp/backend/quality-guidelines.md", "reason": "Desktop MCP quality checks and CLI contracts"}
+{"file": ".trellis/spec/guides/desktop-acceptance-tdd.md", "reason": "Required desktop acceptance documentation updates"}
+{"file": ".trellis/tasks/archive/2026-06/06-28-06-28-fix-workspace-tab-navigation-flicker/prd.md", "reason": "Regression class this gate must catch"}
