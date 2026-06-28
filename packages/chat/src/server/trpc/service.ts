@@ -1,30 +1,19 @@
-import { Memory } from "@mastra/memory";
+import { isAbsolute } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { AppRouter } from "@superset/trpc";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { initTRPC } from "@trpc/server";
-import { createMastraCode } from "mastracode";
 import superjson from "superjson";
-import {
-	type StandaloneChatRuntimeLogger,
+import type {
+	ResolveClaudeAgentRuntime,
+	StandaloneChatRuntimeLogger,
 	StandaloneChatRuntimeManager,
 } from "./standalone-runtime";
-import { searchFiles } from "./utils/file-search";
-import {
-	authenticateRuntimeMcpServer,
-	destroyRuntime,
-	generateAndSetTitle,
-	getRuntimeMcpOverview,
-	type LifecycleEvent,
-	onUserPromptSubmit,
-	type RuntimeQuestionResponse,
-	type RuntimeSession,
-	reloadHookConfig,
-	restartRuntimeFromUserMessage,
-	runSessionStartHook,
-	subscribeToSessionEvents,
-	syncRuntimeHookSessionId,
+import type {
+	LifecycleEvent,
+	RuntimeQuestionResponse,
+	RuntimeSession,
 } from "./utils/runtime";
-import { getSupersetMcpTools } from "./utils/runtime/superset-mcp";
 import {
 	approvalRespondInput,
 	displayStateInput,
@@ -40,6 +29,91 @@ import {
 } from "./zod";
 
 const ENABLE_MASTRA_MCP_SERVERS = false;
+
+type StandaloneRuntimeModule = typeof import("./standalone-runtime");
+type RuntimeModule = typeof import("./utils/runtime");
+type SupersetMcpModule = typeof import("./utils/runtime/superset-mcp");
+type FileSearchModule = typeof import("./utils/file-search");
+type CreateMastraCode = typeof import("mastracode").createMastraCode;
+type MastraMemoryConstructor = typeof import("@mastra/memory").Memory;
+type MastracodeRuntimeModule = {
+	createMastraCode: CreateMastraCode;
+};
+type MastraMemoryModule = {
+	Memory: MastraMemoryConstructor;
+};
+type MastracodeRuntimeModules = MastracodeRuntimeModule & MastraMemoryModule;
+
+let standaloneRuntimeModulePromise: Promise<StandaloneRuntimeModule> | null =
+	null;
+let runtimeModulePromise: Promise<RuntimeModule> | null = null;
+let supersetMcpModulePromise: Promise<SupersetMcpModule> | null = null;
+let fileSearchModulePromise: Promise<FileSearchModule> | null = null;
+const mastracodeRuntimeModulePromises = new Map<
+	string,
+	Promise<MastracodeRuntimeModules>
+>();
+
+function loadStandaloneRuntimeModule(): Promise<StandaloneRuntimeModule> {
+	standaloneRuntimeModulePromise ??= import("./standalone-runtime");
+	return standaloneRuntimeModulePromise;
+}
+
+function loadRuntimeModule(): Promise<RuntimeModule> {
+	runtimeModulePromise ??= import("./utils/runtime");
+	return runtimeModulePromise;
+}
+
+function loadSupersetMcpModule(): Promise<SupersetMcpModule> {
+	supersetMcpModulePromise ??= import("./utils/runtime/superset-mcp");
+	return supersetMcpModulePromise;
+}
+
+function loadFileSearchModule(): Promise<FileSearchModule> {
+	fileSearchModulePromise ??= import("./utils/file-search");
+	return fileSearchModulePromise;
+}
+
+function toDynamicImportSpecifier(pathOrSpecifier: string): string {
+	if (pathOrSpecifier.startsWith("file:")) return pathOrSpecifier;
+	if (isAbsolute(pathOrSpecifier)) {
+		return pathToFileURL(pathOrSpecifier).href;
+	}
+	return pathOrSpecifier;
+}
+
+export interface MastracodeRuntimePaths {
+	mastracodeImportPath: string;
+	memoryImportPath: string;
+}
+
+export type ResolveMastracodeRuntime =
+	() => Promise<MastracodeRuntimePaths | null>;
+
+async function loadMastracodeRuntimeModules(
+	resolveRuntimePaths: ResolveMastracodeRuntime | undefined,
+): Promise<MastracodeRuntimeModules> {
+	const runtimePaths = await resolveRuntimePaths?.();
+	const mastracodeSpecifier = toDynamicImportSpecifier(
+		runtimePaths?.mastracodeImportPath ?? "mastracode",
+	);
+	const memorySpecifier = toDynamicImportSpecifier(
+		runtimePaths?.memoryImportPath ?? "@mastra/memory",
+	);
+	const cacheKey = `${mastracodeSpecifier}\0${memorySpecifier}`;
+	let modulePromise = mastracodeRuntimeModulePromises.get(cacheKey);
+	if (!modulePromise) {
+		modulePromise = Promise.all([
+			import(mastracodeSpecifier) as Promise<MastracodeRuntimeModule>,
+			import(memorySpecifier) as Promise<MastraMemoryModule>,
+		]).then(([mastracodeModule, memoryModule]) => ({
+			createMastraCode: mastracodeModule.createMastraCode,
+			Memory: memoryModule.Memory,
+		}));
+		mastracodeRuntimeModulePromises.set(cacheKey, modulePromise);
+	}
+	return modulePromise;
+}
 
 type RuntimeQuestionPayload = Parameters<
 	RuntimeSession["harness"]["respondToQuestion"]
@@ -121,6 +195,8 @@ export interface ChatRuntimeServiceOptions {
 	headers: () => Record<string, string> | Promise<Record<string, string>>;
 	apiUrl: string;
 	onLifecycleEvent?: (event: LifecycleEvent) => void;
+	resolveClaudeAgentRuntime?: ResolveClaudeAgentRuntime;
+	resolveMastracodeRuntime?: ResolveMastracodeRuntime;
 	standaloneRuntimeLogger?: StandaloneChatRuntimeLogger;
 }
 
@@ -131,7 +207,7 @@ export class ChatRuntimeService {
 		Promise<RuntimeSession>
 	>();
 	private readonly apiClient: ReturnType<typeof createTRPCClient<AppRouter>>;
-	private readonly standaloneRuntime: StandaloneChatRuntimeManager;
+	private standaloneRuntime: StandaloneChatRuntimeManager | null = null;
 
 	constructor(readonly opts: ChatRuntimeServiceOptions) {
 		this.apiClient = createTRPCClient<AppRouter>({
@@ -145,11 +221,23 @@ export class ChatRuntimeService {
 				}),
 			],
 		});
+	}
+
+	private async getStandaloneRuntime(): Promise<StandaloneChatRuntimeManager> {
+		if (this.standaloneRuntime) return this.standaloneRuntime;
+		const { ClaudeStandaloneChatProvider, StandaloneChatRuntimeManager } =
+			await loadStandaloneRuntimeModule();
+		const provider = this.opts.resolveClaudeAgentRuntime
+			? new ClaudeStandaloneChatProvider({
+					resolveRuntimePaths: this.opts.resolveClaudeAgentRuntime,
+				})
+			: undefined;
 		this.standaloneRuntime = new StandaloneChatRuntimeManager(
 			this.apiClient,
-			undefined,
-			opts.standaloneRuntimeLogger,
+			provider,
+			this.opts.standaloneRuntimeLogger,
 		);
+		return this.standaloneRuntime;
 	}
 
 	private async getOrCreateRuntime(
@@ -162,9 +250,11 @@ export class ChatRuntimeService {
 		const existing = this.runtimes.get(sessionId);
 		if (existing) {
 			if (cwd && existing.cwd !== cwd) {
+				const { destroyRuntime } = await loadRuntimeModule();
 				await destroyRuntime(existing);
 				this.runtimes.delete(sessionId);
 			} else {
+				const { reloadHookConfig } = await loadRuntimeModule();
 				reloadHookConfig(existing);
 				return existing;
 			}
@@ -177,6 +267,19 @@ export class ChatRuntimeService {
 
 		const creationPromise = (async () => {
 			try {
+				const [
+					{ Memory, createMastraCode },
+					{ getSupersetMcpTools },
+					{
+						runSessionStartHook,
+						subscribeToSessionEvents,
+						syncRuntimeHookSessionId,
+					},
+				] = await Promise.all([
+					loadMastracodeRuntimeModules(this.opts.resolveMastracodeRuntime),
+					loadSupersetMcpModule(),
+					loadRuntimeModule(),
+				]);
 				const extraTools = await getSupersetMcpTools(
 					() => Promise.resolve(this.opts.headers()),
 					this.opts.apiUrl,
@@ -227,6 +330,7 @@ export class ChatRuntimeService {
 				searchFiles: t.procedure
 					.input(searchFilesInput)
 					.query(async ({ input }) => {
+						const { searchFiles } = await loadFileSearchModule();
 						return searchFiles({
 							rootPath: input.rootPath,
 							query: input.query,
@@ -246,6 +350,7 @@ export class ChatRuntimeService {
 							input.sessionId,
 							input.cwd,
 						);
+						const { getRuntimeMcpOverview } = await loadRuntimeModule();
 						return getRuntimeMcpOverview(runtime);
 					}),
 				authenticateMcpServer: t.procedure
@@ -259,6 +364,7 @@ export class ChatRuntimeService {
 							input.sessionId,
 							input.cwd,
 						);
+						const { authenticateRuntimeMcpServer } = await loadRuntimeModule();
 						return authenticateRuntimeMcpServer(runtime, input.serverName);
 					}),
 			}),
@@ -268,7 +374,8 @@ export class ChatRuntimeService {
 					.input(displayStateInput)
 					.query(async ({ input }) => {
 						if (!input.cwd) {
-							return this.standaloneRuntime.getDisplayState(input.sessionId) as
+							const standaloneRuntime = await this.getStandaloneRuntime();
+							return standaloneRuntime.getDisplayState(input.sessionId) as
 								| RuntimeDisplayState
 								| StandaloneDisplayState;
 						}
@@ -324,7 +431,8 @@ export class ChatRuntimeService {
 					.input(listMessagesInput)
 					.query(async ({ input }) => {
 						if (!input.cwd) {
-							const messages = await this.standaloneRuntime.listMessages(
+							const standaloneRuntime = await this.getStandaloneRuntime();
+							const messages = await standaloneRuntime.listMessages(
 								input.sessionId,
 							);
 							return messages as RuntimeMessages;
@@ -340,8 +448,11 @@ export class ChatRuntimeService {
 					.input(sendMessageInput)
 					.mutation(async ({ input }) => {
 						if (!input.cwd) {
-							return this.standaloneRuntime.sendMessage(input);
+							const standaloneRuntime = await this.getStandaloneRuntime();
+							return standaloneRuntime.sendMessage(input);
 						}
+						const { generateAndSetTitle, onUserPromptSubmit } =
+							await loadRuntimeModule();
 						const runtime = await this.getOrCreateRuntime(
 							input.sessionId,
 							input.cwd,
@@ -375,8 +486,14 @@ export class ChatRuntimeService {
 					.input(restartFromMessageInput)
 					.mutation(async ({ input }) => {
 						if (!input.cwd) {
-							return this.standaloneRuntime.restartFromMessage(input);
+							const standaloneRuntime = await this.getStandaloneRuntime();
+							return standaloneRuntime.restartFromMessage(input);
 						}
+						const {
+							generateAndSetTitle,
+							onUserPromptSubmit,
+							restartRuntimeFromUserMessage,
+						} = await loadRuntimeModule();
 						const runtime = await this.getOrCreateRuntime(
 							input.sessionId,
 							input.cwd,
@@ -401,7 +518,8 @@ export class ChatRuntimeService {
 
 				stop: t.procedure.input(sessionIdInput).mutation(async ({ input }) => {
 					if (!input.cwd) {
-						await this.standaloneRuntime.abort(input.sessionId);
+						const standaloneRuntime = await this.getStandaloneRuntime();
+						await standaloneRuntime.abort(input.sessionId);
 						return;
 					}
 					const runtime = await this.getOrCreateRuntime(
@@ -413,7 +531,8 @@ export class ChatRuntimeService {
 
 				abort: t.procedure.input(sessionIdInput).mutation(async ({ input }) => {
 					if (!input.cwd) {
-						await this.standaloneRuntime.abort(input.sessionId);
+						const standaloneRuntime = await this.getStandaloneRuntime();
+						await standaloneRuntime.abort(input.sessionId);
 						return;
 					}
 					const runtime = await this.getOrCreateRuntime(
@@ -428,7 +547,8 @@ export class ChatRuntimeService {
 						.input(approvalRespondInput)
 						.mutation(async ({ input }) => {
 							if (!input.cwd) {
-								return this.standaloneRuntime.respondToApproval(
+								const standaloneRuntime = await this.getStandaloneRuntime();
+								return standaloneRuntime.respondToApproval(
 									input.sessionId,
 									input.payload,
 								);

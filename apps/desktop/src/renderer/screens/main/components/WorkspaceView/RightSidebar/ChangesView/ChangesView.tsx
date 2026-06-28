@@ -1,4 +1,3 @@
-import { toast } from "@superset/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@superset/ui/tabs";
 import { cn } from "@superset/ui/utils";
 import { useParams } from "@tanstack/react-router";
@@ -8,6 +7,7 @@ import {
 	getGitHubPRCommentsQueryPolicy,
 	getGitHubStatusQueryPolicy,
 } from "renderer/lib/githubQueryPolicy";
+import { toast } from "renderer/lib/toast";
 import { useWorkspaceFileEvents } from "renderer/screens/main/components/WorkspaceView/hooks/useWorkspaceFileEvents";
 import {
 	checkSummaryIconConfig,

@@ -1,10 +1,6 @@
-import { createAuthStorage } from "mastracode";
+import { createSupersetAuthStorage } from "../../chat-service/auth-storage";
+import type { AuthStorageLike } from "../../chat-service/auth-storage-types";
 import { OPENAI_AUTH_PROVIDER_IDS } from "../provider-ids";
-
-interface OpenAIAuthStorageLike {
-	reload: () => void;
-	get: (providerId: string) => unknown;
-}
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
@@ -30,7 +26,10 @@ export function isOpenAICredentialExpired(
 }
 
 export function getOpenAICredentialsFromAuthStorage(
-	authStorage: OpenAIAuthStorageLike = createAuthStorage(),
+	authStorage: Pick<
+		AuthStorageLike,
+		"get" | "reload"
+	> = createSupersetAuthStorage(),
 ): OpenAICredentials | null {
 	try {
 		authStorage.reload();

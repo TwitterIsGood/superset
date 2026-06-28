@@ -9,6 +9,7 @@ COMPOSE_PROJECT_NAME="${SUPERSET_ONLINE_COMPOSE_PROJECT:-superset-online}"
 ONLINE_BUILD_DIR="${SUPERSET_ONLINE_BUILD_DIR:-$ROOT_DIR/.online-build}"
 RUN_DIR="${SUPERSET_ONLINE_RUN_DIR:-$ROOT_DIR/.tmp/online-service}"
 MOBILE_ENV_PATH="${SUPERSET_ONLINE_MOBILE_ENV_FILE:-$ROOT_DIR/apps/mobile/.env.local}"
+ONLINE_PROFILE="${SUPERSET_ONLINE_PROFILE:-full}"
 
 LAUNCH_AGENT_LABEL="com.superset.online"
 LAUNCH_AGENT_PATH="$HOME/Library/LaunchAgents/${LAUNCH_AGENT_LABEL}.plist"
@@ -33,6 +34,7 @@ PUBLIC_WEB_URL="${SUPERSET_PUBLIC_WEB_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:6
 PUBLIC_API_URL="${SUPERSET_PUBLIC_API_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63001}"
 PUBLIC_ELECTRIC_URL="${SUPERSET_PUBLIC_ELECTRIC_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63012}"
 PUBLIC_RELAY_URL="${SUPERSET_PUBLIC_RELAY_URL:-${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}:63013}"
+PUBLIC_RESOURCE_PACK_BASE_URL="${SUPERSET_RESOURCE_PACK_BASE_URL:-}"
 MOBILE_PROFILE="${SUPERSET_MOBILE_PROFILE:-online-canary}"
 
 HOST_DATABASE_URL="postgres://postgres:postgres@localhost:${ONLINE_PG_PORT}/main"
@@ -82,6 +84,7 @@ load_base_env() {
 apply_host_env() {
 	export NODE_ENV="production"
 	export SUPERSET_ONLINE_SERVICE="1"
+	export SUPERSET_ALLOW_LOCALHOST_CORS="0"
 	export SUPERSET_HOME_DIR="${SUPERSET_ONLINE_HOME_DIR:-$RUN_DIR/superset-home}"
 	export SUPERSET_NEXT_DIST_DIR=".next-online"
 
@@ -92,6 +95,12 @@ apply_host_env() {
 	export LOCAL_KV_REST_PORT="$ONLINE_KV_REST_PORT"
 	export LOCAL_S3_PORT="$ONLINE_S3_PORT"
 	export LOCAL_S3_CONSOLE_PORT="$ONLINE_S3_CONSOLE_PORT"
+	if [[ "${SUPERSET_ONLINE_EXPOSE_RESOURCE_PACKS_PUBLIC:-0}" == "1" ]]; then
+		export LOCAL_S3_BIND_HOST="${LOCAL_S3_BIND_HOST:-0.0.0.0}"
+	else
+		export LOCAL_S3_BIND_HOST="${LOCAL_S3_BIND_HOST:-127.0.0.1}"
+	fi
+	export LOCAL_S3_CONSOLE_BIND_HOST="${LOCAL_S3_CONSOLE_BIND_HOST:-127.0.0.1}"
 
 	export DATABASE_URL="$HOST_DATABASE_URL"
 	export DATABASE_URL_UNPOOLED="$HOST_DATABASE_URL_UNPOOLED"
@@ -149,7 +158,7 @@ apply_host_env() {
 
 write_online_env_file() {
 	local managed_keys_re
-	managed_keys_re='^(export[[:space:]]+)?(NODE_ENV|SUPERSET_ONLINE_SERVICE|SUPERSET_HOME_DIR|SUPERSET_NEXT_DIST_DIR|LOCAL_PG_PORT|LOCAL_NEON_PROXY_PORT|LOCAL_ELECTRIC_PORT|LOCAL_REDIS_PORT|LOCAL_KV_REST_PORT|LOCAL_S3_PORT|LOCAL_S3_CONSOLE_PORT|DATABASE_URL|DATABASE_URL_UNPOOLED|KV_REST_API_URL|KV_REST_API_TOKEN|KV_URL|MINIO_ROOT_USER|MINIO_ROOT_PASSWORD|SUPERSET_OBJECT_STORAGE_ENDPOINT|SUPERSET_OBJECT_STORAGE_BUCKET|SUPERSET_OBJECT_STORAGE_REGION|SUPERSET_OBJECT_STORAGE_ACCESS_KEY|SUPERSET_OBJECT_STORAGE_SECRET_KEY|SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE|ELECTRIC_SECRET|ELECTRIC_URL|ELECTRIC_SHAPE_URL|AUTH_URL|AUTH_JWKS_URL|RELAY_INTERNAL_API_URL|WEB_PORT|API_PORT|WRANGLER_PORT|RELAY_PORT|ELECTRIC_PORT|NEXT_PUBLIC_WEB_URL|NEXT_PUBLIC_API_URL|NEXT_PUBLIC_ELECTRIC_URL|NEXT_PUBLIC_ELECTRIC_PROXY_URL|NEXT_PUBLIC_RELAY_URL|RELAY_URL|NEXT_PUBLIC_COOKIE_DOMAIN|SUPERSET_WEB_URL|SUPERSET_MOBILE_PROFILE|EXPO_PUBLIC_SUPERSET_PROFILE|EXPO_PUBLIC_API_URL|EXPO_PUBLIC_ELECTRIC_URL|EXPO_PUBLIC_WEB_URL|EXPO_PUBLIC_RELAY_URL|NEXT_PUBLIC_MARKETING_URL|NEXT_PUBLIC_ADMIN_URL|NEXT_PUBLIC_DOCS_URL|NEXT_PUBLIC_DESKTOP_URL|NEXT_PUBLIC_STREAMS_URL|STREAMS_URL|FLY_REGION|FLY_MACHINE_ID|RELAY_PUBLIC_URL|RELAY_SYNTHETIC_JWT|NO_PROXY|no_proxy)='
+	managed_keys_re='^(export[[:space:]]+)?(NODE_ENV|SUPERSET_ONLINE_SERVICE|SUPERSET_ALLOW_LOCALHOST_CORS|SUPERSET_HOME_DIR|SUPERSET_NEXT_DIST_DIR|LOCAL_PG_PORT|LOCAL_NEON_PROXY_PORT|LOCAL_ELECTRIC_PORT|LOCAL_REDIS_PORT|LOCAL_KV_REST_PORT|LOCAL_S3_PORT|LOCAL_S3_CONSOLE_PORT|LOCAL_S3_BIND_HOST|LOCAL_S3_CONSOLE_BIND_HOST|DATABASE_URL|DATABASE_URL_UNPOOLED|KV_REST_API_URL|KV_REST_API_TOKEN|KV_URL|MINIO_ROOT_USER|MINIO_ROOT_PASSWORD|SUPERSET_OBJECT_STORAGE_ENDPOINT|SUPERSET_OBJECT_STORAGE_BUCKET|SUPERSET_OBJECT_STORAGE_REGION|SUPERSET_OBJECT_STORAGE_ACCESS_KEY|SUPERSET_OBJECT_STORAGE_SECRET_KEY|SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE|ELECTRIC_SECRET|ELECTRIC_URL|ELECTRIC_SHAPE_URL|AUTH_URL|AUTH_JWKS_URL|RELAY_INTERNAL_API_URL|WEB_PORT|API_PORT|WRANGLER_PORT|RELAY_PORT|ELECTRIC_PORT|NEXT_PUBLIC_WEB_URL|NEXT_PUBLIC_API_URL|NEXT_PUBLIC_ELECTRIC_URL|NEXT_PUBLIC_ELECTRIC_PROXY_URL|NEXT_PUBLIC_RELAY_URL|RELAY_URL|NEXT_PUBLIC_COOKIE_DOMAIN|SUPERSET_WEB_URL|SUPERSET_MOBILE_PROFILE|EXPO_PUBLIC_SUPERSET_PROFILE|EXPO_PUBLIC_API_URL|EXPO_PUBLIC_ELECTRIC_URL|EXPO_PUBLIC_WEB_URL|EXPO_PUBLIC_RELAY_URL|NEXT_PUBLIC_MARKETING_URL|NEXT_PUBLIC_ADMIN_URL|NEXT_PUBLIC_DOCS_URL|NEXT_PUBLIC_DESKTOP_URL|NEXT_PUBLIC_STREAMS_URL|STREAMS_URL|FLY_REGION|FLY_MACHINE_ID|RELAY_PUBLIC_URL|RELAY_SYNTHETIC_JWT|NO_PROXY|no_proxy)='
 
 	{
 		if [[ -f "$BASE_ENV_PATH" ]]; then
@@ -159,6 +168,7 @@ write_online_env_file() {
 		printf '# --- Managed by scripts/superset-online.sh. Do not edit below. ---\n'
 		write_env_var "NODE_ENV" "production"
 		write_env_var "SUPERSET_ONLINE_SERVICE" "1"
+		write_env_var "SUPERSET_ALLOW_LOCALHOST_CORS" "0"
 		write_env_var "SUPERSET_HOME_DIR" "/var/lib/superset"
 		write_env_var "SUPERSET_NEXT_DIST_DIR" ".next-online"
 		write_env_var "LOCAL_PG_PORT" "$ONLINE_PG_PORT"
@@ -167,6 +177,8 @@ write_online_env_file() {
 		write_env_var "LOCAL_KV_REST_PORT" "$ONLINE_KV_REST_PORT"
 		write_env_var "LOCAL_S3_PORT" "$ONLINE_S3_PORT"
 		write_env_var "LOCAL_S3_CONSOLE_PORT" "$ONLINE_S3_CONSOLE_PORT"
+		write_env_var "LOCAL_S3_BIND_HOST" "$LOCAL_S3_BIND_HOST"
+		write_env_var "LOCAL_S3_CONSOLE_BIND_HOST" "$LOCAL_S3_CONSOLE_BIND_HOST"
 		write_env_var "DATABASE_URL" "$CONTAINER_DATABASE_URL"
 		write_env_var "DATABASE_URL_UNPOOLED" "$CONTAINER_DATABASE_URL_UNPOOLED"
 		write_env_var "KV_REST_API_TOKEN" "$KV_REST_API_TOKEN"
@@ -251,6 +263,14 @@ write_mobile_env_file() {
 }
 
 prepare_env() {
+	case "$ONLINE_PROFILE" in
+		full|desktop)
+			;;
+		*)
+			fail "unknown SUPERSET_ONLINE_PROFILE: $ONLINE_PROFILE (expected full or desktop)"
+			;;
+	esac
+
 	load_base_env
 	apply_host_env
 	write_online_env_file
@@ -320,16 +340,20 @@ build_app_artifacts() {
 			bun run build
 	)
 
-	log "building Web standalone artifact"
-	(
-		cd "$ROOT_DIR/apps/web"
-		rm -rf .next-online
-		SUPERSET_ONLINE_SERVICE=1 \
-			SUPERSET_NEXT_DIST_DIR=.next-online \
-			NODE_ENV=production \
-			SKIP_ENV_VALIDATION=1 \
-			bun run build
-	)
+	if [[ "$ONLINE_PROFILE" == "full" ]]; then
+		log "building Web standalone artifact"
+		(
+			cd "$ROOT_DIR/apps/web"
+			rm -rf .next-online
+			SUPERSET_ONLINE_SERVICE=1 \
+				SUPERSET_NEXT_DIST_DIR=.next-online \
+				NODE_ENV=production \
+				SKIP_ENV_VALIDATION=1 \
+				bun run build
+		)
+	else
+		log "skipping Web standalone artifact build for SUPERSET_ONLINE_PROFILE=$ONLINE_PROFILE"
+	fi
 
 	log "building Relay bundle"
 	rm -rf "$ONLINE_BUILD_DIR/relay"
@@ -434,27 +458,114 @@ run_migrations_and_seed() {
 	fi
 }
 
+desktop_perf_fixture_args() {
+	local default_host_backed_workspaces="0"
+
+	printf '%s\n' \
+		"--slug" "${SUPERSET_ONLINE_FIXTURE_SLUG:-desktop-perf-loaded}" \
+		"--projects" "${SUPERSET_ONLINE_FIXTURE_PROJECTS:-10}" \
+		"--workspaces-per-project" "${SUPERSET_ONLINE_FIXTURE_WORKSPACES_PER_PROJECT:-20}" \
+		"--tasks" "${SUPERSET_ONLINE_FIXTURE_TASKS:-300}" \
+		"--host-backed-workspaces" "${SUPERSET_ONLINE_FIXTURE_HOST_BACKED_WORKSPACES:-$default_host_backed_workspaces}"
+}
+
+ensure_desktop_perf_fixture_if_requested() {
+	if [[ "${SUPERSET_ONLINE_LOAD_FIXTURE:-0}" != "1" ]]; then
+		return
+	fi
+
+	log "ensuring loaded desktop performance fixture"
+	local args=()
+	while IFS= read -r arg; do
+		args+=("$arg")
+	done < <(desktop_perf_fixture_args)
+	DATABASE_URL="$HOST_DATABASE_URL" \
+		DATABASE_URL_UNPOOLED="$HOST_DATABASE_URL_UNPOOLED" \
+		NODE_ENV=development bun run --cwd "$ROOT_DIR" desktop:perf-fixture -- ensure "${args[@]}"
+}
+
+cleanup_stale_minio_init_containers() {
+	if ! docker info >/dev/null 2>&1; then
+		return
+	fi
+
+	local ids=()
+	while IFS= read -r id; do
+		[[ -n "$id" ]] && ids+=("$id")
+	done < <(docker ps -aq --filter "name=^/${COMPOSE_PROJECT_NAME}-minio-init-run-" 2>/dev/null || true)
+
+	if [[ "${#ids[@]}" -gt 0 ]]; then
+		docker rm -f "${ids[@]}" >/dev/null 2>&1 || true
+	fi
+}
+
+run_minio_init() {
+	local attempts="${SUPERSET_ONLINE_MINIO_INIT_ATTEMPTS:-30}"
+	if compose run --rm \
+		-e MINIO_INIT_ATTEMPTS="$attempts" \
+		-e NO_PROXY="localhost,127.0.0.1,minio" \
+		-e no_proxy="localhost,127.0.0.1,minio" \
+		--entrypoint /bin/sh minio-init -c '
+attempt=1
+while [ "$attempt" -le "${MINIO_INIT_ATTEMPTS:-30}" ]; do
+  if mc alias set superset http://minio:9000 "${MINIO_ROOT_USER:-superset}" "${MINIO_ROOT_PASSWORD:-superset-local-artifacts}"; then
+    mc mb --ignore-existing "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}" &&
+      mc anonymous set none "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}" &&
+      mc anonymous set download "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}/packs"
+    exit $?
+  fi
+  sleep 1
+  attempt=$((attempt + 1))
+done
+exit 1
+'; then
+		log "minio artifact bucket ready"
+	else
+		log "minio artifact bucket initialization did not complete; S3-dependent flows may need retry"
+	fi
+}
+
 start_data_services() {
 	log "starting Docker data services on 430xx ports"
-	compose up -d --no-build postgres electric redis minio
-	if ! compose up -d --no-build kv-rest; then
+	compose up -d --remove-orphans --no-build postgres electric redis minio
+	if ! compose up -d --remove-orphans --no-build kv-rest; then
 		log "kv-rest image missing; building it once"
-		compose up -d --build kv-rest
+		compose up -d --remove-orphans --build kv-rest
 	fi
-	compose run --rm minio-init
+	compose rm -sf minio-init >/dev/null 2>&1 || true
+	cleanup_stale_minio_init_containers
+	run_minio_init
+	cleanup_stale_minio_init_containers
 }
 
 start_app_services() {
-	log "building app images from prepared artifacts"
-	compose build api web relay electric-proxy
+	local services=(api relay electric-proxy)
+	if [[ "$ONLINE_PROFILE" == "full" ]]; then
+		services=(api web relay electric-proxy)
+	else
+		log "stopping web service for SUPERSET_ONLINE_PROFILE=$ONLINE_PROFILE"
+		compose stop web >/dev/null 2>&1 || true
+		compose rm -f web >/dev/null 2>&1 || true
+	fi
+
+	if [[ "${SUPERSET_ONLINE_SKIP_DOCKER_BUILD:-${SUPERSET_ONLINE_SKIP_BUILD:-0}}" == "1" ]]; then
+		log "skipping Docker app image build because SUPERSET_ONLINE_SKIP_DOCKER_BUILD/SUPERSET_ONLINE_SKIP_BUILD is set"
+	else
+		log "building app images from prepared artifacts"
+		compose build "${services[@]}"
+	fi
 	log "starting Docker app services"
-	compose up -d --remove-orphans api web relay electric-proxy
+	compose up -d --remove-orphans "${services[@]}"
 }
 
 wait_for_local_services() {
 	log "waiting for online app services to become ready"
 	wait_for_probe "api" "http://localhost:${ONLINE_API_PORT}/api/auth/get-session" "200" 90
-	wait_for_probe "web" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200" 90
+	if [[ "$ONLINE_PROFILE" == "full" ]]; then
+		wait_for_probe "web" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200" 90
+	else
+		log "web probe skipped (SUPERSET_ONLINE_PROFILE=$ONLINE_PROFILE)"
+	fi
 	wait_for_probe "electric-proxy" "http://localhost:${ONLINE_ELECTRIC_PROXY_PORT}/v1/shape" "401" 60
 	wait_for_probe "relay" "http://localhost:${ONLINE_RELAY_PORT}/health" "200" 60
 }
@@ -472,8 +583,142 @@ probe_url() {
 	fi
 }
 
+format_mib() {
+	local kib="${1:-0}"
+	awk -v kib="$kib" 'BEGIN { printf "%.1f MiB", kib / 1024 }'
+}
+
+docker_mem_to_kib() {
+	local value="$1"
+	awk -v raw="$value" '
+		BEGIN {
+			number = raw
+			sub(/[[:alpha:]]+$/, "", number)
+			unit = raw
+			sub(/^[0-9.]+/, "", unit)
+			if (unit == "GiB") {
+				printf "%.0f", number * 1024 * 1024
+			} else if (unit == "MiB") {
+				printf "%.0f", number * 1024
+			} else if (unit == "KiB") {
+				printf "%.0f", number
+			} else if (unit == "B") {
+				printf "%.0f", number / 1024
+			} else {
+				printf "0"
+			}
+		}
+	'
+}
+
+online_docker_memory_kib() {
+	if ! docker info >/dev/null 2>&1; then
+		printf "0"
+		return
+	fi
+
+	local total=0
+	local name usage value kib
+	while IFS=$'\t' read -r name usage; do
+		case "$name" in
+			"$COMPOSE_PROJECT_NAME"-*)
+				value="${usage%% / *}"
+				kib="$(docker_mem_to_kib "$value")"
+				total=$((total + kib))
+				;;
+		esac
+	done < <(docker stats --no-stream --format '{{.Name}}\t{{.MemUsage}}' 2>/dev/null || true)
+
+	printf "%d" "$total"
+}
+
+print_online_top_container_memory() {
+	if ! docker info >/dev/null 2>&1; then
+		return
+	fi
+
+	docker stats --no-stream --format '{{.Name}}\t{{.MemUsage}}' 2>/dev/null |
+		awk -F '\t' -v project="$COMPOSE_PROJECT_NAME" '
+			index($1, project "-") == 1 {
+				print "  " $2 "  " $1
+			}
+		' | head -8
+}
+
+print_memory_status() {
+	local docker_kib
+	docker_kib="$(online_docker_memory_kib)"
+
+	echo "memory:"
+	printf '  %-24s %s\n' "docker compose" "$(format_mib "$docker_kib")"
+	echo "top containers:"
+	print_online_top_container_memory || true
+}
+
+print_desktop_perf_fixture_status() {
+	echo "dense desktop fixture:"
+	if ! db_query_ok; then
+		printf '  - %-24s %s\n' "desktop-perf-loaded" "database unavailable"
+		return
+	fi
+
+	local args=()
+	while IFS= read -r arg; do
+		args+=("$arg")
+	done < <(desktop_perf_fixture_args)
+
+	local output
+	if ! output="$(
+		DATABASE_URL="$HOST_DATABASE_URL" \
+			DATABASE_URL_UNPOOLED="$HOST_DATABASE_URL_UNPOOLED" \
+			NODE_ENV=development bun run --cwd "$ROOT_DIR" desktop:perf-fixture -- stats "${args[@]}" 2>/dev/null
+	)"; then
+		printf '  FAIL %-24s %s\n' "desktop-perf-loaded" "stats failed"
+		return
+	fi
+
+	if command -v jq >/dev/null 2>&1; then
+		local summary
+		summary="$(
+			printf '%s' "$output" | jq -r \
+				'"\(.slug): \(.projectCount) projects / \(.workspaceCount) workspaces / \(.taskCount) tasks / \(.hostBackedWorkspaceCount) host-backed (loaded=\(.isLoaded))"'
+		)"
+		printf '  %s\n' "$summary"
+		if [[ "$(printf '%s' "$output" | jq -r '.isLoaded')" != "true" ]]; then
+			printf '  ! %-24s %s\n' "loaded data" "run: bun run online:start:loaded"
+		fi
+	else
+		printf '  %s\n' "$(printf '%s' "$output" | tr '\n' ' ' | sed 's/[[:space:]][[:space:]]*/ /g')"
+	fi
+}
+
+minio_api_published_host() {
+	if ! docker info >/dev/null 2>&1; then
+		return 1
+	fi
+
+	local published
+	published="$(docker port "${COMPOSE_PROJECT_NAME}-minio-1" 9000/tcp 2>/dev/null | head -1 || true)"
+	if [[ -z "$published" ]]; then
+		return 1
+	fi
+
+	printf '%s\n' "${published%:*}"
+}
+
+minio_api_is_public() {
+	local host="${1:-}"
+	[[ "$host" == "0.0.0.0" || "$host" == "::" || "$host" == "[::]" ]]
+}
+
 print_status() {
 	prepare_env
+	local runtime_s3_bind_host="$LOCAL_S3_BIND_HOST"
+	local published_s3_host
+	if published_s3_host="$(minio_api_published_host)"; then
+		runtime_s3_bind_host="$published_s3_host"
+	fi
+
 	echo "online local ports:"
 	echo "  web              http://localhost:${ONLINE_WEB_PORT}"
 	echo "  api              http://localhost:${ONLINE_API_PORT}"
@@ -483,14 +728,24 @@ print_status() {
 	echo "  electric         localhost:${ONLINE_ELECTRIC_PORT}"
 	echo "  redis            localhost:${ONLINE_REDIS_PORT}"
 	echo "  kv-rest          localhost:${ONLINE_KV_REST_PORT}"
-	echo "  object-storage   localhost:${ONLINE_S3_PORT}"
-	echo "  object-console   localhost:${ONLINE_S3_CONSOLE_PORT}"
+	echo "  object-storage   ${runtime_s3_bind_host}:${ONLINE_S3_PORT}"
+	echo "  object-console   ${LOCAL_S3_CONSOLE_BIND_HOST}:${ONLINE_S3_CONSOLE_PORT}"
 	echo
 	echo "public router targets:"
 	echo "  63000 -> ${ONLINE_WEB_PORT}"
 	echo "  63001 -> ${ONLINE_API_PORT}"
 	echo "  63012 -> ${ONLINE_ELECTRIC_PROXY_PORT}"
 	echo "  63013 -> ${ONLINE_RELAY_PORT}"
+	if minio_api_is_public "$runtime_s3_bind_host"; then
+		echo "  6XXXX -> ${ONLINE_S3_PORT}  (resource-pack downloads only; do not expose ${ONLINE_S3_CONSOLE_PORT})"
+	else
+		echo "  resource packs: set SUPERSET_ONLINE_EXPOSE_RESOURCE_PACKS_PUBLIC=1 before start if a router must reach MinIO"
+	fi
+	if [[ -n "$PUBLIC_RESOURCE_PACK_BASE_URL" ]]; then
+		echo "  resource pack base URL: ${PUBLIC_RESOURCE_PACK_BASE_URL}"
+	fi
+	echo
+	echo "profile: $ONLINE_PROFILE"
 	echo
 	echo "docker compose project: $COMPOSE_PROJECT_NAME"
 	if docker info >/dev/null 2>&1; then
@@ -498,6 +753,8 @@ print_status() {
 	else
 		echo "  Docker/OrbStack is not reachable"
 	fi
+	echo
+	print_memory_status
 	echo
 	echo "local probes:"
 	if db_query_ok; then
@@ -507,15 +764,25 @@ print_status() {
 	fi
 	probe_url "object storage" "http://localhost:${ONLINE_S3_PORT}/minio/health/live" "200"
 	probe_url "api session" "http://localhost:${ONLINE_API_PORT}/api/auth/get-session" "200"
-	probe_url "web /sign-in" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200"
+	if [[ "$ONLINE_PROFILE" == "full" ]]; then
+		probe_url "web /sign-in" "http://localhost:${ONLINE_WEB_PORT}/sign-in" "200"
+	else
+		printf '  - %-24s skipped SUPERSET_ONLINE_PROFILE=%s\n' "web /sign-in" "$ONLINE_PROFILE"
+	fi
 	probe_url "electric auth gate" "http://localhost:${ONLINE_ELECTRIC_PROXY_PORT}/v1/shape" "401"
 	probe_url "relay health" "http://localhost:${ONLINE_RELAY_PORT}/health" "200"
 	echo
 	echo "public probes:"
-	probe_url "public web /sign-in" "${PUBLIC_WEB_URL}/sign-in" "200"
+	if [[ "$ONLINE_PROFILE" == "full" ]]; then
+		probe_url "public web /sign-in" "${PUBLIC_WEB_URL}/sign-in" "200"
+	else
+		printf '  - %-24s skipped SUPERSET_ONLINE_PROFILE=%s\n' "public web /sign-in" "$ONLINE_PROFILE"
+	fi
 	probe_url "public api session" "${PUBLIC_API_URL}/api/auth/get-session" "200"
 	probe_url "public electric" "${PUBLIC_ELECTRIC_URL}/v1/shape" "401"
 	probe_url "public relay health" "${PUBLIC_RELAY_URL}/health" "200"
+	echo
+	print_desktop_perf_fixture_status
 }
 
 start_all() {
@@ -528,6 +795,7 @@ start_all() {
 	wait_for_db_query
 	wait_for_object_storage
 	run_migrations_and_seed
+	ensure_desktop_perf_fixture_if_requested
 	start_app_services
 	wait_for_local_services
 	print_status
@@ -538,7 +806,7 @@ stop_all() {
 	ensure_prereqs
 	stop_legacy_host_services
 	log "stopping Docker online stack"
-	compose down
+	compose down --remove-orphans
 }
 
 restart_all() {
@@ -558,6 +826,8 @@ Usage: $0 <command>
 
 Commands:
   start              Build artifacts and start the full Docker online stack
+                     Set SUPERSET_ONLINE_PROFILE=desktop to skip the web app
+                     for low-memory Desktop development.
   stop               Stop the Docker online stack (volumes are preserved)
   restart            Stop and start the Docker online stack
   status             Print compose status and probes
@@ -591,7 +861,11 @@ main() {
 			ensure_prereqs
 			wait_for_docker "${ONLINE_DOCKER_WAIT_ATTEMPTS:-300}"
 			build_app_artifacts
-			compose build api web relay electric-proxy
+			if [[ "$ONLINE_PROFILE" == "full" ]]; then
+				compose build api web relay electric-proxy
+			else
+				compose build api relay electric-proxy
+			fi
 			;;
 		uninstall-launchd)
 			stop_legacy_host_services

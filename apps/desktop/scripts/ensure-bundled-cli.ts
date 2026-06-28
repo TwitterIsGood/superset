@@ -21,7 +21,12 @@ function hasExecutableCli(): boolean {
 	}
 }
 
-if (hasExecutableCli()) {
+if (process.env.DESKTOP_BUNDLE_CLI !== "true") {
+	console.log(
+		"[desktop] bundled CLI disabled; ensuring stale output is removed",
+	);
+	await import("./build-bundled-cli");
+} else if (hasExecutableCli()) {
 	console.log(`[desktop] bundled CLI already exists at ${outfile}`);
 } else {
 	console.log("[desktop] bundled CLI missing; building it now");

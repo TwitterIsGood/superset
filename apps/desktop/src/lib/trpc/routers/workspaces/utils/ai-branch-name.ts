@@ -1,5 +1,3 @@
-import { generateTitleFromMessage } from "@superset/chat/server/desktop";
-import { getSmallModel } from "@superset/chat/server/shared";
 import { sanitizeBranchNameWithMaxLength } from "@superset/shared/workspace-launch";
 
 const BRANCH_NAME_INSTRUCTIONS =
@@ -58,6 +56,10 @@ export async function generateBranchNameFromPrompt(
 	existingBranches: string[],
 	branchPrefix?: string,
 ): Promise<string | null> {
+	const [{ generateTitleFromMessage }, { getSmallModel }] = await Promise.all([
+		import("@superset/chat/server/desktop/title-generation"),
+		import("@superset/chat/server/shared"),
+	]);
 	const model = await getSmallModel();
 	if (!model) return null;
 

@@ -1,5 +1,4 @@
 import type { CreatePaneInput, Pane, WorkspaceStore } from "@superset/panes";
-import { toast } from "@superset/ui/sonner";
 import { workspaceTrpc } from "@superset/workspace-client";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useCallback, useMemo } from "react";
@@ -9,6 +8,7 @@ import {
 	buildTerminalCommand,
 	normalizeTerminalCommand,
 } from "renderer/lib/terminal/launch-command";
+import { toast } from "renderer/lib/toast";
 import { useWorkspace } from "renderer/routes/_authenticated/_dashboard/v2-workspace/providers/WorkspaceProvider";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import type { V2TerminalPresetRow } from "renderer/routes/_authenticated/providers/CollectionsProvider/dashboardSidebarLocal";
@@ -159,7 +159,7 @@ export function useV2PresetExecution({
 		async (
 			preset: V2TerminalPresetRow,
 			options?: { target?: "new-tab" | "active-tab" },
-		) => {
+		): Promise<boolean> => {
 			const state = store.getState();
 			const activeTabId = state.activeTabId;
 			const target = options?.target ?? resolveTarget(preset.executionMode);
@@ -199,7 +199,7 @@ export function useV2PresetExecution({
 				switch (plan) {
 					case "active-terminal": {
 						const command = launchCommands[0];
-						if (!activeTerminal || !command) break;
+						if (!activeTerminal || !command) return false;
 						await writeInput.mutateAsync({
 							terminalId: activeTerminal.terminalId,
 							workspaceId,
@@ -289,6 +289,7 @@ export function useV2PresetExecution({
 						break;
 					}
 				}
+				return true;
 			} catch (err) {
 				console.error("[useV2PresetExecution] Failed to execute preset:", err);
 				toast.error("Failed to run preset", {
@@ -297,6 +298,7 @@ export function useV2PresetExecution({
 							? err.message
 							: "Terminal session creation failed.",
 				});
+				return false;
 			}
 		},
 		[

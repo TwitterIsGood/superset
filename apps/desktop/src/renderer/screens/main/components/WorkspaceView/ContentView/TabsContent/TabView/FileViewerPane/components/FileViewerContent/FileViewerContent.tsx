@@ -1,10 +1,10 @@
+import { Loader } from "lucide-react";
 import {
 	type MutableRefObject,
 	type RefObject,
 	useEffect,
 	useRef,
 } from "react";
-import { LuLoader } from "react-icons/lu";
 import {
 	type MarkdownEditorAdapter,
 	TipTapMarkdownRenderer,
@@ -379,7 +379,7 @@ export function FileViewerContent({
 		if (isLoadingImage) {
 			return (
 				<div className="flex h-full items-center justify-center text-muted-foreground">
-					<LuLoader className="mr-2 h-4 w-4 animate-spin" />
+					<Loader className="mr-2 h-4 w-4 animate-spin" />
 					<span>Loading image...</span>
 				</div>
 			);

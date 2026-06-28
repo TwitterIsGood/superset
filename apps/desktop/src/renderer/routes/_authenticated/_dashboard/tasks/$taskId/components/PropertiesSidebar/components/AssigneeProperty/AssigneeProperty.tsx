@@ -6,8 +6,8 @@ import {
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
 import { useLiveQuery } from "@tanstack/react-db";
+import { CircleUserRound } from "lucide-react";
 import { useMemo, useState } from "react";
-import { HiOutlineUserCircle } from "react-icons/hi2";
 import { useOptimisticCollectionActions } from "renderer/routes/_authenticated/hooks/useOptimisticCollectionActions";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import type { TaskWithStatus } from "../../../../../components/TasksView/hooks/useTasksTable";
@@ -82,7 +82,7 @@ export function AssigneeProperty({ task }: AssigneePropertyProps) {
 						</>
 					) : (
 						<>
-							<HiOutlineUserCircle className="w-5 h-5 text-muted-foreground" />
+							<CircleUserRound className="w-5 h-5 text-muted-foreground" />
 							<span className="text-sm text-muted-foreground">Unassigned</span>
 						</>
 					)}
@@ -94,7 +94,7 @@ export function AssigneeProperty({ task }: AssigneePropertyProps) {
 						onSelect={() => handleSelectUser(null)}
 						className="flex items-center gap-2"
 					>
-						<HiOutlineUserCircle className="w-5 h-5 text-muted-foreground shrink-0" />
+						<CircleUserRound className="w-5 h-5 text-muted-foreground shrink-0" />
 						<span className="text-sm">No assignee</span>
 						{!task.assigneeId && !task.assigneeExternalId && (
 							<span className="ml-auto text-xs text-muted-foreground">✓</span>

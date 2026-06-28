@@ -13,7 +13,6 @@ import {
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { workspaceTrpc } from "@superset/workspace-client";
 import {
@@ -31,6 +30,7 @@ import {
 	useChangesSidebarFilePolicy,
 } from "renderer/lib/clickPolicy";
 import { FileIcon } from "renderer/lib/fileIcons";
+import { toast } from "renderer/lib/toast";
 import { DiscardConfirmDialog } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/components/DiscardConfirmDialog";
 import { StatusIndicator } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/components/StatusIndicator";
 import { PathActionsMenuItems } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/components/WorkspaceSidebar/components/PathActionsMenuItems";

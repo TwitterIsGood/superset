@@ -1,8 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { CommandPrimitive, CommandSeparator } from "@superset/ui/command";
-import { SearchIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, SearchIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 import type { RecentFile } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/hooks/useRecentlyViewedFiles";
 import { RECENT_DISPLAY_LIMIT } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/hooks/useRecentlyViewedFiles";
 import { useFileSearch } from "renderer/screens/main/components/WorkspaceView/RightSidebar/FilesView/hooks/useFileSearch/useFileSearch";
@@ -158,9 +157,9 @@ export function CommandPalette({
 									aria-label={filtersOpen ? "Hide Filters" : "Show Filters"}
 								>
 									{filtersOpen ? (
-										<LuChevronDown className="size-4" />
+										<ChevronDown className="size-4" />
 									) : (
-										<LuChevronRight className="size-4" />
+										<ChevronRight className="size-4" />
 									)}
 								</button>
 							)}

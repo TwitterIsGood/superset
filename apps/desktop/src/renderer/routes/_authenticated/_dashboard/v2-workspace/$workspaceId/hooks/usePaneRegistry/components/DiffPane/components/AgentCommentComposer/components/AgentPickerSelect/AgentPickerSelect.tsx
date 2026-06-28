@@ -10,7 +10,7 @@ import {
 	SelectValue,
 } from "@superset/ui/select";
 import { cn } from "@superset/ui/utils";
-import { LuPlus } from "react-icons/lu";
+import { Plus } from "lucide-react";
 import { usePresetIcon } from "renderer/assets/app-icons/preset-icons";
 import type { TerminalAgentBinding } from "renderer/hooks/host-service/useTerminalAgentBindings";
 import { EXISTING_PREFIX, NEW_PREFIX } from "../../hooks/useDiffCommentTarget";
@@ -119,7 +119,7 @@ function NewSessionOption({
 					draggable={false}
 				/>
 			) : (
-				<LuPlus className="size-3 text-muted-foreground" />
+				<Plus className="size-3 text-muted-foreground" />
 			)}
 			<span>{label}</span>
 		</span>

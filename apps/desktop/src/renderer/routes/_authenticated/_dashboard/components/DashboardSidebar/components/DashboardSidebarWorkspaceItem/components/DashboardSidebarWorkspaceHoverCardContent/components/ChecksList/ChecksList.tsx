@@ -1,5 +1,5 @@
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 import { STROKE_WIDTH } from "renderer/screens/main/components/WorkspaceSidebar/constants";
 import type { DashboardSidebarWorkspacePullRequestCheck } from "../../../../../../types";
 import { CheckItemRow } from "./components/CheckItemRow";
@@ -25,9 +25,9 @@ export function ChecksList({ checks }: ChecksListProps) {
 				className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
 			>
 				{expanded ? (
-					<LuChevronDown className="size-3" strokeWidth={STROKE_WIDTH} />
+					<ChevronDown className="size-3" strokeWidth={STROKE_WIDTH} />
 				) : (
-					<LuChevronRight className="size-3" strokeWidth={STROKE_WIDTH} />
+					<ChevronRight className="size-3" strokeWidth={STROKE_WIDTH} />
 				)}
 				<span>{expanded ? "Hide checks" : "Show checks"}</span>
 			</button>

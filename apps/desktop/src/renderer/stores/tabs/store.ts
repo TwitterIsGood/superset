@@ -19,6 +19,7 @@ import {
 	movePaneToNewTab,
 	movePaneToTab,
 } from "./actions/move-pane";
+import { createPersistedTabsState } from "./persistence";
 import type {
 	AddFileViewerPaneOptions,
 	AddTabWithMultiplePanesOptions,
@@ -2277,6 +2278,7 @@ export const useTabsStore = create<TabsStore>()(
 					}
 					return state;
 				},
+				partialize: (state) => createPersistedTabsState(state),
 				merge: (persistedState, currentState) => {
 					const persisted = persistedState as TabsState;
 					// Clear stale transient statuses on startup:

@@ -7,14 +7,8 @@ import {
 } from "@superset/ui/dropdown-menu";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
+import { ChevronDown, Play, Settings, StopCircle, X } from "lucide-react";
 import { memo, useCallback } from "react";
-import {
-	HiChevronDown,
-	HiMiniCog6Tooth,
-	HiMiniPlay,
-	HiMiniStop,
-	HiMiniXMark,
-} from "react-icons/hi2";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useWorkspaceRunCommand } from "renderer/routes/_authenticated/_dashboard/workspace/$workspaceId/hooks/useWorkspaceRunCommand";
@@ -122,11 +116,11 @@ export const WorkspaceRunButton = memo(function WorkspaceRunButton({
 				)}
 			>
 				{isRunning ? (
-					<HiMiniStop className="size-3.5 shrink-0" />
+					<StopCircle className="size-3.5 shrink-0" />
 				) : hasRunCommand ? (
-					<HiMiniPlay className="size-3.5 shrink-0" />
+					<Play className="size-3.5 shrink-0" />
 				) : (
-					<HiMiniCog6Tooth className="size-3.5 shrink-0" />
+					<Settings className="size-3.5 shrink-0" />
 				)}
 				<span className="hidden sm:inline">{buttonLabel}</span>
 				{hotkeyText && hotkeyText !== "Unassigned" && (
@@ -155,7 +149,7 @@ export const WorkspaceRunButton = memo(function WorkspaceRunButton({
 										"text-muted-foreground/80 border-border/40 bg-secondary/40",
 						)}
 					>
-						<HiChevronDown className="size-3.5" />
+						<ChevronDown className="size-3.5" />
 					</button>
 				</DropdownMenuTrigger>
 
@@ -166,14 +160,14 @@ export const WorkspaceRunButton = memo(function WorkspaceRunButton({
 								onClick={handleForceStopClick}
 								className="text-destructive focus:text-destructive"
 							>
-								<HiMiniXMark className="mr-2 size-4 text-destructive" />
+								<X className="mr-2 size-4 text-destructive" />
 								Force Stop
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 						</>
 					)}
 					<DropdownMenuItem onClick={handleConfigureClick}>
-						<HiMiniCog6Tooth className="mr-2 size-4" />
+						<Settings className="mr-2 size-4" />
 						{runDefinition?.source === "terminal-preset"
 							? "Edit Run Preset"
 							: "Configure"}

@@ -1,5 +1,5 @@
 import { cn } from "@superset/ui/utils";
-import { LuChevronDown, LuChevronsUpDown, LuChevronUp } from "react-icons/lu";
+import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import type { SortDirection, SortField } from "../../types";
 
 interface SortableHeaderProps {
@@ -25,10 +25,10 @@ export function SortableHeader({
 }: SortableHeaderProps) {
 	const isActive = sortField === field;
 	const Icon = !isActive
-		? LuChevronsUpDown
+		? ChevronsUpDown
 		: sortDirection === "asc"
-			? LuChevronUp
-			: LuChevronDown;
+			? ChevronUp
+			: ChevronDown;
 	const sortLabel = isActive
 		? sortDirection === "asc"
 			? "ascending"

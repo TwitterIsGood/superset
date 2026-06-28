@@ -53,9 +53,11 @@ describe("ChatRuntimeService runtime creation", () => {
 	});
 
 	it("reasserts the Superset session id after thread selection", async () => {
+		const resolveMastracodeRuntime = mock(async () => null);
 		const service = new ChatRuntimeService({
 			headers: async () => ({}),
 			apiUrl: "http://localhost:3000",
+			resolveMastracodeRuntime,
 		});
 
 		const runtime = await (
@@ -71,6 +73,7 @@ describe("ChatRuntimeService runtime creation", () => {
 		expect(setSessionIdMock.mock.calls.map(([sessionId]) => sessionId)).toEqual(
 			[SESSION_ID, THREAD_ID, SESSION_ID],
 		);
+		expect(resolveMastracodeRuntime).toHaveBeenCalledTimes(1);
 		expect(runSessionStartMock).toHaveBeenCalledTimes(1);
 	});
 });

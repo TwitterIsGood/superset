@@ -1,11 +1,11 @@
 import { Checkbox } from "@superset/ui/checkbox";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { workspaceTrpc } from "@superset/workspace-client";
+import { ArrowUpRight, Check, Copy, Undo2 } from "lucide-react";
 import { useCallback, useId, useMemo, useState } from "react";
-import { LuArrowUpRight, LuCheck, LuCopy, LuUndo2 } from "react-icons/lu";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { useSidebarFilePolicy } from "renderer/lib/clickPolicy";
+import { toast } from "renderer/lib/toast";
 import { DiscardConfirmDialog } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/components/DiscardConfirmDialog";
 import { StatusIndicator } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/components/StatusIndicator";
 import type { ChangesetFile } from "../../../../../useChangeset";
@@ -100,7 +100,7 @@ export function DiffHeaderMetadata({
 							aria-label="Open in file viewer"
 							className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-accent hover:text-muted-foreground"
 						>
-							<LuArrowUpRight className="size-3.5" />
+							<ArrowUpRight className="size-3.5" />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="bottom" showArrow={false}>
@@ -116,9 +116,9 @@ export function DiffHeaderMetadata({
 							className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-accent hover:text-muted-foreground"
 						>
 							{copied ? (
-								<LuCheck className="size-3.5" />
+								<Check className="size-3.5" />
 							) : (
-								<LuCopy className="size-3.5" />
+								<Copy className="size-3.5" />
 							)}
 						</button>
 					</TooltipTrigger>
@@ -151,7 +151,7 @@ export function DiffHeaderMetadata({
 								data-discard-button
 								className="rounded p-1 text-muted-foreground/60 opacity-0 transition-all hover:bg-accent hover:text-destructive"
 							>
-								<LuUndo2 className="size-3.5" />
+								<Undo2 className="size-3.5" />
 							</button>
 						</TooltipTrigger>
 						<TooltipContent side="bottom" showArrow={false}>

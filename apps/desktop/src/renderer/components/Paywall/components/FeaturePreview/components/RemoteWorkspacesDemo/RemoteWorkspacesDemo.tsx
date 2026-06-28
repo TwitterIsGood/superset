@@ -1,4 +1,4 @@
-import { HiOutlineComputerDesktop, HiOutlineSignal } from "react-icons/hi2";
+import { Monitor, Signal } from "lucide-react";
 
 export function RemoteWorkspacesDemo() {
 	return (
@@ -21,7 +21,7 @@ export function RemoteWorkspacesDemo() {
 					<div className="flex items-center justify-center gap-3 py-3">
 						<div className="flex flex-col items-center gap-1.5">
 							<div className="w-10 h-10 rounded-lg bg-foreground/10 flex items-center justify-center">
-								<HiOutlineComputerDesktop className="size-5 text-foreground/80" />
+								<Monitor className="size-5 text-foreground/80" />
 							</div>
 							<span className="text-[10px] text-muted-foreground">
 								This Mac
@@ -29,12 +29,12 @@ export function RemoteWorkspacesDemo() {
 						</div>
 						<div className="flex items-center gap-1">
 							<div className="w-6 h-px bg-foreground/20" />
-							<HiOutlineSignal className="size-4 text-pink-400 animate-pulse" />
+							<Signal className="size-4 text-pink-400 animate-pulse" />
 							<div className="w-6 h-px bg-foreground/20" />
 						</div>
 						<div className="flex flex-col items-center gap-1.5">
 							<div className="w-10 h-10 rounded-lg bg-foreground/10 flex items-center justify-center">
-								<HiOutlineComputerDesktop className="size-5 text-foreground/80" />
+								<Monitor className="size-5 text-foreground/80" />
 							</div>
 							<span className="text-[10px] text-muted-foreground">Remote</span>
 						</div>

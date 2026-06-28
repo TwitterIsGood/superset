@@ -22,6 +22,7 @@ import {
 	getCommandShellArgs,
 	getShellArgs,
 } from "../lib/agent-setup/shell-wrappers";
+import { resolveElectronRunAsNodeExecPath } from "../lib/electron-run-as-node-exec-path";
 import { raceWithAbort, throwIfAborted } from "../lib/terminal/abort";
 import { buildSafeEnv } from "../lib/terminal/env";
 import { isTerminalAttachCanceledError } from "../lib/terminal/errors";
@@ -265,7 +266,9 @@ export class Session {
 		const subprocessPath = path.join(__dirname, "pty-subprocess.js");
 
 		// Spawn subprocess with filtered env to prevent leaking NODE_ENV etc.
-		const electronPath = process.execPath;
+		const electronPath = resolveElectronRunAsNodeExecPath({
+			isPackaged: process.env.NODE_ENV === "production",
+		});
 		this.subprocess = this.spawnProcess(electronPath, [subprocessPath], {
 			stdio: ["pipe", "pipe", "inherit"],
 			env: { ...processEnv, ELECTRON_RUN_AS_NODE: "1" },

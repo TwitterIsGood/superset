@@ -4,7 +4,6 @@ import {
 	type HostAgentPreset,
 } from "@superset/shared/host-agent-presets";
 import { Skeleton } from "@superset/ui/skeleton";
-import { toast } from "@superset/ui/sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -15,6 +14,7 @@ import {
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { getHostServiceUnavailableMessage } from "renderer/lib/host-service-unavailable";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import { AgentDetail } from "./components/AgentDetail";
 import { AgentsSettingsSidebar } from "./components/AgentsSettingsSidebar";

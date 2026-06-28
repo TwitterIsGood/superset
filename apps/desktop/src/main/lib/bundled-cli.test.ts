@@ -18,6 +18,7 @@ import {
 	getBundledCliBinaryName,
 	getBundledCliShimName,
 	installBundledCliShim,
+	resolveCliRuntimePackBinaryPath,
 } from "./bundled-cli";
 
 describe("bundled CLI", () => {
@@ -65,6 +66,18 @@ describe("bundled CLI", () => {
 		);
 	});
 
+	it("resolves the CLI binary inside a downloaded runtime pack", () => {
+		expect(
+			resolveCliRuntimePackBinaryPath(
+				"/Users/test/.superset/packs/superset-cli-runtime/0.2.22-darwin-arm64",
+				"darwin",
+			),
+		).toBe(
+			"/Users/test/.superset/packs/superset-cli-runtime/0.2.22-darwin-arm64/bin/superset",
+		);
+		expect(resolveCliRuntimePackBinaryPath("", "darwin")).toBe(null);
+	});
+
 	it("installs an executable managed shim into the terminal bin directory", () => {
 		const status = installBundledCliShim({
 			binDir,
@@ -110,6 +123,31 @@ describe("bundled CLI", () => {
 
 		expect(status).toBe("skipped");
 		expect(readFileSync(shimPath, "utf-8")).toBe("#!/bin/sh\necho custom\n");
+	});
+
+	it("installs a managed shim pointing at a downloaded CLI runtime pack", () => {
+		const packRoot = path.join(
+			tempDir,
+			"packs",
+			"superset-cli-runtime",
+			"0.2.22-darwin-arm64",
+		);
+		const packCliPath = path.join(packRoot, "bin", "superset");
+		mkdirSync(path.dirname(packCliPath), { recursive: true });
+		writeFileSync(packCliPath, "#!/bin/sh\n", { mode: 0o755 });
+
+		const status = installBundledCliShim({
+			binDir,
+			bundledCliPath: null,
+			runtimePackPath: packRoot,
+			devCliPackageDir: null,
+			platform: "darwin",
+		});
+
+		expect(status).toBe("installed");
+		expect(readFileSync(path.join(binDir, "superset"), "utf-8")).toContain(
+			packCliPath,
+		);
 	});
 
 	it("returns missing when the bundled binary is unavailable", () => {

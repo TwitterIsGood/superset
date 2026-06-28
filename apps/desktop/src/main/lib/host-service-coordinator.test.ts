@@ -7,13 +7,18 @@ import {
 	mock,
 	test,
 } from "bun:test";
+import type { spawn as nodeSpawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import path from "node:path";
 
 const APP_VERSION = "1.2.3";
+let appIsPackaged = false;
 let killedPids: Array<{ pid: number; signal: NodeJS.Signals | number }> = [];
 let killProcessError: NodeJS.ErrnoException | null = null;
+let nextSpawnPid = 12000;
+let spawnedChildren: FakeChildProcess[] = [];
 
 const manifestStore: {
 	current: {
@@ -30,6 +35,7 @@ let localSettingsRow: {
 	exposeHostServiceViaRelay?: boolean | null;
 	worktreeBaseDir?: string | null;
 } | null = null;
+let cachedMastracodePackPath: string | null = null;
 
 const readManifestMock = mock(() => manifestStore.current);
 const removeManifestMock = mock(() => {
@@ -55,6 +61,41 @@ mock.module("./host-service-manifest", () => ({
 	manifestDir: (orgId: string) => path.join(testManifestRoot, orgId),
 }));
 
+class FakeReadableStream extends EventEmitter {
+	pipe(): this {
+		return this;
+	}
+}
+
+class FakeChildProcess extends EventEmitter {
+	readonly pid = nextSpawnPid++;
+	readonly stdout = new FakeReadableStream();
+	readonly stderr = new FakeReadableStream();
+	readonly kill = mock(() => true);
+	readonly unref = mock(() => undefined);
+}
+
+const realChildProcess = await import("node:child_process");
+const realSpawn = realChildProcess.spawn;
+const spawnProcessMock = mock(
+	(
+		command: string,
+		args: string[],
+		options: Parameters<typeof nodeSpawn>[2],
+	) => {
+		if (command !== process.execPath || !args[0]?.endsWith("host-service.js")) {
+			return realSpawn(command, args, options);
+		}
+		const child = new FakeChildProcess();
+		spawnedChildren.push(child);
+		return child;
+	},
+);
+mock.module("node:child_process", () => ({
+	...realChildProcess,
+	spawn: spawnProcessMock,
+}));
+
 const pollHealthCheckMock = mock(() => Promise.resolve(true));
 
 const realHostServiceUtils = await import("./host-service-utils");
@@ -70,7 +111,9 @@ mock.module("./host-service-utils", () => ({
 mock.module("electron", () => ({
 	app: {
 		getVersion: () => APP_VERSION,
-		isPackaged: false,
+		get isPackaged() {
+			return appIsPackaged;
+		},
 		getAppPath: () => "/tmp/app",
 	},
 	dialog: {
@@ -99,6 +142,11 @@ mock.module("./local-db", () => ({
 }));
 mock.module("./relay-url", () => ({
 	getRelayUrl: () => Promise.resolve("https://relay.example"),
+}));
+mock.module("./pack-system", () => ({
+	getPackManager: () => ({
+		getPackPath: () => cachedMastracodePackPath,
+	}),
 }));
 
 const { HostServiceCoordinator } = await import("./host-service-coordinator");
@@ -129,15 +177,32 @@ interface HostServiceCoordinatorBuildEnvInternals {
 }
 
 function resetMocks(): void {
+	appIsPackaged = false;
 	manifestStore.current = null;
 	localSettingsRow = null;
+	cachedMastracodePackPath = null;
 	readManifestMock.mockClear();
 	removeManifestMock.mockClear();
 	isProcessAliveMock.mockClear();
 	killProcessMock.mockClear();
 	pollHealthCheckMock.mockClear();
+	spawnProcessMock.mockClear();
+	spawnedChildren = [];
+	nextSpawnPid = 12000;
 	killedPids = [];
 	killProcessError = null;
+}
+
+async function waitFor(
+	predicate: () => boolean,
+	timeoutMs = 1000,
+): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		if (predicate()) return;
+		await new Promise((resolve) => setTimeout(resolve, 0));
+	}
+	throw new Error("Timed out waiting for condition");
 }
 
 describe("HostServiceCoordinator preferred ports", () => {
@@ -251,6 +316,176 @@ describe("HostServiceCoordinator relay exposure env", () => {
 	});
 });
 
+describe("HostServiceCoordinator active organization pruning", () => {
+	let coordinator: InstanceType<typeof HostServiceCoordinator>;
+
+	beforeEach(() => {
+		resetMocks();
+		testManifestRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hsc-test-"));
+		coordinator = new HostServiceCoordinator();
+		(
+			coordinator as unknown as HostServiceCoordinatorBuildEnvInternals
+		).resolveChildEnv = (env) => Promise.resolve(env);
+	});
+
+	afterEach(() => {
+		coordinator.stopAll();
+		if (testManifestRoot) {
+			fs.rmSync(testManifestRoot, { recursive: true, force: true });
+			testManifestRoot = "";
+		}
+	});
+
+	test("stops the previous organization host-service when another organization starts", async () => {
+		const firstConnection = await coordinator.start("org-1", spawnConfig);
+		const firstChild = spawnedChildren[0];
+		const secondConnection = await coordinator.start("org-2", spawnConfig);
+
+		expect(firstConnection.port).toBe(40000);
+		expect(secondConnection.port).toBe(40000);
+		expect(killedPids).toContainEqual({
+			pid: firstChild.pid,
+			signal: "SIGTERM",
+		});
+		expect(coordinator.getConnection("org-1")).toBeNull();
+		expect(coordinator.getConnection("org-2")).toEqual({
+			port: secondConnection.port,
+			secret: secondConnection.secret,
+			machineId: "host-1",
+		});
+		expect(coordinator.getActiveOrganizationIds()).toEqual(["org-2"]);
+	});
+
+	test("keeps the same organization running when start is called again", async () => {
+		const firstConnection = await coordinator.start("org-1", spawnConfig);
+		const secondConnection = await coordinator.start("org-1", spawnConfig);
+
+		expect(secondConnection).toEqual(firstConnection);
+		expect(spawnedChildren).toHaveLength(1);
+		expect(killedPids).toHaveLength(0);
+		expect(coordinator.getActiveOrganizationIds()).toEqual(["org-1"]);
+	});
+});
+
+describe("HostServiceCoordinator Trellis runtime env", () => {
+	let coordinator: InstanceType<typeof HostServiceCoordinator>;
+	let previousResourcesPath: string | undefined;
+
+	beforeEach(() => {
+		resetMocks();
+		const processWithResourcesPath = process as NodeJS.Process & {
+			resourcesPath?: string;
+		};
+		previousResourcesPath = processWithResourcesPath.resourcesPath;
+		processWithResourcesPath.resourcesPath = "/tmp/resources";
+		testManifestRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hsc-test-"));
+		coordinator = new HostServiceCoordinator();
+		(
+			coordinator as unknown as HostServiceCoordinatorBuildEnvInternals
+		).resolveChildEnv = (env) => Promise.resolve(env);
+	});
+
+	afterEach(() => {
+		coordinator.stopAll();
+		if (testManifestRoot) {
+			fs.rmSync(testManifestRoot, { recursive: true, force: true });
+			testManifestRoot = "";
+		}
+		const processWithResourcesPath = process as NodeJS.Process & {
+			resourcesPath?: string;
+		};
+		if (previousResourcesPath === undefined) {
+			Reflect.deleteProperty(processWithResourcesPath, "resourcesPath");
+		} else {
+			processWithResourcesPath.resourcesPath = previousResourcesPath;
+		}
+	});
+
+	test("does not force a bundled Trellis bin path in packaged apps", async () => {
+		appIsPackaged = true;
+		const previous = process.env.SUPERSET_TRELLIS_BIN_PATH;
+		delete process.env.SUPERSET_TRELLIS_BIN_PATH;
+		try {
+			const env = await (
+				coordinator as unknown as HostServiceCoordinatorBuildEnvInternals
+			).buildEnv("org-1", 40000, "secret", spawnConfig);
+
+			expect(env.SUPERSET_TRELLIS_BIN_PATH).toBe("");
+		} finally {
+			if (previous !== undefined) {
+				process.env.SUPERSET_TRELLIS_BIN_PATH = previous;
+			}
+		}
+	});
+
+	test("preserves an explicit Trellis bin override for host-service children", async () => {
+		appIsPackaged = true;
+		const previous = process.env.SUPERSET_TRELLIS_BIN_PATH;
+		process.env.SUPERSET_TRELLIS_BIN_PATH = "/tmp/custom-trellis.js";
+		try {
+			const env = await (
+				coordinator as unknown as HostServiceCoordinatorBuildEnvInternals
+			).buildEnv("org-1", 40000, "secret", spawnConfig);
+
+			expect(env.SUPERSET_TRELLIS_BIN_PATH).toBe("/tmp/custom-trellis.js");
+		} finally {
+			if (previous === undefined) {
+				delete process.env.SUPERSET_TRELLIS_BIN_PATH;
+			} else {
+				process.env.SUPERSET_TRELLIS_BIN_PATH = previous;
+			}
+		}
+	});
+
+	test("passes an already-installed MastraCode runtime pack to host-service children", async () => {
+		cachedMastracodePackPath = "/tmp/superset/packs/mastracode-runtime/0.18.1";
+
+		const env = await (
+			coordinator as unknown as HostServiceCoordinatorBuildEnvInternals
+		).buildEnv("org-1", 40000, "secret", spawnConfig);
+
+		expect(env.SUPERSET_MASTRACODE_RUNTIME_IMPORT_PATH).toBe(
+			"/tmp/superset/packs/mastracode-runtime/0.18.1/node_modules/mastracode/dist/index.js",
+		);
+		expect(env.SUPERSET_MASTRA_MEMORY_IMPORT_PATH).toBe(
+			"/tmp/superset/packs/mastracode-runtime/0.18.1/node_modules/@mastra/memory/dist/index.js",
+		);
+	});
+
+	test("preserves explicit MastraCode runtime import overrides", async () => {
+		const previousMastracode =
+			process.env.SUPERSET_MASTRACODE_RUNTIME_IMPORT_PATH;
+		const previousMemory = process.env.SUPERSET_MASTRA_MEMORY_IMPORT_PATH;
+		process.env.SUPERSET_MASTRACODE_RUNTIME_IMPORT_PATH =
+			"/tmp/custom/mastracode.js";
+		process.env.SUPERSET_MASTRA_MEMORY_IMPORT_PATH = "/tmp/custom/memory.js";
+		try {
+			const env = await (
+				coordinator as unknown as HostServiceCoordinatorBuildEnvInternals
+			).buildEnv("org-1", 40000, "secret", spawnConfig);
+
+			expect(env.SUPERSET_MASTRACODE_RUNTIME_IMPORT_PATH).toBe(
+				"/tmp/custom/mastracode.js",
+			);
+			expect(env.SUPERSET_MASTRA_MEMORY_IMPORT_PATH).toBe(
+				"/tmp/custom/memory.js",
+			);
+		} finally {
+			if (previousMastracode === undefined) {
+				delete process.env.SUPERSET_MASTRACODE_RUNTIME_IMPORT_PATH;
+			} else {
+				process.env.SUPERSET_MASTRACODE_RUNTIME_IMPORT_PATH =
+					previousMastracode;
+			}
+			if (previousMemory === undefined) {
+				delete process.env.SUPERSET_MASTRA_MEMORY_IMPORT_PATH;
+			} else {
+				process.env.SUPERSET_MASTRA_MEMORY_IMPORT_PATH = previousMemory;
+			}
+		}
+	});
+});
+
 describe("HostServiceCoordinator.reset", () => {
 	let coordinator: InstanceType<typeof HostServiceCoordinator>;
 	let spawnMock: ReturnType<typeof mock>;
@@ -324,6 +559,51 @@ describe("HostServiceCoordinator.reset", () => {
 		expect(killedPids).toHaveLength(0);
 		expect(spawnMock).toHaveBeenCalledTimes(1);
 		expect(conn.port).toBe(60000);
+	});
+});
+
+describe("HostServiceCoordinator startup cancellation", () => {
+	let coordinator: InstanceType<typeof HostServiceCoordinator>;
+
+	beforeEach(() => {
+		resetMocks();
+		testManifestRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hsc-test-"));
+		coordinator = new HostServiceCoordinator();
+		(
+			coordinator as unknown as HostServiceCoordinatorBuildEnvInternals
+		).resolveChildEnv = (env) => Promise.resolve(env);
+	});
+
+	afterEach(() => {
+		coordinator.stopAll();
+		if (testManifestRoot) {
+			fs.rmSync(testManifestRoot, { recursive: true, force: true });
+			testManifestRoot = "";
+		}
+	});
+
+	test("does not return a running connection when stop wins during health polling", async () => {
+		let resolveHealth!: (healthy: boolean) => void;
+		pollHealthCheckMock.mockImplementationOnce(
+			() =>
+				new Promise<boolean>((resolve) => {
+					resolveHealth = resolve;
+				}),
+		);
+
+		const startPromise = coordinator.start("org-1", spawnConfig);
+		await waitFor(() => spawnedChildren.length === 1);
+		const child = spawnedChildren[0];
+		manifestStore.current = baseManifest(child.pid);
+
+		coordinator.stop("org-1");
+		resolveHealth(true);
+
+		await expect(startPromise).rejects.toThrow("was canceled");
+		expect(coordinator.getConnection("org-1")).toBeNull();
+		expect(killedPids).toContainEqual({ pid: child.pid, signal: "SIGTERM" });
+		expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+		expect(removeManifestMock).toHaveBeenCalled();
 	});
 });
 

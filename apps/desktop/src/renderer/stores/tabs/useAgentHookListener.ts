@@ -3,8 +3,6 @@ import { electronTrpc } from "renderer/lib/electron-trpc";
 import { navigateToV2Workspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { NOTIFICATION_EVENTS } from "shared/constants";
 import { debugLog } from "shared/debug";
-import { useTabsStore } from "./store";
-import { resolveNotificationTarget } from "./utils/resolve-notification-target";
 
 /**
  * Hook that listens for agent lifecycle events via tRPC subscription and updates
@@ -51,12 +49,17 @@ export function useAgentHookListener() {
 	const navigate = useNavigate();
 
 	electronTrpc.notifications.subscribe.useSubscription(undefined, {
-		onData: (event) => {
+		onData: async (event) => {
 			if (!event.data) return;
 			if (event.type === NOTIFICATION_EVENTS.FOCUS_V2_NOTIFICATION_SOURCE) {
 				return;
 			}
 
+			const [{ useTabsStore }, { resolveNotificationTarget }] =
+				await Promise.all([
+					import("./store"),
+					import("./utils/resolve-notification-target"),
+				]);
 			const state = useTabsStore.getState();
 			const target = resolveNotificationTarget(event.data, state);
 			if (!target) return;

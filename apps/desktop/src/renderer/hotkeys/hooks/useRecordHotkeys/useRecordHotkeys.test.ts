@@ -1,8 +1,22 @@
-import { describe, expect, it } from "bun:test";
-import {
-	captureHotkeyFromEvent,
-	resolveCapturedBinding,
-} from "./useRecordHotkeys";
+import { describe, expect, it, mock } from "bun:test";
+
+mock.module("renderer/lib/trpc-client", () => ({
+	electronReactClient: {},
+	electronTrpcClient: {
+		keyboardLayout: {
+			changes: {
+				subscribe: () => ({ unsubscribe: () => undefined }),
+			},
+			getCurrent: {
+				query: async () => null,
+			},
+		},
+	},
+}));
+
+const { captureHotkeyFromEvent, resolveCapturedBinding } = await import(
+	"./useRecordHotkeys"
+);
 
 /**
  * Covers the regressions fixed in

@@ -26,11 +26,11 @@
 	},
 	"scripts": {
 		"clean": "git clean -xdf .cache .turbo dist node_modules",
-		"start": "node --experimental-strip-types src/main.ts",
+		"start": "tsx src/main.ts",
 		"build:daemon": "bun run build.ts",
 		"typecheck": "tsc --noEmit --emitDeclarationOnly false",
 		"test": "bun test src/protocol src/SessionStore src/handlers src/Pty/Pty.test.ts test/no-encoding-hops.test.ts",
-		"test:integration": "node --experimental-strip-types --test test/integration.test.ts test/control-plane.test.ts test/signal-recovery.test.ts test/byte-fidelity.test.ts test/handoff.test.ts"
+		"test:integration": "tsx --test test/integration.node-test.ts test/control-plane.node-test.ts test/signal-recovery.node-test.ts test/byte-fidelity.node-test.ts test/handoff.node-test.ts"
 	},
 	"dependencies": {
 		"node-pty": "1.1.0"
@@ -39,6 +39,7 @@
 		"@superset/typescript": "workspace:*",
 		"@types/node": "24.12.0",
 		"bun-types": "1.3.11",
+		"tsx": "4.21.0",
 		"typescript": "5.9.3"
 	}
 }

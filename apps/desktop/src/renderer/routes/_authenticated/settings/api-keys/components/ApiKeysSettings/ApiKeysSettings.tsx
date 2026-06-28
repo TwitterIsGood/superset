@@ -12,19 +12,13 @@ import {
 import { Input } from "@superset/ui/input";
 import { Label } from "@superset/ui/label";
 import { Skeleton } from "@superset/ui/skeleton";
-import { toast } from "@superset/ui/sonner";
 import { useLiveQuery } from "@tanstack/react-db";
+import { Clipboard, ExternalLink, KeyRound, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import {
-	HiArrowTopRightOnSquare,
-	HiOutlineClipboardDocument,
-	HiOutlineKey,
-	HiOutlinePlus,
-	HiOutlineTrash,
-} from "react-icons/hi2";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { authClient } from "renderer/lib/auth-client";
+import { toast } from "renderer/lib/toast";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import {
 	isItemVisible,
@@ -127,7 +121,7 @@ export function ApiKeysSettings({ visibleItems }: ApiKeysSettingsProps) {
 							className="inline-flex items-center gap-1 text-primary hover:underline"
 						>
 							Learn more
-							<HiArrowTopRightOnSquare className="h-3 w-3" />
+							<ExternalLink className="h-3 w-3" />
 						</a>
 					</p>
 				</div>
@@ -137,7 +131,7 @@ export function ApiKeysSettings({ visibleItems }: ApiKeysSettingsProps) {
 						size="sm"
 						className="gap-2 shrink-0"
 					>
-						<HiOutlinePlus className="h-4 w-4" />
+						<Plus className="h-4 w-4" />
 						Generate key
 					</Button>
 				)}
@@ -158,7 +152,7 @@ export function ApiKeysSettings({ visibleItems }: ApiKeysSettingsProps) {
 					</div>
 				) : apiKeys.length === 0 ? (
 					<div className="text-center py-12 text-sm text-muted-foreground">
-						<HiOutlineKey className="h-8 w-8 mx-auto mb-3 opacity-50" />
+						<KeyRound className="h-8 w-8 mx-auto mb-3 opacity-50" />
 						<p>No API keys yet.</p>
 						<p className="text-xs mt-1">
 							Generate a key to use with MCP servers.
@@ -172,7 +166,7 @@ export function ApiKeysSettings({ visibleItems }: ApiKeysSettingsProps) {
 								className="group flex items-center justify-between gap-4 py-3"
 							>
 								<div className="flex items-center gap-3 min-w-0">
-									<HiOutlineKey className="h-4 w-4 shrink-0 text-muted-foreground" />
+									<KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" />
 									<div className="min-w-0">
 										<div className="text-sm font-medium truncate">
 											{key.name ?? "Unnamed key"}
@@ -194,7 +188,7 @@ export function ApiKeysSettings({ visibleItems }: ApiKeysSettingsProps) {
 										onClick={() => handleRevokeKey(key.id, key.name)}
 										aria-label="Revoke key"
 									>
-										<HiOutlineTrash className="h-4 w-4" />
+										<Trash2 className="h-4 w-4" />
 									</Button>
 								</div>
 							</div>
@@ -261,7 +255,7 @@ export function ApiKeysSettings({ visibleItems }: ApiKeysSettingsProps) {
 								onClick={handleCopyKey}
 								aria-label="Copy key"
 							>
-								<HiOutlineClipboardDocument className="h-4 w-4" />
+								<Clipboard className="h-4 w-4" />
 							</Button>
 						</div>
 						{copied && (

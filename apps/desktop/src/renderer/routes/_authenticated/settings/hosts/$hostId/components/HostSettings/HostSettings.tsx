@@ -1,9 +1,9 @@
-import { toast } from "@superset/ui/sonner";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useMemo } from "react";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { authClient } from "renderer/lib/auth-client";
+import { toast } from "renderer/lib/toast";
 import {
 	type PersistableTransaction,
 	useOptimisticCollectionActions,

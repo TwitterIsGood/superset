@@ -1,6 +1,8 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import {
+	lazy,
+	Suspense,
 	useCallback,
 	useDeferredValue,
 	useEffect,
@@ -13,15 +15,28 @@ import {
 	tasksSearchFromFilters,
 	useTasksFilterStore,
 } from "../../stores/tasks-filter-state";
-import { BoardContent } from "./components/BoardContent";
-import {
-	GitHubIssuesContent,
-	type SelectedIssue,
-} from "./components/GitHubIssuesContent";
-import { PullRequestsContent } from "./components/PullRequestsContent";
+import type { SelectedIssue } from "./components/GitHubIssuesContent";
 import { TableContent } from "./components/TableContent";
 import { type TabValue, TasksTopBar } from "./components/TasksTopBar";
 import type { TaskWithStatus } from "./hooks/useTasksData";
+
+const BoardContent = lazy(() =>
+	import("./components/BoardContent").then((module) => ({
+		default: module.BoardContent,
+	})),
+);
+
+const PullRequestsContent = lazy(() =>
+	import("./components/PullRequestsContent").then((module) => ({
+		default: module.PullRequestsContent,
+	})),
+);
+
+const GitHubIssuesContent = lazy(() =>
+	import("./components/GitHubIssuesContent").then((module) => ({
+		default: module.GitHubIssuesContent,
+	})),
+);
 
 interface TasksViewProps {
 	initialTab?: "all" | "active" | "backlog";
@@ -245,18 +260,21 @@ export function TasksView({
 				onTypeTabChange={handleTypeTabChange}
 				projectFilter={projectFilter}
 				onProjectFilterChange={handleProjectFilterChange}
+				projects={v2Projects ?? []}
 			/>
 
 			<div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
 				{showTasks &&
 					(viewMode === "board" ? (
-						<BoardContent
-							filterTab={currentTab}
-							searchQuery={deferredSearchQuery}
-							assigneeFilter={assigneeFilter}
-							projectFilter={projectFilter}
-							onTaskClick={handleTaskClick}
-						/>
+						<Suspense fallback={null}>
+							<BoardContent
+								filterTab={currentTab}
+								searchQuery={deferredSearchQuery}
+								assigneeFilter={assigneeFilter}
+								projectFilter={projectFilter}
+								onTaskClick={handleTaskClick}
+							/>
+						</Suspense>
 					) : (
 						<TableContent
 							filterTab={currentTab}
@@ -268,17 +286,21 @@ export function TasksView({
 						/>
 					))}
 				{showPRs && (
-					<PullRequestsContent
-						projectFilter={projectFilter}
-						searchQuery={deferredSearchQuery}
-					/>
+					<Suspense fallback={null}>
+						<PullRequestsContent
+							projectFilter={projectFilter}
+							searchQuery={deferredSearchQuery}
+						/>
+					</Suspense>
 				)}
 				{showIssues && (
-					<GitHubIssuesContent
-						projectFilter={projectFilter}
-						searchQuery={deferredSearchQuery}
-						onSelectionChange={handleIssueSelectionChange}
-					/>
+					<Suspense fallback={null}>
+						<GitHubIssuesContent
+							projectFilter={projectFilter}
+							searchQuery={deferredSearchQuery}
+							onSelectionChange={handleIssueSelectionChange}
+						/>
+					</Suspense>
 				)}
 			</div>
 		</div>

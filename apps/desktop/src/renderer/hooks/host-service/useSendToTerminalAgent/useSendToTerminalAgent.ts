@@ -1,7 +1,7 @@
-import { toast } from "@superset/ui/sonner";
 import { workspaceTrpc } from "@superset/workspace-client";
 import { useCallback } from "react";
 import { normalizeTerminalCommand } from "renderer/lib/terminal/launch-command";
+import { toast } from "renderer/lib/toast";
 
 export type AgentPromptFileSide = "additions" | "deletions" | "mixed";
 

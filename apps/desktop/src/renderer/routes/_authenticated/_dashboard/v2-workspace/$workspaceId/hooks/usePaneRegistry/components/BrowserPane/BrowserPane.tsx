@@ -1,34 +1,15 @@
-import type { RendererContext, Tab } from "@superset/panes";
+import type { RendererContext } from "@superset/panes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
-import { GlobeIcon } from "lucide-react";
+import { GlobeIcon, Monitor } from "lucide-react";
 import { useCallback, useSyncExternalStore } from "react";
-import { TbDeviceDesktop } from "react-icons/tb";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
-import type { BrowserPaneData, PaneViewerData } from "../../../../types";
+import type { PaneViewerData } from "../../../../types";
 
 import { browserRuntimeRegistry } from "./browserRuntimeRegistry";
 import { BrowserErrorOverlay } from "./components/BrowserErrorOverlay";
 import { BrowserOverflowMenu } from "./components/BrowserOverflowMenu";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { usePersistentWebview } from "./hooks/usePersistentWebview";
-
-function getSingleBrowserPane(
-	tab: Tab<PaneViewerData>,
-): { id: string; data: BrowserPaneData } | null {
-	const paneIds = Object.keys(tab.panes);
-	if (paneIds.length !== 1) return null;
-	const pane = tab.panes[paneIds[0]];
-	if (pane.kind !== "browser") return null;
-	return { id: pane.id, data: pane.data as BrowserPaneData };
-}
-
-export function renderBrowserTabIcon(tab: Tab<PaneViewerData>) {
-	const browser = getSingleBrowserPane(tab);
-	if (!browser?.data.faviconUrl) return null;
-	return (
-		<img src={browser.data.faviconUrl} alt="" className="size-3.5 shrink-0" />
-	);
-}
 
 interface BrowserPaneProps {
 	ctx: RendererContext<PaneViewerData>;
@@ -132,7 +113,7 @@ export function BrowserPaneToolbar({ ctx }: BrowserPaneToolbarProps) {
 							onClick={handleOpenDevTools}
 							className="rounded p-0.5 text-muted-foreground/60 transition-colors hover:text-muted-foreground"
 						>
-							<TbDeviceDesktop className="size-3.5" />
+							<Monitor className="size-3.5" />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="bottom" showArrow={false}>

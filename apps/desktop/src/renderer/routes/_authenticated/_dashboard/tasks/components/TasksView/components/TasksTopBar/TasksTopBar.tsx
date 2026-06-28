@@ -2,25 +2,24 @@ import { Button } from "@superset/ui/button";
 import { Input } from "@superset/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@superset/ui/tabs";
 import { cn } from "@superset/ui/utils";
-import { useRef, useState } from "react";
-import { GoGitPullRequest, GoIssueOpened } from "react-icons/go";
-import {
-	HiOutlineMagnifyingGlass,
-	HiOutlinePencilSquare,
-	HiOutlineQueueList,
-	HiOutlineViewColumns,
-	HiXMark,
-} from "react-icons/hi2";
+import CircleDotIcon from "lucide-react/dist/esm/icons/circle-dot.js";
+import Columns3 from "lucide-react/dist/esm/icons/columns-3.js";
+import GitPullRequestIcon from "lucide-react/dist/esm/icons/git-pull-request.js";
+import List from "lucide-react/dist/esm/icons/list.js";
+import Search from "lucide-react/dist/esm/icons/search.js";
+import SquarePen from "lucide-react/dist/esm/icons/square-pen.js";
+import X from "lucide-react/dist/esm/icons/x.js";
+import { lazy, Suspense, useRef, useState } from "react";
 import { useHotkey } from "renderer/hotkeys";
 import type { TypeTab, ViewMode } from "../../../../stores/tasks-filter-state";
 import type { TaskWithStatus } from "../../hooks/useTasksData";
 import type { SelectedIssue } from "../GitHubIssuesContent";
 import { ActiveIcon } from "../shared/icons/ActiveIcon";
 import { AssigneeFilter } from "./components/AssigneeFilter";
-import { CreateTaskDialog } from "./components/CreateTaskDialog";
-import { ProjectFilter } from "./components/ProjectFilter";
-import { RunInWorkspacePopoverV2 } from "./components/RunInWorkspacePopoverV2";
-import { RunIssuesInWorkspacePopover } from "./components/RunIssuesInWorkspacePopover";
+import {
+	ProjectFilter,
+	type ProjectFilterProject,
+} from "./components/ProjectFilter";
 import { StatusFilter } from "./components/StatusFilter";
 
 export type TabValue = "all" | "active" | "backlog";
@@ -42,13 +41,32 @@ interface TasksTopBarProps {
 	onTypeTabChange: (typeTab: TypeTab) => void;
 	projectFilter: string | null;
 	onProjectFilterChange: (projectId: string | null) => void;
+	projects: ProjectFilterProject[];
 }
 
 const TYPE_TABS = [
 	{ value: "tasks" as const, label: "Tasks", Icon: ActiveIcon },
-	{ value: "prs" as const, label: "PRs", Icon: GoGitPullRequest },
-	{ value: "issues" as const, label: "Issues", Icon: GoIssueOpened },
+	{ value: "prs" as const, label: "PRs", Icon: GitPullRequestIcon },
+	{ value: "issues" as const, label: "Issues", Icon: CircleDotIcon },
 ] as const;
+
+const CreateTaskDialog = lazy(() =>
+	import("./components/CreateTaskDialog").then((module) => ({
+		default: module.CreateTaskDialog,
+	})),
+);
+
+const RunInWorkspacePopoverV2 = lazy(() =>
+	import("./components/RunInWorkspacePopoverV2").then((module) => ({
+		default: module.RunInWorkspacePopoverV2,
+	})),
+);
+
+const RunIssuesInWorkspacePopover = lazy(() =>
+	import("./components/RunIssuesInWorkspacePopover").then((module) => ({
+		default: module.RunIssuesInWorkspacePopover,
+	})),
+);
 
 export function TasksTopBar({
 	currentTab,
@@ -67,6 +85,7 @@ export function TasksTopBar({
 	onTypeTabChange,
 	projectFilter,
 	onProjectFilterChange,
+	projects,
 }: TasksTopBarProps) {
 	const showTaskOnlyControls = typeTab === "tasks";
 	const showIssues = typeTab === "issues";
@@ -100,23 +119,27 @@ export function TasksTopBar({
 								onClick={showIssues ? onClearIssueSelection : onClearSelection}
 								aria-label="Clear selection"
 							>
-								<HiXMark />
+								<X />
 							</Button>
 							<span className="text-sm font-medium">
 								{selectedCount} selected
 							</span>
 							<div className="h-4 w-px bg-border" />
 							{showIssues ? (
-								<RunIssuesInWorkspacePopover
-									issues={selectedIssues}
-									projectFilter={projectFilter}
-									onComplete={onClearIssueSelection ?? (() => {})}
-								/>
+								<Suspense fallback={null}>
+									<RunIssuesInWorkspacePopover
+										issues={selectedIssues}
+										projectFilter={projectFilter}
+										onComplete={onClearIssueSelection ?? (() => {})}
+									/>
+								</Suspense>
 							) : (
-								<RunInWorkspacePopoverV2
-									tasks={selectedTasks}
-									onComplete={onClearSelection ?? (() => {})}
-								/>
+								<Suspense fallback={null}>
+									<RunInWorkspacePopoverV2
+										tasks={selectedTasks}
+										onComplete={onClearSelection ?? (() => {})}
+									/>
+								</Suspense>
 							)}
 						</>
 					) : (
@@ -125,6 +148,7 @@ export function TasksTopBar({
 								value={projectFilter}
 								onChange={onProjectFilterChange}
 								includeTaskOptions={showTaskOnlyControls}
+								projects={projects}
 							/>
 
 							<div className="h-4 w-px bg-border" />
@@ -181,7 +205,7 @@ export function TasksTopBar({
 								className="h-8 gap-1.5 px-3"
 								onClick={() => setIsCreateTaskOpen(true)}
 							>
-								<HiOutlinePencilSquare className="size-4" />
+								<SquarePen className="size-4" />
 								<span className="hidden @4xl:inline">New task</span>
 							</Button>
 
@@ -197,7 +221,7 @@ export function TasksTopBar({
 									)}
 									onClick={() => onViewModeChange("table")}
 								>
-									<HiOutlineQueueList className="size-3.5" />
+									<List className="size-3.5" />
 								</button>
 								<button
 									type="button"
@@ -210,14 +234,14 @@ export function TasksTopBar({
 									)}
 									onClick={() => onViewModeChange("board")}
 								>
-									<HiOutlineViewColumns className="size-3.5" />
+									<Columns3 className="size-3.5" />
 								</button>
 							</div>
 						</>
 					)}
 
 					<div className="relative w-32 @2xl:w-40 @4xl:w-56 @6xl:w-64">
-						<HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+						<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
 						<Input
 							ref={searchInputRef}
 							type="text"
@@ -242,14 +266,18 @@ export function TasksTopBar({
 				</div>
 			</div>
 
-			<CreateTaskDialog
-				open={isCreateTaskOpen}
-				onOpenChange={setIsCreateTaskOpen}
-				currentTab={currentTab}
-				searchQuery={searchQuery}
-				assigneeFilter={assigneeFilter}
-				projectFilter={projectFilter}
-			/>
+			{isCreateTaskOpen ? (
+				<Suspense fallback={null}>
+					<CreateTaskDialog
+						open={isCreateTaskOpen}
+						onOpenChange={setIsCreateTaskOpen}
+						currentTab={currentTab}
+						searchQuery={searchQuery}
+						assigneeFilter={assigneeFilter}
+						projectFilter={projectFilter}
+					/>
+				</Suspense>
+			) : null}
 		</>
 	);
 }

@@ -6,6 +6,7 @@ import type {
 import { CodeView, type CodeViewHandle } from "@pierre/diffs/react";
 import type { RendererContext } from "@superset/panes";
 import { useCallback, useMemo, useRef } from "react";
+import { PierreDiffRuntimeProvider } from "renderer/routes/_authenticated/lib/pierreWorker";
 import type { DiffPaneData, PaneViewerData } from "../../../../types";
 import { type ChangesetFile, useChangeset } from "../../../useChangeset";
 import { useOpenInExternalEditor } from "../../../useOpenInExternalEditor";
@@ -245,15 +246,17 @@ export function DiffPane({
 	}
 
 	return (
-		<CodeView<DiffAnnotationMetadata>
-			ref={codeViewRef}
-			className="h-full w-full overflow-y-auto overflow-x-clip overscroll-contain [overflow-anchor:none]"
-			style={style}
-			items={items}
-			options={codeViewOptions}
-			renderHeaderPrefix={renderHeaderPrefix}
-			renderHeaderMetadata={renderHeaderMetadata}
-			renderAnnotation={renderAnnotation}
-		/>
+		<PierreDiffRuntimeProvider>
+			<CodeView<DiffAnnotationMetadata>
+				ref={codeViewRef}
+				className="h-full w-full overflow-y-auto overflow-x-clip overscroll-contain [overflow-anchor:none]"
+				style={style}
+				items={items}
+				options={codeViewOptions}
+				renderHeaderPrefix={renderHeaderPrefix}
+				renderHeaderMetadata={renderHeaderMetadata}
+				renderAnnotation={renderAnnotation}
+			/>
+		</PierreDiffRuntimeProvider>
 	);
 }

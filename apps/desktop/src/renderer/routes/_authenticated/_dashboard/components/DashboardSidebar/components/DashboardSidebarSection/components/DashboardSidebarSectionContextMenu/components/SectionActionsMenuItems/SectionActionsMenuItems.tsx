@@ -12,8 +12,7 @@ import {
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
 } from "@superset/ui/dropdown-menu";
-import { HiCheck } from "react-icons/hi2";
-import { LuPalette, LuPencil, LuTrash2 } from "react-icons/lu";
+import { Check, Palette, Pencil, Trash2 } from "lucide-react";
 import {
 	PROJECT_COLOR_DEFAULT,
 	PROJECT_COLORS,
@@ -105,7 +104,7 @@ export function SectionActionsMenuItems({
 					</span>
 					<span>{projectColor.name}</span>
 					{isSelected ? (
-						<HiCheck className="ml-auto size-3.5 text-muted-foreground" />
+						<Check className="ml-auto size-3.5 text-muted-foreground" />
 					) : null}
 				</>
 			),
@@ -113,7 +112,7 @@ export function SectionActionsMenuItems({
 	});
 	const colorTrigger = (
 		<>
-			<LuPalette className={iconClassName} />
+			<Palette className={iconClassName} />
 			Set group color
 		</>
 	);
@@ -124,7 +123,7 @@ export function SectionActionsMenuItems({
 				onSelect: onRename,
 				children: (
 					<>
-						<LuPencil className={iconClassName} />
+						<Pencil className={iconClassName} />
 						Rename group
 					</>
 				),
@@ -154,7 +153,7 @@ export function SectionActionsMenuItems({
 				onSelect: onDelete,
 				children: (
 					<>
-						<LuTrash2
+						<Trash2
 							className={
 								kind === "context"
 									? "size-4 mr-2 text-destructive"

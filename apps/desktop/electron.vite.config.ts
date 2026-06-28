@@ -11,16 +11,26 @@ import tsconfigPathsPlugin from "vite-tsconfig-paths";
 import { dependencies, resources, version } from "./package.json";
 import { mainExternalizedDependencies } from "./runtime-dependencies";
 import {
+	applyDesktopTargetEnvOverrides,
 	copyResourcesPlugin,
+	createBundleStatsPlugin,
+	createDesktopApiProxy,
 	defineEnv,
 	devPath,
+	generatedOutputWatchIgnores,
 	htmlEnvTransformPlugin,
+	isCodeInspectorEnabled,
 } from "./vite/helpers";
 
 // override: true ensures .env values take precedence over inherited env vars
 config({ path: resolve(__dirname, "../../.env"), override: true, quiet: true });
+applyDesktopTargetEnvOverrides();
 
 const DEV_SERVER_PORT = Number(process.env.DESKTOP_VITE_PORT);
+const desktopApiProxy = createDesktopApiProxy(
+	process.env.SUPERSET_DESKTOP_PROXY_API_TARGET,
+	process.env.SUPERSET_DESKTOP_PROXY_ORIGIN,
+);
 
 // Validate required env vars at build time using the Zod schema (single source of truth)
 await import("./src/main/env.main");
@@ -37,6 +47,7 @@ const buildSourcemap =
 	process.env.DESKTOP_INCLUDE_SOURCEMAPS === "true"
 		? "hidden"
 		: false;
+const targetPlatform = process.env.TARGET_PLATFORM ?? process.platform;
 
 // Sentry plugin for uploading sourcemaps (only in CI with auth token)
 const sentryPlugin = process.env.SENTRY_AUTH_TOKEN
@@ -47,6 +58,116 @@ const sentryPlugin = process.env.SENTRY_AUTH_TOKEN
 			release: { name: version },
 		})
 	: null;
+const codeInspectorVitePlugin = isCodeInspectorEnabled()
+	? codeInspectorPlugin({
+			bundler: "vite",
+			hotKeys: ["altKey"],
+			hideConsole: true,
+			port: Number(process.env.CODE_INSPECTOR_PORT) || undefined,
+		})
+	: null;
+const mainBundleStatsPlugin = createBundleStatsPlugin({ target: "main" });
+const preloadBundleStatsPlugin = createBundleStatsPlugin({ target: "preload" });
+const rendererBundleStatsPlugin = createBundleStatsPlugin({
+	target: "renderer",
+});
+
+const lucideNamedImportRegex =
+	/import\s*\{([^{}]*?)\}\s*from\s*["']lucide-react["'];?/g;
+
+function toLucideIconFileName(iconName: string): string {
+	const withoutIconSuffix =
+		iconName.endsWith("Icon") && iconName !== "Icon"
+			? iconName.slice(0, -"Icon".length)
+			: iconName;
+
+	return withoutIconSuffix
+		.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+		.replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
+		.replace(/([A-Za-z])([0-9])/g, "$1-$2")
+		.toLowerCase();
+}
+
+function isLucideDirectIconImportTarget(id: string): boolean {
+	const cleanId = id.split("?", 1)[0] ?? id;
+	if (!/\.[cm]?[tj]sx?$/.test(cleanId)) {
+		return false;
+	}
+
+	return (
+		cleanId.includes("/src/renderer/") ||
+		cleanId.includes("/packages/ui/src/") ||
+		cleanId.includes("/packages/panes/src/") ||
+		cleanId.startsWith("/routes/") ||
+		cleanId.startsWith("/components/") ||
+		cleanId.startsWith("/screens/") ||
+		cleanId.startsWith("/hooks/") ||
+		cleanId.startsWith("/lib/") ||
+		cleanId.startsWith("/stores/")
+	);
+}
+
+function lucideDirectIconImportsPlugin() {
+	return {
+		name: "superset-lucide-direct-icon-imports",
+		enforce: "pre" as const,
+		transform(code: string, id: string) {
+			if (
+				!isLucideDirectIconImportTarget(id) ||
+				!code.includes("lucide-react")
+			) {
+				return null;
+			}
+
+			let transformed = code;
+			let didTransform = false;
+			transformed = transformed.replace(
+				lucideNamedImportRegex,
+				(_statement, specifierList: string) => {
+					const valueImports: string[] = [];
+					const typeImports: string[] = [];
+
+					for (const rawSpecifier of specifierList.split(",")) {
+						const specifier = rawSpecifier.trim();
+						if (!specifier) continue;
+
+						const typeMatch = specifier.match(/^type\s+(.+)$/);
+						if (typeMatch?.[1]) {
+							typeImports.push(typeMatch[1].trim());
+							continue;
+						}
+
+						const [importedName, localName = importedName] = specifier
+							.split(/\s+as\s+/)
+							.map((part) => part.trim());
+						if (!importedName || !localName) continue;
+
+						const fileName = toLucideIconFileName(importedName);
+						valueImports.push(
+							`import ${localName} from "lucide-react/dist/esm/icons/${fileName}.js";`,
+						);
+					}
+
+					if (valueImports.length === 0 && typeImports.length === 0) {
+						return _statement;
+					}
+
+					didTransform = true;
+					return [
+						typeImports.length
+							? `import type { ${typeImports.join(", ")} } from "lucide-react";`
+							: null,
+						...valueImports,
+					]
+						.filter(Boolean)
+						.join("\n");
+				},
+			);
+
+			return didTransform ? { code: transformed, map: null } : null;
+		},
+	};
+}
 
 export default defineConfig({
 	main: {
@@ -105,7 +226,11 @@ export default defineConfig({
 
 		build: {
 			sourcemap: buildSourcemap,
+			reportCompressedSize: false,
 			rollupOptions: {
+				watch: {
+					exclude: generatedOutputWatchIgnores,
+				},
 				input: {
 					index: resolve("src/main/index.ts"),
 					// Terminal host daemon process - runs separately for terminal persistence
@@ -124,7 +249,7 @@ export default defineConfig({
 					dir: resolve(devPath, "main"),
 				},
 				external: ["electron", ...mainExternalizedDependencies],
-				plugins: [sentryPlugin].filter(Boolean),
+				plugins: [sentryPlugin, mainBundleStatsPlugin].filter(Boolean),
 			},
 		},
 		resolve: {
@@ -158,8 +283,13 @@ export default defineConfig({
 		},
 
 		build: {
+			reportCompressedSize: false,
 			outDir: resolve(devPath, "preload"),
 			rollupOptions: {
+				watch: {
+					exclude: generatedOutputWatchIgnores,
+				},
+				plugins: [preloadBundleStatsPlugin].filter(Boolean),
 				input: {
 					index: resolve("src/preload/index.ts"),
 				},
@@ -174,7 +304,7 @@ export default defineConfig({
 				process.env.SKIP_ENV_VALIDATION,
 				"",
 			),
-			"process.platform": defineEnv(process.platform),
+			"process.platform": defineEnv(targetPlatform),
 			"process.env.NEXT_PUBLIC_API_URL": defineEnv(
 				process.env.NEXT_PUBLIC_API_URL,
 				"https://api.superset.sh",
@@ -223,6 +353,43 @@ export default defineConfig({
 		server: {
 			port: DEV_SERVER_PORT,
 			strictPort: false,
+			...(desktopApiProxy ? { proxy: desktopApiProxy } : {}),
+			watch: {
+				ignored: generatedOutputWatchIgnores,
+			},
+		},
+		optimizeDeps: {
+			exclude: [
+				"@codemirror/commands",
+				"@codemirror/lang-cpp",
+				"@codemirror/lang-css",
+				"@codemirror/lang-go",
+				"@codemirror/lang-html",
+				"@codemirror/lang-java",
+				"@codemirror/lang-javascript",
+				"@codemirror/lang-json",
+				"@codemirror/lang-markdown",
+				"@codemirror/lang-php",
+				"@codemirror/lang-python",
+				"@codemirror/lang-rust",
+				"@codemirror/lang-sql",
+				"@codemirror/lang-xml",
+				"@codemirror/lang-yaml",
+				"@codemirror/language",
+				"@codemirror/legacy-modes",
+				"@codemirror/search",
+				"@codemirror/state",
+				"@codemirror/view",
+				"@sentry/electron/renderer",
+				"@xterm/addon-webgl",
+				"@xterm/xterm",
+				"lucide-react",
+				"react-day-picker",
+				"shiki",
+			],
+			esbuildOptions: {
+				sourcemap: false,
+			},
 		},
 
 		plugins: [
@@ -238,12 +405,8 @@ export default defineConfig({
 			}),
 			tsconfigPaths,
 			tailwindcss(),
-			codeInspectorPlugin({
-				bundler: "vite",
-				hotKeys: ["altKey"],
-				hideConsole: true,
-				port: Number(process.env.CODE_INSPECTOR_PORT) || undefined,
-			}),
+			...(codeInspectorVitePlugin ? [codeInspectorVitePlugin] : []),
+			lucideDirectIconImportsPlugin(),
 			reactPlugin(),
 			htmlEnvTransformPlugin(),
 		],
@@ -252,19 +415,53 @@ export default defineConfig({
 			format: "es",
 		},
 
+		resolve: {
+			alias: [
+				{
+					find: /^shiki$/,
+					replacement: resolve(
+						"src/renderer/lib/shikiLimitedManifest/shiki.ts",
+					),
+				},
+				{
+					find: "shiki/dist/langs.mjs",
+					replacement: resolve(
+						"src/renderer/lib/shikiLimitedManifest/languages.ts",
+					),
+				},
+				{
+					find: "shiki/dist/themes.mjs",
+					replacement: resolve(
+						"src/renderer/lib/shikiLimitedManifest/themes.ts",
+					),
+				},
+				{
+					find: /^shiki\/wasm$/,
+					replacement: resolve(
+						"src/renderer/lib/shikiLimitedManifest/empty-wasm.ts",
+					),
+				},
+			],
+		},
+
 		publicDir: resolve(resources, "public"),
 
 		build: {
 			sourcemap: buildSourcemap,
+			reportCompressedSize: false,
 			outDir: resolve(devPath, "renderer"),
 
 			rollupOptions: {
+				watch: {
+					exclude: generatedOutputWatchIgnores,
+				},
 				plugins: [
 					injectProcessEnvPlugin({
 						NODE_ENV: "production",
-						platform: process.platform,
+						platform: targetPlatform,
 					}),
 					sentryPlugin,
+					rendererBundleStatsPlugin,
 				].filter(Boolean),
 
 				input: {

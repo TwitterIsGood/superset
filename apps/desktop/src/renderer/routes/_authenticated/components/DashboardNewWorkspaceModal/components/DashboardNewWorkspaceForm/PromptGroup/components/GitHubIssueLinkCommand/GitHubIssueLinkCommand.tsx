@@ -8,7 +8,6 @@ import {
 	CommandList,
 } from "@superset/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -16,6 +15,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { useDebouncedValue } from "renderer/hooks/useDebouncedValue";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
+import { toast } from "renderer/lib/toast";
 import {
 	IssueIcon,
 	type IssueState,

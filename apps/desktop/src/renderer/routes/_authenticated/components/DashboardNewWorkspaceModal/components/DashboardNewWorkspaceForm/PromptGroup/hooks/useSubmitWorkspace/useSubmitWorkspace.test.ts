@@ -11,8 +11,11 @@ describe("useSubmitWorkspace Trellis setup wiring", () => {
 	);
 
 	test("passes the Trellis initialization intent to workspaces.create snapshots", () => {
-		expect(source).toContain("trellisSetup: draft.trellisInitialize");
-		expect(source).toContain("? { initialize: true }");
+		expect(source).toContain(
+			"const trellisSetup = await trellisRuntimePack.prepareTrellisSetup",
+		);
+		expect(source).toContain("initialize: draft.trellisInitialize");
+		expect(source).toContain("trellisSetup,");
 	});
 
 	test("surfaces Trellis setup warnings returned by workspace creation", () => {

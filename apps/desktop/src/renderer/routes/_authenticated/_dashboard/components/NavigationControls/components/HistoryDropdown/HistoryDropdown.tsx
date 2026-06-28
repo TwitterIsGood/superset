@@ -11,7 +11,7 @@ import { cn } from "@superset/ui/utils";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { LuCpu, LuGitBranch, LuHistory } from "react-icons/lu";
+import { Cpu, GitBranch, History } from "lucide-react";
 import { usePresetIcon } from "renderer/assets/app-icons/preset-icons";
 import {
 	StatusIcon,
@@ -49,10 +49,7 @@ function V2WorkspaceRow({
 				{ws ? ws.projectName : "Workspace"}
 			</span>
 			<span className="flex items-center justify-center w-4 shrink-0">
-				<LuGitBranch
-					className="size-3 text-muted-foreground"
-					strokeWidth={1.5}
-				/>
+				<GitBranch className="size-3 text-muted-foreground" strokeWidth={1.5} />
 			</span>
 			<span
 				className={cn(
@@ -96,7 +93,7 @@ function AutomationRow({
 				{presetIcon ? (
 					<img src={presetIcon} alt="" className="size-3.5 object-contain" />
 				) : (
-					<LuCpu className="size-3 text-muted-foreground" strokeWidth={1.5} />
+					<Cpu className="size-3 text-muted-foreground" strokeWidth={1.5} />
 				)}
 			</span>
 			<span
@@ -245,7 +242,7 @@ export function HistoryDropdown() {
 						disabled
 						className="no-drag flex items-center justify-center size-7 rounded-md text-muted-foreground opacity-30"
 					>
-						<LuHistory className="size-3.5" strokeWidth={1.5} />
+						<History className="size-3.5" strokeWidth={1.5} />
 					</button>
 				</TooltipTrigger>
 				<TooltipContent side="bottom">Recently viewed</TooltipContent>
@@ -262,7 +259,7 @@ export function HistoryDropdown() {
 							type="button"
 							className="no-drag flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
 						>
-							<LuHistory className="size-3.5" strokeWidth={1.5} />
+							<History className="size-3.5" strokeWidth={1.5} />
 						</button>
 					</DropdownMenuTrigger>
 				</TooltipTrigger>

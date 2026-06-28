@@ -1,13 +1,13 @@
 import { Button } from "@superset/ui/button";
 import { Kbd, KbdGroup } from "@superset/ui/kbd";
 import { formatDistanceToNow } from "date-fns";
-import { FaGithub } from "react-icons/fa";
 import {
-	LuExternalLink,
-	LuGlobe,
-	LuPencil,
-	LuTriangleAlert,
-} from "react-icons/lu";
+	ExternalLink,
+	Github,
+	Globe,
+	Pencil,
+	TriangleAlert,
+} from "lucide-react";
 import type { DiffStats } from "renderer/hooks/host-service/useDiffStats";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import type { DashboardSidebarWorkspace } from "../../../../types";
@@ -54,7 +54,7 @@ export function DashboardSidebarWorkspaceHoverCardContent({
 			asChild
 		>
 			<a href={previewUrl} target="_blank" rel="noopener noreferrer">
-				<LuGlobe className="size-3" />
+				<Globe className="size-3" />
 				Open Preview
 			</a>
 		</Button>
@@ -77,7 +77,7 @@ export function DashboardSidebarWorkspaceHoverCardContent({
 								title="Rename branch"
 							>
 								<span className="break-all">{branch}</span>
-								<LuPencil className="size-3 shrink-0 opacity-0 group-hover/branch:opacity-100 transition-opacity" />
+								<Pencil className="size-3 shrink-0 opacity-0 group-hover/branch:opacity-100 transition-opacity" />
 							</button>
 						) : (
 							<code
@@ -95,7 +95,7 @@ export function DashboardSidebarWorkspaceHoverCardContent({
 								title="Open branch on GitHub"
 								onClick={(e) => e.stopPropagation()}
 							>
-								<LuExternalLink className="size-3" />
+								<ExternalLink className="size-3" />
 							</a>
 						)}
 					</div>
@@ -109,7 +109,7 @@ export function DashboardSidebarWorkspaceHoverCardContent({
 
 			{needsRebase && (
 				<div className="flex items-center gap-2 text-amber-500 text-xs bg-amber-500/10 px-2 py-1.5 rounded-md">
-					<LuTriangleAlert className="size-3.5 shrink-0" />
+					<TriangleAlert className="size-3.5 shrink-0" />
 					<span>
 						Behind main by {behindCount ?? "?"} commit
 						{behindCount !== 1 && "s"}, needs rebase
@@ -167,7 +167,7 @@ export function DashboardSidebarWorkspaceHoverCardContent({
 						asChild
 					>
 						<a href={pullRequest.url} target="_blank" rel="noopener noreferrer">
-							<FaGithub className="size-3" />
+							<Github className="size-3" />
 							View on GitHub
 							{hasOpenPRShortcut && (
 								<KbdGroup className="ml-auto">
@@ -202,7 +202,7 @@ export function DashboardSidebarWorkspaceHoverCardContent({
 							target="_blank"
 							rel="noopener noreferrer"
 						>
-							<LuGlobe className="size-3" />
+							<Globe className="size-3" />
 							Open Preview
 						</a>
 					</Button>

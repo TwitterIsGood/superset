@@ -6,8 +6,8 @@ import {
 import { HOST_AGENT_PRESETS } from "@superset/shared/host-agent-presets";
 import { Button } from "@superset/ui/button";
 import { useLiveQuery } from "@tanstack/react-db";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HiOutlinePlus } from "react-icons/hi2";
 import { useIsDarkTheme } from "renderer/assets/app-icons/preset-icons";
 import { useV2AgentConfigs } from "renderer/hooks/useV2AgentConfigs";
 import { getAgentCommandText } from "renderer/lib/agent-launch-command";
@@ -619,7 +619,7 @@ export function V2PresetsSection({
 						)}
 						{showPresets && (
 							<Button size="sm" onClick={() => handleAddRow()}>
-								<HiOutlinePlus className="size-4" />
+								<Plus className="size-4" />
 								Add preset
 							</Button>
 						)}

@@ -11,16 +11,16 @@ import {
 	DialogTitle,
 } from "@superset/ui/dialog";
 import { Kbd, KbdGroup } from "@superset/ui/kbd";
-import { toast } from "@superset/ui/sonner";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
+import { ChevronRight, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { HiChevronRight, HiSparkles, HiXMark } from "react-icons/hi2";
 import { MarkdownEditor } from "renderer/components/MarkdownEditor";
 import { PLATFORM } from "renderer/hotkeys";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { showHostServiceUnavailableToast } from "renderer/lib/host-service-unavailable";
+import { toast } from "renderer/lib/toast";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import { isProjectlessTaskFilter } from "../../../../../../stores/tasks-filter-state";
@@ -284,7 +284,7 @@ export function CreateTaskDialog({
 						<div className="max-w-40 truncate rounded-md border border-border/60 bg-muted/40 px-2 py-1 font-medium text-muted-foreground">
 							{organizationLabel}
 						</div>
-						<HiChevronRight className="size-3.5 text-muted-foreground" />
+						<ChevronRight className="size-3.5 text-muted-foreground" />
 						<span className="font-medium">New task</span>
 					</div>
 
@@ -296,7 +296,7 @@ export function CreateTaskDialog({
 							onClick={handlePolishDraft}
 							disabled={isCreating || isGeneratingDraft}
 						>
-							<HiSparkles className="size-4" />
+							<Sparkles className="size-4" />
 							{isGeneratingDraft ? "Polishing..." : "AI polish"}
 						</Button>
 						<DialogClose asChild>
@@ -306,7 +306,7 @@ export function CreateTaskDialog({
 								className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
 								aria-label="Close"
 							>
-								<HiXMark className="size-4" />
+								<X className="size-4" />
 							</button>
 						</DialogClose>
 					</div>

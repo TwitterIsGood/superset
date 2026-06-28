@@ -1,13 +1,14 @@
 import { cn } from "@superset/ui/utils";
-import { CgLaptop } from "react-icons/cg";
 import {
-	LuGitMerge,
-	LuGitPullRequest,
-	LuGitPullRequestClosed,
-	LuGitPullRequestDraft,
-} from "react-icons/lu";
-import { RxDot } from "react-icons/rx";
-import { TbCloud, TbCloudOff } from "react-icons/tb";
+	Cloud,
+	CloudOff,
+	Dot,
+	GitMerge,
+	GitPullRequest,
+	GitPullRequestClosed,
+	GitPullRequestDraft,
+	Laptop,
+} from "lucide-react";
 import { AsciiSpinner } from "renderer/screens/main/components/AsciiSpinner";
 import { StatusIndicator } from "renderer/screens/main/components/StatusIndicator";
 import type { ActivePaneStatus } from "shared/tabs-types";
@@ -34,10 +35,10 @@ const OVERLAY_POSITION = {
 } as const;
 
 const PR_ICON_BY_STATE = {
-	open: LuGitPullRequest,
-	merged: LuGitMerge,
-	closed: LuGitPullRequestClosed,
-	draft: LuGitPullRequestDraft,
+	open: GitPullRequest,
+	merged: GitMerge,
+	closed: GitPullRequestClosed,
+	draft: GitPullRequestDraft,
 } as const;
 
 const PR_COLOR_BY_STATE = {
@@ -75,17 +76,15 @@ export function DashboardSidebarWorkspaceIcon({
 
 		if (hostType === "local-device") {
 			if (workspaceType === "main") {
-				return (
-					<CgLaptop className={cn("size-4 transition-colors", iconColor)} />
-				);
+				return <Laptop className={cn("size-4 transition-colors", iconColor)} />;
 			}
 
-			return <RxDot className={cn("size-4 transition-colors", iconColor)} />;
+			return <Dot className={cn("size-4 transition-colors", iconColor)} />;
 		}
 
 		if (isRemoteDeviceOffline) {
 			return (
-				<TbCloudOff
+				<CloudOff
 					className={cn("size-4 transition-colors", iconColor, "opacity-60")}
 					strokeWidth={1.75}
 				/>
@@ -93,7 +92,7 @@ export function DashboardSidebarWorkspaceIcon({
 		}
 
 		return (
-			<TbCloud
+			<Cloud
 				className={cn("size-4 transition-colors", iconColor)}
 				strokeWidth={1.75}
 			/>

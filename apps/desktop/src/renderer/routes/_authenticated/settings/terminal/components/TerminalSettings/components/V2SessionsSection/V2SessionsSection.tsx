@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 // V2 Settings → Terminal → Manage daemon section.
 //
 // Talks to host-service's `terminal.daemon` namespace — the supervisor
@@ -23,18 +24,17 @@ import {
 	AlertDialogTitle,
 } from "@superset/ui/alert-dialog";
 import { Button } from "@superset/ui/button";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import {
 	WorkspaceClientProvider,
 	workspaceTrpc,
 } from "@superset/workspace-client";
 import { useState } from "react";
-import { HiChevronRight } from "react-icons/hi2";
 import {
 	getHostServiceHeaders,
 	getHostServiceWsToken,
 } from "renderer/lib/host-service-auth";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 
 const REFETCH_WHILE_OPEN_MS = 5_000;
@@ -218,7 +218,7 @@ function V2SessionsSectionInner() {
 							onClick={() => setShowSessionList((v) => !v)}
 							className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
 						>
-							<HiChevronRight
+							<ChevronRight
 								className={cn(
 									"size-3 transition-transform",
 									showSessionList && "rotate-90",

@@ -60,8 +60,29 @@ mock.module("shared/constants", () => ({
 const autoUpdater = await import("./auto-updater");
 const { AUTO_UPDATE_STATUS } = await import("shared/auto-update");
 
+describe("setupAutoUpdater", () => {
+	beforeEach(() => {
+		fakeAutoUpdater.removeAllListeners();
+		fakeAutoUpdater.checkForUpdates.mockClear();
+		fakeAutoUpdater.setFeedURL.mockClear();
+		delete process.env.SUPERSET_DISABLE_AUTO_UPDATES;
+	});
+
+	test("skips setup when auto-updates are disabled for the session", () => {
+		process.env.SUPERSET_DISABLE_AUTO_UPDATES = "1";
+
+		autoUpdater.setupAutoUpdater();
+		autoUpdater.checkForUpdates();
+
+		expect(fakeAutoUpdater.setFeedURL).not.toHaveBeenCalled();
+		expect(fakeAutoUpdater.checkForUpdates).not.toHaveBeenCalled();
+		delete process.env.SUPERSET_DISABLE_AUTO_UPDATES;
+	});
+});
+
 describe("installUpdate", () => {
 	beforeEach(() => {
+		delete process.env.SUPERSET_DISABLE_AUTO_UPDATES;
 		fakeAutoUpdater.removeAllListeners();
 		fakeAutoUpdater.quitAndInstall.mockClear();
 		fakeAutoUpdater.checkForUpdates.mockClear();

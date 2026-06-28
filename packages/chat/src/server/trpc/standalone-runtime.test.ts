@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AppRouter } from "@superset/trpc";
 import type { createTRPCClient } from "@trpc/client";
 import {
+	ClaudeStandaloneChatProvider,
 	type StandaloneChatProvider,
 	StandaloneChatRuntimeManager,
 	toSpawnableAsarUnpackedPath,
@@ -52,6 +53,10 @@ const originalInitCwd = process.env.INIT_CWD;
 const originalOldPwd = process.env.OLDPWD;
 let temporarySupersetHomeDir: string | null = null;
 let temporaryHomeDir: string | null = null;
+
+type ClaudeRuntimeOptionsProbe = typeof globalThis & {
+	__supersetClaudeRuntimeOptions?: unknown[];
+};
 
 function createApiClient(options?: {
 	updateTitleInputs?: Array<{ sessionId: string; title: string }>;
@@ -163,9 +168,28 @@ afterEach(() => {
 	} else {
 		process.env.OLDPWD = originalOldPwd;
 	}
+	delete (globalThis as ClaudeRuntimeOptionsProbe)
+		.__supersetClaudeRuntimeOptions;
 });
 
 describe("standalone Claude Code executable resolution", () => {
+	it("does not statically import the Claude Agent SDK value runtime", () => {
+		const source = readFileSync(
+			join(import.meta.dirname, "standalone-runtime.ts"),
+			"utf8",
+		);
+		const importDeclarations =
+			source.match(/import(?:[\s\S]*?)from\s+["'][^"']+["'];/g) ?? [];
+		const staticClaudeImports = importDeclarations.filter(
+			(declaration) =>
+				declaration.includes('"@anthropic-ai/claude-agent-sdk"') &&
+				!declaration.startsWith("import type"),
+		);
+
+		expect(staticClaudeImports).toEqual([]);
+		expect(source).toContain("loadClaudeAgentSdk");
+	});
+
 	it("rewrites packaged executable paths out of app.asar", () => {
 		expect(
 			toSpawnableAsarUnpackedPath(
@@ -181,6 +205,55 @@ describe("standalone Claude Code executable resolution", () => {
 			"/Applications/Superset Canary.app/Contents/Resources/app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude";
 
 		expect(toSpawnableAsarUnpackedPath(unpackedPath)).toBe(unpackedPath);
+	});
+
+	it("loads the SDK and executable from a resolved runtime pack", async () => {
+		temporarySupersetHomeDir = mkdtempSync(
+			join(tmpdir(), "superset-claude-pack-"),
+		);
+		const sdkPath = join(temporarySupersetHomeDir, "sdk.mjs");
+		const executablePath = join(temporarySupersetHomeDir, "claude");
+		writeFileSync(
+			sdkPath,
+			[
+				"export function query(args) {",
+				"globalThis.__supersetClaudeRuntimeOptions.push(args.options);",
+				"return (async function* () {",
+				"yield { type: 'assistant', message: { content: [{ type: 'text', text: 'pack ok' }] } };",
+				"})();",
+				"}",
+				"",
+			].join("\n"),
+		);
+		writeFileSync(executablePath, "#!/bin/sh\n");
+		(globalThis as ClaudeRuntimeOptionsProbe).__supersetClaudeRuntimeOptions =
+			[];
+		const resolveRuntimePaths = mock(async () => ({
+			sdkImportPath: sdkPath,
+			executablePath,
+		}));
+		const provider = new ClaudeStandaloneChatProvider({
+			resolveRuntimePaths,
+		});
+
+		const response = await provider.sendTurn({
+			messages: [{ role: "user", content: "hello" }],
+			cwd: temporarySupersetHomeDir,
+			env: {},
+			signal: new AbortController().signal,
+			onEvent: mock(() => {}),
+			requestToolApproval: mock(async () => ({ decision: "approve" })),
+		});
+
+		expect(resolveRuntimePaths).toHaveBeenCalledTimes(1);
+		expect(response.text).toBe("pack ok");
+		expect(
+			(globalThis as ClaudeRuntimeOptionsProbe)
+				.__supersetClaudeRuntimeOptions?.[0],
+		).toMatchObject({
+			pathToClaudeCodeExecutable: executablePath,
+			cwd: temporarySupersetHomeDir,
+		});
 	});
 });
 

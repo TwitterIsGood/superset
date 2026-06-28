@@ -1,8 +1,8 @@
 import { COMPANY } from "@superset/shared/constants";
 import { Button } from "@superset/ui/button";
-import { toast } from "@superset/ui/sonner";
-import { HiArrowPath, HiMiniXMark } from "react-icons/hi2";
+import { RefreshCw, X } from "lucide-react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { AUTO_UPDATE_STATUS } from "shared/auto-update";
 
 interface UpdateToastProps {
@@ -50,7 +50,7 @@ export function UpdateToast({
 				className="absolute top-2 right-2 size-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
 				aria-label="Dismiss"
 			>
-				<HiMiniXMark className="size-4" />
+				<X className="size-4" />
 			</button>
 			<div className="flex flex-col gap-0.5">
 				{isError ? (
@@ -94,7 +94,7 @@ export function UpdateToast({
 						disabled={installMutation.isPending}
 					>
 						{installMutation.isPending && (
-							<HiArrowPath className="size-3.5 animate-spin" />
+							<RefreshCw className="size-3.5 animate-spin" />
 						)}
 						{installMutation.isPending ? "Installing..." : "Install"}
 					</Button>

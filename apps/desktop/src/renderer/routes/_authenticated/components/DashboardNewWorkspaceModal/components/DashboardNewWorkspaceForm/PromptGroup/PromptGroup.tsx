@@ -9,17 +9,14 @@ import {
 } from "@superset/ui/ai-elements/prompt-input";
 import { Input } from "@superset/ui/input";
 import { isEnterSubmit } from "@superset/ui/lib/keyboard";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpIcon } from "lucide-react";
+import { ArrowUpIcon, CircleDotIcon, GitPullRequest } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { GoIssueOpened } from "react-icons/go";
-import { LuGitPullRequest } from "react-icons/lu";
-import { SiLinear } from "react-icons/si";
 import { AgentSelect } from "renderer/components/AgentSelect";
 import { LinkedIssuePill } from "renderer/components/Chat/ChatInterface/components/ChatInputFooter/components/LinkedIssuePill";
 import { IssueLinkCommand } from "renderer/components/Chat/ChatInterface/components/IssueLinkCommand";
+import { LinearIcon } from "renderer/components/icons/LinearIcon";
 import { MarkdownEditor } from "renderer/components/MarkdownEditor";
 import { resolveHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { useAgentLaunchPreferences } from "renderer/hooks/useAgentLaunchPreferences";
@@ -28,6 +25,7 @@ import { useV2AgentChoices } from "renderer/hooks/useV2AgentChoices";
 import { PLATFORM } from "renderer/hotkeys";
 import { authClient } from "renderer/lib/auth-client";
 import { showHostServiceUnavailableToast } from "renderer/lib/host-service-unavailable";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import { useNewWorkspaceModalOpen } from "renderer/stores/new-workspace-modal";
 import { useNewWorkspacePromptContext } from "renderer/stores/new-workspace-prompt-context";
@@ -454,7 +452,7 @@ export function PromptGroup({
 										aria-label="Link issue"
 										className={`${PILL_BUTTON_CLASS} w-[22px]`}
 									>
-										<SiLinear className="size-3.5" />
+										<LinearIcon className="size-3.5" />
 									</PromptInputButton>
 								</IssueLinkCommand>
 							}
@@ -476,7 +474,7 @@ export function PromptGroup({
 										aria-label="Link GitHub issue"
 										className={`${PILL_BUTTON_CLASS} w-[22px]`}
 									>
-										<GoIssueOpened className="size-3.5" />
+										<CircleDotIcon className="size-3.5" />
 									</PromptInputButton>
 								</GitHubIssueLinkCommand>
 							}
@@ -491,7 +489,7 @@ export function PromptGroup({
 										aria-label="Link pull request"
 										className={`${PILL_BUTTON_CLASS} w-[22px]`}
 									>
-										<LuGitPullRequest className="size-3.5" />
+										<GitPullRequest className="size-3.5" />
 									</PromptInputButton>
 								</PRLinkCommand>
 							}
@@ -545,7 +543,7 @@ export function PromptGroup({
 								transition={{ duration: 0.2, ease: "easeOut" }}
 								className="flex items-center gap-1 text-xs text-muted-foreground"
 							>
-								<LuGitPullRequest className="size-3 shrink-0" />
+								<GitPullRequest className="size-3 shrink-0" />
 								based off PR #{linkedPR.prNumber}
 							</motion.span>
 						) : (

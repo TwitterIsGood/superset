@@ -25,4 +25,11 @@ describe("TrellisSetupRow user-facing copy", () => {
 		expect(SOURCE).toContain("project-not-setup");
 		expect(SOURCE).toContain("project-checking");
 	});
+
+	test("shows one localized runtime preparation state for guided workflow packs", () => {
+		expect(SOURCE).toContain("SUPERSET_CLI_RUNTIME_PACK_ID");
+		expect(SOURCE).toContain("cliRuntimePack");
+		expect(SOURCE).toContain("runtimeProgresses");
+		expect(SOURCE).toContain("Downloading and verifying the workflow runtime.");
+	});
 });

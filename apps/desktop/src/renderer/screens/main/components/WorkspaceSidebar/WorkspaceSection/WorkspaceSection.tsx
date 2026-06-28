@@ -8,15 +8,14 @@ import {
 	ContextMenuSubTrigger,
 	ContextMenuTrigger,
 } from "@superset/ui/context-menu";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { AnimatePresence, motion } from "framer-motion";
+import { ChevronRight, Palette, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDrag, useDrop } from "react-dnd";
-import { HiChevronRight } from "react-icons/hi2";
-import { LuPalette, LuPencil, LuTrash2 } from "react-icons/lu";
 import { ColorSelector } from "renderer/components/ColorSelector";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { useReorderProjectChildren } from "renderer/react-query/workspaces";
 import { PROJECT_COLOR_DEFAULT } from "shared/constants/project-colors";
 import { SECTION_DND_TYPE, STROKE_WIDTH } from "../constants";
@@ -241,7 +240,7 @@ export function WorkspaceSection({
 								onDoubleClick={handleDoubleClick}
 								className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer"
 							>
-								<HiChevronRight
+								<ChevronRight
 									className={cn(
 										"size-3 shrink-0 transition-transform duration-150",
 										!isCollapsed && "rotate-90",
@@ -257,12 +256,12 @@ export function WorkspaceSection({
 				</ContextMenuTrigger>
 				<ContextMenuContent>
 					<ContextMenuItem onSelect={handleStartRename}>
-						<LuPencil className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+						<Pencil className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 						Rename Section
 					</ContextMenuItem>
 					<ContextMenuSub>
 						<ContextMenuSubTrigger>
-							<LuPalette className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
+							<Palette className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 							Set Color
 						</ContextMenuSubTrigger>
 						<ContextMenuSubContent className="w-40 max-h-80 overflow-y-auto">
@@ -279,7 +278,7 @@ export function WorkspaceSection({
 						disabled={mutations.isDeleting}
 						className="text-destructive focus:text-destructive"
 					>
-						<LuTrash2
+						<Trash2
 							className="size-4 mr-2 text-destructive"
 							strokeWidth={STROKE_WIDTH}
 						/>

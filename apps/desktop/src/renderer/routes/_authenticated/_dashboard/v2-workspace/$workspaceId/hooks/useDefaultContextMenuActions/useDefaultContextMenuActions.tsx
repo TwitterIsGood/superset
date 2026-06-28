@@ -4,17 +4,17 @@ import {
 	type RendererContext,
 	resolveTabTitle,
 } from "@superset/panes";
-import { useMemo } from "react";
 import {
-	LuColumns2,
-	LuEqual,
-	LuGlobe,
-	LuMessageSquare,
-	LuMoveRight,
-	LuPlus,
-	LuRows2,
-	LuX,
-} from "react-icons/lu";
+	Columns2,
+	Equal,
+	Globe,
+	MessageSquare,
+	MoveRight,
+	Plus,
+	Rows2,
+	X,
+} from "lucide-react";
+import { useMemo } from "react";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import type {
 	BrowserPaneData,
@@ -45,7 +45,7 @@ export function useDefaultContextMenuActions({
 			{
 				key: "split-horizontal",
 				label: "Split Horizontally",
-				icon: <LuRows2 />,
+				icon: <Rows2 />,
 				shortcut:
 					splitDownShortcut !== "Unassigned" ? splitDownShortcut : undefined,
 				onSelect: async (ctx) => {
@@ -59,7 +59,7 @@ export function useDefaultContextMenuActions({
 			{
 				key: "split-vertical",
 				label: "Split Vertically",
-				icon: <LuColumns2 />,
+				icon: <Columns2 />,
 				shortcut:
 					splitRightShortcut !== "Unassigned" ? splitRightShortcut : undefined,
 				onSelect: async (ctx) => {
@@ -73,7 +73,7 @@ export function useDefaultContextMenuActions({
 			{
 				key: "split-with-chat",
 				label: "Split with New Chat",
-				icon: <LuMessageSquare />,
+				icon: <MessageSquare />,
 				shortcut:
 					splitWithChatShortcut !== "Unassigned"
 						? splitWithChatShortcut
@@ -88,7 +88,7 @@ export function useDefaultContextMenuActions({
 			{
 				key: "split-with-browser",
 				label: "Split with New Browser",
-				icon: <LuGlobe />,
+				icon: <Globe />,
 				shortcut:
 					splitWithBrowserShortcut !== "Unassigned"
 						? splitWithBrowserShortcut
@@ -105,7 +105,7 @@ export function useDefaultContextMenuActions({
 			{
 				key: "equalize-splits",
 				label: "Equalize Pane Splits",
-				icon: <LuEqual />,
+				icon: <Equal />,
 				shortcut:
 					equalizePaneSplitsShortcut !== "Unassigned"
 						? equalizePaneSplitsShortcut
@@ -118,7 +118,7 @@ export function useDefaultContextMenuActions({
 			{
 				key: "move-to-tab",
 				label: "Move to Tab",
-				icon: <LuMoveRight />,
+				icon: <MoveRight />,
 				children: (ctx: RendererContext<PaneViewerData>) => {
 					const tabs = ctx.store.getState().tabs;
 					const otherTabs = tabs.filter((t) => t.id !== ctx.tab.id);
@@ -138,7 +138,7 @@ export function useDefaultContextMenuActions({
 					items.push({
 						key: "move-to-new-tab",
 						label: "New Tab",
-						icon: <LuPlus />,
+						icon: <Plus />,
 						onSelect: () => {
 							ctx.store.getState().movePaneToNewTab({ paneId: ctx.pane.id });
 						},
@@ -150,7 +150,7 @@ export function useDefaultContextMenuActions({
 			{
 				key: "close-pane",
 				label: "Close Pane",
-				icon: <LuX />,
+				icon: <X />,
 				variant: "destructive",
 				shortcut:
 					closePaneShortcut !== "Unassigned" ? closePaneShortcut : undefined,

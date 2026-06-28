@@ -1,4 +1,3 @@
-import { toast } from "@superset/ui/sonner";
 import {
 	createContext,
 	type PropsWithChildren,
@@ -7,6 +6,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import { toast } from "renderer/lib/toast";
 import { useCreateFromPr } from "renderer/react-query/workspaces/useCreateFromPr";
 import { useCreateWorkspace } from "renderer/react-query/workspaces/useCreateWorkspace";
 import { useOpenExternalWorktree } from "renderer/react-query/workspaces/useOpenExternalWorktree";

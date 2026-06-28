@@ -1,5 +1,5 @@
 import { cn } from "@superset/ui/lib/utils";
-import { HiOutlineChevronDown, HiOutlineChevronRight } from "react-icons/hi2";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { SortOption, WorkspaceMetrics } from "../../types";
 import { formatCpu, formatMemory } from "../../utils/formatters";
 import { getUsageSeverity } from "../../utils/resourceSeverity";
@@ -180,9 +180,9 @@ export function WorkspaceResourceSection({
 					<div className="flex items-center gap-1 min-w-0 mr-2">
 						<span className="flex items-center justify-center h-4 w-4 shrink-0 text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
 							{isProjectCollapsed ? (
-								<HiOutlineChevronRight className="h-3 w-3" />
+								<ChevronRight className="h-3 w-3" />
 							) : (
-								<HiOutlineChevronDown className="h-3 w-3" />
+								<ChevronDown className="h-3 w-3" />
 							)}
 						</span>
 						<span className="text-[11px] font-semibold uppercase tracking-[0.04em] truncate min-w-0 text-muted-foreground">
@@ -215,9 +215,9 @@ export function WorkspaceResourceSection({
 											}
 										>
 											{isCollapsed ? (
-												<HiOutlineChevronRight className="h-3 w-3" />
+												<ChevronRight className="h-3 w-3" />
 											) : (
-												<HiOutlineChevronDown className="h-3 w-3" />
+												<ChevronDown className="h-3 w-3" />
 											)}
 										</button>
 									) : (

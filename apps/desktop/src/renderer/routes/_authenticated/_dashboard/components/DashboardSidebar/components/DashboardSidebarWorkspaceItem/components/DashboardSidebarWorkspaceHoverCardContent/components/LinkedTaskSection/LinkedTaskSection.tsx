@@ -1,7 +1,7 @@
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
-import { LuExternalLink } from "react-icons/lu";
+import { ExternalLink } from "lucide-react";
 import {
 	StatusIcon,
 	type StatusType,
@@ -75,7 +75,7 @@ export function LinkedTaskSection({ taskId }: LinkedTaskSectionProps) {
 						title="Open task externally"
 						onClick={(e) => e.stopPropagation()}
 					>
-						<LuExternalLink className="size-3" />
+						<ExternalLink className="size-3" />
 					</a>
 				)}
 			</div>

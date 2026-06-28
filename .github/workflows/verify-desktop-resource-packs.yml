@@ -1,0 +1,155 @@
+name: Verify Desktop Resource Packs
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_loose_files:
+        description: "Also upload and verify loose pack files, not just manifests and pack.zip archives."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify-macos:
+    name: Verify macOS packs (${{ matrix.arch }})
+    runs-on: macos-latest
+    environment: production
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        id: setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Cache dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-revision }}-${{ hashFiles('bun.lock', 'package.json', 'apps/desktop/package.json', 'packages/*/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-revision }}-
+
+      - name: Install dependencies
+        run: bun install --frozen --ignore-scripts --minimum-release-age=0
+
+      - name: Install target platform optional dependencies
+        run: bun install --frozen --ignore-scripts --minimum-release-age=0 --cpu="${{ matrix.arch }}" --os=darwin
+
+      - name: Build resource packs
+        working-directory: apps/desktop
+        env:
+          BUNDLE_CLI: "false"
+          SUPERSET_RESOURCE_PACK_BASE_URL: ${{ secrets.SUPERSET_RESOURCE_PACK_BASE_URL }}
+          TARGET_ARCH: ${{ matrix.arch }}
+          TARGET_PLATFORM: darwin
+        run: |
+          bun run build:trellis-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
+          bun run build:claude-agent-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
+          bun run build:mastracode-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
+          bun run build:cli-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
+          bun run validate:trellis-runtime -- --node-modules dist/resource-packs/trellis-runtime/*/node_modules
+
+      - name: Upload and verify public downloads
+        working-directory: apps/desktop
+        env:
+          INCLUDE_LOOSE_FILES: ${{ inputs.include_loose_files }}
+          SUPERSET_OBJECT_STORAGE_ENDPOINT: ${{ secrets.SUPERSET_OBJECT_STORAGE_ENDPOINT }}
+          SUPERSET_OBJECT_STORAGE_BUCKET: ${{ secrets.SUPERSET_OBJECT_STORAGE_BUCKET }}
+          SUPERSET_OBJECT_STORAGE_REGION: ${{ secrets.SUPERSET_OBJECT_STORAGE_REGION }}
+          SUPERSET_OBJECT_STORAGE_ACCESS_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_ACCESS_KEY }}
+          SUPERSET_OBJECT_STORAGE_SECRET_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_SECRET_KEY }}
+          SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE: ${{ secrets.SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE }}
+          SUPERSET_RESOURCE_PACK_BASE_URL: ${{ secrets.SUPERSET_RESOURCE_PACK_BASE_URL }}
+        run: |
+          bun run check:resource-pack-release-readiness
+          bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files="$INCLUDE_LOOSE_FILES"
+          bun run verify:resource-pack-downloads -- --index dist/resource-packs/pack-manifest-index.json --include-loose-files="$INCLUDE_LOOSE_FILES"
+
+      - name: Upload verification manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-resource-packs-darwin-${{ matrix.arch }}-manifest
+          path: apps/desktop/dist/resource-packs/pack-manifest-index.json
+          retention-days: 14
+          if-no-files-found: error
+
+  verify-linux:
+    name: Verify Linux packs (x64)
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        id: setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Cache dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-revision }}-${{ hashFiles('bun.lock', 'package.json', 'apps/desktop/package.json', 'packages/*/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-revision }}-
+
+      - name: Install dependencies
+        run: bun install --frozen --ignore-scripts --minimum-release-age=0
+
+      - name: Install target platform optional dependencies
+        run: bun install --frozen --ignore-scripts --minimum-release-age=0 --cpu=x64 --os=linux
+
+      - name: Build resource packs
+        working-directory: apps/desktop
+        env:
+          BUNDLE_CLI: "false"
+          SUPERSET_RESOURCE_PACK_BASE_URL: ${{ secrets.SUPERSET_RESOURCE_PACK_BASE_URL }}
+          TARGET_ARCH: x64
+          TARGET_PLATFORM: linux
+        run: |
+          bun run build:trellis-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
+          bun run build:claude-agent-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
+          bun run build:mastracode-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
+          bun run build:cli-pack -- --out-dir dist/resource-packs --app-index-out dist/resources/pack-system/pack-manifest-index.json
+          bun run validate:trellis-runtime -- --node-modules dist/resource-packs/trellis-runtime/*/node_modules
+
+      - name: Upload and verify public downloads
+        working-directory: apps/desktop
+        env:
+          INCLUDE_LOOSE_FILES: ${{ inputs.include_loose_files }}
+          SUPERSET_OBJECT_STORAGE_ENDPOINT: ${{ secrets.SUPERSET_OBJECT_STORAGE_ENDPOINT }}
+          SUPERSET_OBJECT_STORAGE_BUCKET: ${{ secrets.SUPERSET_OBJECT_STORAGE_BUCKET }}
+          SUPERSET_OBJECT_STORAGE_REGION: ${{ secrets.SUPERSET_OBJECT_STORAGE_REGION }}
+          SUPERSET_OBJECT_STORAGE_ACCESS_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_ACCESS_KEY }}
+          SUPERSET_OBJECT_STORAGE_SECRET_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_SECRET_KEY }}
+          SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE: ${{ secrets.SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE }}
+          SUPERSET_RESOURCE_PACK_BASE_URL: ${{ secrets.SUPERSET_RESOURCE_PACK_BASE_URL }}
+        run: |
+          bun run check:resource-pack-release-readiness
+          bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files="$INCLUDE_LOOSE_FILES"
+          bun run verify:resource-pack-downloads -- --index dist/resource-packs/pack-manifest-index.json --include-loose-files="$INCLUDE_LOOSE_FILES"
+
+      - name: Upload verification manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-resource-packs-linux-x64-manifest
+          path: apps/desktop/dist/resource-packs/pack-manifest-index.json
+          retention-days: 14
+          if-no-files-found: error

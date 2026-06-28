@@ -9,11 +9,7 @@ import { Badge } from "@superset/ui/badge";
 import { Button } from "@superset/ui/button";
 import { ScrollArea } from "@superset/ui/scroll-area";
 import { Separator } from "@superset/ui/separator";
-import {
-	HiArrowLeft,
-	HiOutlineFolder,
-	HiOutlineUserCircle,
-} from "react-icons/hi2";
+import { ArrowLeft, CircleUserRound, Folder } from "lucide-react";
 import { MarkdownRenderer } from "renderer/components/MarkdownRenderer";
 import { PriorityIcon } from "renderer/routes/_authenticated/_dashboard/tasks/components/TasksView/components/shared/PriorityIcon";
 import {
@@ -63,7 +59,7 @@ export function TaskDetailSyncingFallback({
 						onClick={onBack}
 						aria-label="Back to tasks"
 					>
-						<HiArrowLeft className="w-4 h-4" />
+						<ArrowLeft className="w-4 h-4" />
 					</Button>
 					<span className="text-sm text-muted-foreground">{task.slug}</span>
 					<Badge variant="outline" className="ml-auto text-xs font-normal">
@@ -178,7 +174,7 @@ export function TaskDetailSyncingFallback({
 									</>
 								) : (
 									<>
-										<HiOutlineUserCircle className="w-5 h-5 text-muted-foreground" />
+										<CircleUserRound className="w-5 h-5 text-muted-foreground" />
 										<span className="text-sm text-muted-foreground">
 											Unassigned
 										</span>
@@ -194,7 +190,7 @@ export function TaskDetailSyncingFallback({
 										className="size-4 rounded-[3px]"
 									/>
 								) : (
-									<HiOutlineFolder className="size-4 text-muted-foreground" />
+									<Folder className="size-4 text-muted-foreground" />
 								)}
 								<span className="min-w-0 flex-1 truncate text-sm">
 									{project?.name ?? "No project"}

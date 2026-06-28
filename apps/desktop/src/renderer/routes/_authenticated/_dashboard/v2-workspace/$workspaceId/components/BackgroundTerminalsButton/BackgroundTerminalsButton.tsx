@@ -8,7 +8,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { workspaceTrpc } from "@superset/workspace-client";
 import { Archive, ChevronDown, Trash2 } from "lucide-react";
 import {
@@ -30,6 +29,7 @@ import {
 	getTerminalBackgroundMarkerIdsKey,
 	subscribeTerminalBackgroundMarkers,
 } from "renderer/lib/terminal/terminal-background-intents";
+import { toast } from "renderer/lib/toast";
 import { getRelativeTime } from "renderer/screens/main/components/WorkspacesListView/utils";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
@@ -48,6 +48,7 @@ import {
 interface BackgroundTerminalsButtonProps {
 	workspaceId: string;
 	store: StoreApi<WorkspaceStore<PaneViewerData>>;
+	sidebarOpen: boolean;
 }
 
 /**
@@ -60,6 +61,7 @@ export const BackgroundTerminalsButton = memo(
 	function BackgroundTerminalsButton({
 		workspaceId,
 		store,
+		sidebarOpen,
 	}: BackgroundTerminalsButtonProps) {
 		const [isOpen, setIsOpen] = useState(false);
 		const attachedTerminalIdsKey = useStore(store, (s) =>
@@ -105,14 +107,18 @@ export const BackgroundTerminalsButton = memo(
 		const sessionsInput = useMemo(() => ({ workspaceId }), [workspaceId]);
 		const utils = workspaceTrpc.useUtils();
 		const killSession = workspaceTrpc.terminal.killSession.useMutation();
+		const countPollingEnabled = !isOpen && sidebarOpen;
 		const backgroundCountQuery =
 			workspaceTrpc.terminal.countBackgroundSessions.useQuery(
 				backgroundCountInput,
 				{
-					enabled: !isOpen,
+					enabled: countPollingEnabled,
 					notifyOnChangeProps: ["data", "dataUpdatedAt"],
-					refetchInterval: getBackgroundTerminalCountRefetchInterval(isOpen),
-					refetchOnWindowFocus: false,
+					refetchInterval: getBackgroundTerminalCountRefetchInterval({
+						isMenuOpen: isOpen,
+						sidebarOpen,
+					}),
+					refetchOnWindowFocus: countPollingEnabled,
 					staleTime: 5_000,
 				},
 			);
@@ -301,5 +307,9 @@ function areBackgroundTerminalsButtonPropsEqual(
 	prev: BackgroundTerminalsButtonProps,
 	next: BackgroundTerminalsButtonProps,
 ) {
-	return prev.workspaceId === next.workspaceId && prev.store === next.store;
+	return (
+		prev.workspaceId === next.workspaceId &&
+		prev.store === next.store &&
+		prev.sidebarOpen === next.sidebarOpen
+	);
 }

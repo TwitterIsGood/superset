@@ -2,7 +2,7 @@ import { dirname, join } from "node:path";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { trpcServer } from "@hono/trpc-server";
 import { Octokit } from "@octokit/rest";
-import type { ChatService } from "@superset/chat/server/desktop";
+import type { ChatService } from "@superset/chat/server/desktop/chat-service";
 import type { MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -21,6 +21,7 @@ import { PullRequestRuntimeManager } from "./runtime/pull-requests";
 import { registerWorkspaceTerminalRoute } from "./terminal/terminal";
 import { TerminalAgentStore } from "./terminal-agents";
 import { appRouter } from "./trpc/router";
+import { gitQueryCache } from "./trpc/router/git/utils/git-query-cache";
 import {
 	execGh as defaultExecGh,
 	type ExecGh,
@@ -107,7 +108,15 @@ export function createApp(options: CreateAppOptions): CreateAppResult {
 	// activity per workspace. Both EventBus (broadcasts to clients) and the
 	// pull-requests runtime (event-driven branch sync) subscribe to it.
 	const gitWatcher = new GitWatcher(db, filesystem);
-	gitWatcher.start();
+	const clearGitQueryCacheOnChange = gitWatcher.onChanged((event) => {
+		gitQueryCache.clearWorkspace(event.workspaceId);
+	});
+	let gitWatcherStarted = false;
+	const ensureGitWatcherStarted = (): void => {
+		if (gitWatcherStarted) return;
+		gitWatcherStarted = true;
+		gitWatcher.start();
+	};
 	const pullRequestRuntime = new PullRequestRuntimeManager({
 		db,
 		execGh,
@@ -115,7 +124,13 @@ export function createApp(options: CreateAppOptions): CreateAppResult {
 		github,
 		gitWatcher,
 	});
-	pullRequestRuntime.start();
+	let pullRequestRuntimeStarted = false;
+	const ensurePullRequestRuntimeStarted = (): void => {
+		if (pullRequestRuntimeStarted) return;
+		ensureGitWatcherStarted();
+		pullRequestRuntimeStarted = true;
+		pullRequestRuntime.start();
+	};
 	const getChatRuntime = onceAsync(async () => {
 		if (options.chatRuntime) return options.chatRuntime;
 		const [{ ChatRuntimeManager }, { RegistryModelProvider }] =
@@ -139,7 +154,9 @@ export function createApp(options: CreateAppOptions): CreateAppResult {
 	// doesn't load the chat/Mastra stack before a provider-auth route is used.
 	const getChatService = onceAsync(async () => {
 		if (options.chatService) return options.chatService;
-		const { ChatService } = await import("@superset/chat/server/desktop");
+		const { ChatService } = await import(
+			"@superset/chat/server/desktop/chat-service"
+		);
 		return new ChatService();
 	});
 
@@ -148,6 +165,8 @@ export function createApp(options: CreateAppOptions): CreateAppResult {
 		getChat: getChatRuntime,
 		filesystem,
 		pullRequests: pullRequestRuntime,
+		ensureGitWatcherStarted,
+		ensurePullRequestRuntimeStarted,
 	};
 	const app = new Hono();
 	const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
@@ -166,7 +185,10 @@ export function createApp(options: CreateAppOptions): CreateAppResult {
 	);
 
 	const eventBus = new EventBus({ db, filesystem, gitWatcher });
-	eventBus.start();
+	const ensureEventBusStarted = (): void => {
+		ensureGitWatcherStarted();
+		eventBus.start();
+	};
 
 	const terminalAgentStore = new TerminalAgentStore();
 
@@ -193,7 +215,12 @@ export function createApp(options: CreateAppOptions): CreateAppResult {
 	app.use("/terminal/*", wsAuth);
 	app.use("/events", wsAuth);
 
-	registerEventBusRoute({ app, eventBus, upgradeWebSocket });
+	registerEventBusRoute({
+		app,
+		eventBus,
+		upgradeWebSocket,
+		onClientOpen: ensureEventBusStarted,
+	});
 	registerWorkspaceTerminalRoute({
 		app,
 		db,
@@ -255,6 +282,12 @@ export function createApp(options: CreateAppOptions): CreateAppResult {
 			gitWatcher.close();
 		} catch (err) {
 			console.warn("[host-service] gitWatcher.close failed:", err);
+		}
+		try {
+			clearGitQueryCacheOnChange();
+			gitQueryCache.clear();
+		} catch (err) {
+			console.warn("[host-service] git query cache cleanup failed:", err);
 		}
 		if (ownsDb) {
 			try {

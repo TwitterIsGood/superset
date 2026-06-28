@@ -2,13 +2,13 @@ import {
 	type BranchPrefixMode,
 	resolveBranchPrefix,
 } from "@superset/shared/workspace-launch";
-import { toast } from "@superset/ui/sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { getHostServiceUnavailableMessage } from "renderer/lib/host-service-unavailable";
+import { toast } from "renderer/lib/toast";
 import { useWorkspaceHostOptions } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker/hooks/useWorkspaceHostOptions";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import { BranchPrefixControl } from "../../../components/BranchPrefixControl";

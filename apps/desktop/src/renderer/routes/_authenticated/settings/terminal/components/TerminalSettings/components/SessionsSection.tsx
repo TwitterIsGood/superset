@@ -8,9 +8,9 @@ import {
 } from "@superset/ui/alert-dialog";
 import { Button } from "@superset/ui/button";
 import { Label } from "@superset/ui/label";
-import { toast } from "@superset/ui/sonner";
 import { useMemo, useState } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 
 export function SessionsSection() {
 	const utils = electronTrpc.useUtils();

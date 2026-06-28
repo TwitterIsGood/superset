@@ -8,19 +8,14 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@superset/ui/sheet";
-import { toast } from "@superset/ui/sonner";
 import { Switch } from "@superset/ui/switch";
 import { Textarea } from "@superset/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
+import { CircleHelp, Download, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-	HiOutlineArrowDownTray,
-	HiOutlineQuestionMarkCircle,
-	HiOutlineTrash,
-	HiPlus,
-} from "react-icons/hi2";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
+import { toast } from "renderer/lib/toast";
 import { parseEnvContent, validateEnvContent } from "../../utils/env-file";
 
 interface SecretEntry {
@@ -294,7 +289,7 @@ export function AddSecretSheet({
 										className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground mt-[1px]"
 										onClick={() => removeEntry(index)}
 									>
-										<HiOutlineTrash className="h-4 w-4" />
+										<Trash2 className="h-4 w-4" />
 									</Button>
 								) : (
 									<div className="w-8 shrink-0" />
@@ -308,7 +303,7 @@ export function AddSecretSheet({
 							className="text-muted-foreground gap-1.5"
 							onClick={addEntry}
 						>
-							<HiPlus className="h-3.5 w-3.5" />
+							<Plus className="h-3.5 w-3.5" />
 							Add Another
 						</Button>
 
@@ -317,7 +312,7 @@ export function AddSecretSheet({
 							<span className="text-sm text-muted-foreground">Sensitive</span>
 							<Tooltip>
 								<TooltipTrigger asChild>
-									<HiOutlineQuestionMarkCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+									<CircleHelp className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
 								</TooltipTrigger>
 								<TooltipContent side="right">
 									<p className="max-w-[200px] text-xs">
@@ -339,7 +334,7 @@ export function AddSecretSheet({
 							className="gap-1.5"
 							onClick={() => fileInputRef.current?.click()}
 						>
-							<HiOutlineArrowDownTray className="h-3.5 w-3.5" />
+							<Download className="h-3.5 w-3.5" />
 							Import .env
 						</Button>
 						<span className="text-xs text-muted-foreground">

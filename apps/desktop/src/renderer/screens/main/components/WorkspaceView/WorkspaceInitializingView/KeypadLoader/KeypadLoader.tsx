@@ -1,13 +1,13 @@
 import { cn } from "@superset/ui/utils";
+import {
+	Database,
+	Download,
+	FileCog,
+	GitBranch,
+	RefreshCw,
+} from "lucide-react";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
-import {
-	LuDatabase,
-	LuDownload,
-	LuFileCog,
-	LuGitBranch,
-	LuRefreshCw,
-} from "react-icons/lu";
 import {
 	getStepIndex,
 	type WorkspaceInitStep,
@@ -37,35 +37,35 @@ const KEYS: readonly KeyDef[] = [
 		// Include "pending" so the keypad shows immediate activity before the
 		// first progress event arrives from the backend.
 		activeSteps: ["pending", "syncing", "verifying"],
-		Icon: LuRefreshCw,
+		Icon: RefreshCw,
 		label: "Syncing",
 	},
 	{
 		id: "two",
 		pressedAfter: "fetching",
 		activeSteps: ["fetching"],
-		Icon: LuDownload,
+		Icon: Download,
 		label: "Fetching",
 	},
 	{
 		id: "three",
 		pressedAfter: "creating_worktree",
 		activeSteps: ["creating_worktree"],
-		Icon: LuGitBranch,
+		Icon: GitBranch,
 		label: "Creating worktree",
 	},
 	{
 		id: "four",
 		pressedAfter: "copying_config",
 		activeSteps: ["copying_config"],
-		Icon: LuFileCog,
+		Icon: FileCog,
 		label: "Copying config",
 	},
 	{
 		id: "five",
 		pressedAfter: "finalizing",
 		activeSteps: ["finalizing"],
-		Icon: LuDatabase,
+		Icon: Database,
 		label: "Finalizing",
 	},
 ];

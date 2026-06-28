@@ -1,10 +1,15 @@
 import type { ExternalApp } from "@superset/local-db";
 import { useParams } from "@tanstack/react-router";
+import {
+	ExternalLink,
+	Globe,
+	type LucideIcon,
+	MessageCirclePlus,
+	Search,
+	SquareTerminal,
+	Trash2,
+} from "lucide-react";
 import { useCallback, useMemo } from "react";
-import type { IconType } from "react-icons";
-import { BsTerminalPlus } from "react-icons/bs";
-import { LuExternalLink, LuSearch, LuTrash2 } from "react-icons/lu";
-import { TbMessageCirclePlus, TbWorld } from "react-icons/tb";
 import { getAppOption } from "renderer/components/OpenInExternalDropdown";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import { electronTrpc } from "renderer/lib/electron-trpc";
@@ -26,7 +31,7 @@ interface EmptyTabAction {
 	id: string;
 	label: string;
 	display: string[];
-	icon: IconType;
+	icon: LucideIcon;
 	onClick: () => void;
 }
 
@@ -80,14 +85,14 @@ export function EmptyTabView({
 				id: "terminal",
 				label: "Open Terminal",
 				display: newGroupDisplay,
-				icon: BsTerminalPlus,
+				icon: SquareTerminal,
 				onClick: handleShowTerminal,
 			},
 			{
 				id: "new-agent",
 				label: "Open Chat",
 				display: newChatDisplay,
-				icon: TbMessageCirclePlus,
+				icon: MessageCirclePlus,
 				onClick: handleNewAgent,
 			},
 		];
@@ -96,7 +101,7 @@ export function EmptyTabView({
 			id: "open-browser",
 			label: "Open Browser",
 			display: newBrowserDisplay,
-			icon: TbWorld,
+			icon: Globe,
 			onClick: handleOpenBrowser,
 		});
 
@@ -105,7 +110,7 @@ export function EmptyTabView({
 				id: "open-in-app",
 				label: openInActionLabel,
 				display: openInAppDisplay,
-				icon: LuExternalLink,
+				icon: ExternalLink,
 				onClick: onOpenInApp,
 			});
 		}
@@ -114,7 +119,7 @@ export function EmptyTabView({
 			id: "search-files",
 			label: "Search Files",
 			display: quickOpenDisplay,
-			icon: LuSearch,
+			icon: Search,
 			onClick: onOpenQuickOpen,
 		});
 
@@ -165,7 +170,7 @@ export function EmptyTabView({
 						className="mx-auto mt-6 flex items-center gap-1 text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
 						onClick={handleDeleteClick}
 					>
-						<LuTrash2 className="size-3" />
+						<Trash2 className="size-3" />
 						Delete workspace
 					</button>
 				)}

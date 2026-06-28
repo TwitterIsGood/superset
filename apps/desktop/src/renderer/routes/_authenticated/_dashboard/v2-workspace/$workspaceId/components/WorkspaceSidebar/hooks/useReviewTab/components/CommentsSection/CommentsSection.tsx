@@ -12,12 +12,15 @@ import {
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
 import { Skeleton } from "@superset/ui/skeleton";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { workspaceTrpc } from "@superset/workspace-client";
 import {
+	ArrowUpRight,
+	Check,
 	CheckCheck,
 	ChevronDown,
+	ChevronRight,
+	Copy,
 	Copy as CopyIcon,
 	ExternalLink,
 	GitCompare,
@@ -26,8 +29,7 @@ import {
 	SquarePlus,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuArrowUpRight, LuCheck, LuCopy } from "react-icons/lu";
-import { VscChevronRight } from "react-icons/vsc";
+import { toast } from "renderer/lib/toast";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { getMarkdownPreviewText } from "renderer/utils/markdownPreview";
 import type { CommentPaneData, DiffFocusSide } from "../../../../../../types";
@@ -207,7 +209,7 @@ export function CommentsSection({
 							"cursor-pointer transition-colors hover:bg-accent/30",
 						)}
 					>
-						<VscChevronRight
+						<ChevronRight
 							className={cn(
 								"size-3 shrink-0 text-muted-foreground transition-transform duration-150",
 								commentsOpen && "rotate-90",
@@ -226,9 +228,9 @@ export function CommentsSection({
 								onClick={handleCopyConversationComments}
 							>
 								{copiedActionKey === "comments:conversation" ? (
-									<LuCheck className="size-3" />
+									<Check className="size-3" />
 								) : (
-									<LuCopy className="size-3" />
+									<Copy className="size-3" />
 								)}
 								<span>{conversationCopyAllLabel}</span>
 							</button>
@@ -269,7 +271,7 @@ export function CommentsSection({
 							"cursor-pointer transition-colors hover:bg-accent/30",
 						)}
 					>
-						<VscChevronRight
+						<ChevronRight
 							className={cn(
 								"size-3 shrink-0 text-muted-foreground transition-transform duration-150",
 								reviewOpen && "rotate-90",
@@ -303,9 +305,9 @@ export function CommentsSection({
 								onClick={handleCopyReviewComments}
 							>
 								{copiedActionKey === "comments:review" ? (
-									<LuCheck className="size-3" />
+									<Check className="size-3" />
 								) : (
-									<LuCopy className="size-3" />
+									<Copy className="size-3" />
 								)}
 								<span>{reviewCopyAllLabel}</span>
 							</button>
@@ -346,7 +348,7 @@ export function CommentsSection({
 							"cursor-pointer transition-colors hover:bg-accent/30",
 						)}
 					>
-						<VscChevronRight
+						<ChevronRight
 							className={cn(
 								"size-3 shrink-0 text-muted-foreground transition-transform duration-150",
 								resolvedOpen && "rotate-90",
@@ -531,7 +533,7 @@ function CommentRow({
 						className="inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 						aria-label="Open comment on GitHub"
 					>
-						<LuArrowUpRight className="size-3" />
+						<ArrowUpRight className="size-3" />
 					</a>
 				) : null}
 				<DropdownMenu>
@@ -596,7 +598,7 @@ function CommentRow({
 							</DropdownMenuItem>
 						) : null}
 						<DropdownMenuItem onSelect={() => onCopy(comment)}>
-							{isCopied ? <LuCheck /> : <CopyIcon />}
+							{isCopied ? <Check /> : <CopyIcon />}
 							{isCopied ? "Copied" : "Copy comment"}
 						</DropdownMenuItem>
 						{comment.url ? (

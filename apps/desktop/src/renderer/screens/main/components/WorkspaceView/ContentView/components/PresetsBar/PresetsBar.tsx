@@ -14,9 +14,8 @@ import {
 } from "@superset/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { useNavigate, useParams } from "@tanstack/react-router";
+import { CirclePlus, Pin, Settings, SquareTerminal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { HiMiniCog6Tooth, HiMiniCommandLine } from "react-icons/hi2";
-import { LuCirclePlus, LuPin } from "react-icons/lu";
 import {
 	getPresetIcon,
 	useIsDarkTheme,
@@ -366,7 +365,7 @@ export function PresetsBar() {
 					<TooltipTrigger asChild>
 						<DropdownMenuTrigger asChild>
 							<Button variant="ghost" size="icon" className="size-6 shrink-0">
-								<HiMiniCog6Tooth className="size-3.5" />
+								<Settings className="size-3.5" />
 							</Button>
 						</DropdownMenuTrigger>
 					</TooltipTrigger>
@@ -412,13 +411,13 @@ export function PresetsBar() {
 								{icon ? (
 									<img src={icon} alt="" className="size-4 object-contain" />
 								) : (
-									<HiMiniCommandLine className="size-4" />
+									<SquareTerminal className="size-4" />
 								)}
 								<span className="truncate">{item.name || "default"}</span>
 								<div className="ml-auto flex items-center gap-2">
 									{hotkeyId ? <HotkeyMenuShortcut hotkeyId={hotkeyId} /> : null}
 									{hasPreset ? (
-										<LuPin
+										<Pin
 											className={`size-3.5 ${
 												isPinned
 													? "text-foreground"
@@ -426,7 +425,7 @@ export function PresetsBar() {
 											}`}
 										/>
 									) : (
-										<LuCirclePlus className="size-3.5 text-muted-foreground" />
+										<CirclePlus className="size-3.5 text-muted-foreground" />
 									)}
 								</div>
 							</DropdownMenuItem>
@@ -447,7 +446,7 @@ export function PresetsBar() {
 						className="gap-2"
 						onClick={() => navigate({ to: "/settings/terminal" })}
 					>
-						<HiMiniCog6Tooth className="size-4" />
+						<Settings className="size-4" />
 						<span>Manage Presets</span>
 					</DropdownMenuItem>
 				</DropdownMenuContent>

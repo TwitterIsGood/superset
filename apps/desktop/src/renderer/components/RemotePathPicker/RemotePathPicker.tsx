@@ -18,17 +18,12 @@ import {
 } from "@superset/ui/dialog";
 import { ScrollArea } from "@superset/ui/scroll-area";
 import { Skeleton } from "@superset/ui/skeleton";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { useQuery } from "@tanstack/react-query";
+import { ExternalLink, Folder, FolderOpen, RefreshCw } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
-import {
-	LuExternalLink,
-	LuFolder,
-	LuFolderOpen,
-	LuRefreshCw,
-} from "react-icons/lu";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
+import { toast } from "renderer/lib/toast";
 
 interface RemotePathPickerProps {
 	open: boolean;
@@ -215,7 +210,7 @@ export function RemotePathPicker({
 						aria-label="Refresh"
 						className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
 					>
-						<LuRefreshCw
+						<RefreshCw
 							className={cn("size-3.5", query.isFetching && "animate-spin")}
 						/>
 					</button>
@@ -233,7 +228,7 @@ export function RemotePathPicker({
 						</div>
 					) : folders.length === 0 ? (
 						<div className="flex h-72 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-							<LuFolder className="size-6 opacity-40" />
+							<Folder className="size-6 opacity-40" />
 							<span>
 								{query.data?.entries.length === 0
 									? "Empty folder"
@@ -253,10 +248,10 @@ export function RemotePathPicker({
 											onClick={() => setCurrentPath(childPath)}
 											className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 										>
-											<LuFolder className="size-4 shrink-0 text-muted-foreground" />
+											<Folder className="size-4 shrink-0 text-muted-foreground" />
 											<span className="truncate">{entry.name}</span>
 											{entry.isSymlink && (
-												<LuExternalLink className="ml-auto size-3 shrink-0 text-muted-foreground/60" />
+												<ExternalLink className="ml-auto size-3 shrink-0 text-muted-foreground/60" />
 											)}
 										</button>
 									</li>
@@ -279,7 +274,7 @@ export function RemotePathPicker({
 						onClick={handlePick}
 						disabled={!query.data || query.isFetching}
 					>
-						<LuFolderOpen className="size-4" />
+						<FolderOpen className="size-4" />
 						{confirmLabel}
 					</Button>
 				</DialogFooter>

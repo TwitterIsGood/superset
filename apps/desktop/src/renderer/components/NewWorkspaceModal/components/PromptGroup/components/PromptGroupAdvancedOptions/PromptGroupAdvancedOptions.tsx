@@ -15,13 +15,13 @@ import { Input } from "@superset/ui/input";
 import { Label } from "@superset/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
 import { Switch } from "@superset/ui/switch";
-import { GoGitBranch } from "react-icons/go";
 import {
-	HiCheck,
-	HiChevronDown,
-	HiChevronUpDown,
-	HiOutlinePencil,
-} from "react-icons/hi2";
+	Check,
+	ChevronDown,
+	ChevronsUpDown,
+	GitBranchIcon,
+	Pencil,
+} from "lucide-react";
 import { formatRelativeTime } from "renderer/lib/formatRelativeTime";
 
 interface PromptGroupAdvancedOptionsProps {
@@ -75,7 +75,7 @@ export function PromptGroupAdvancedOptions({
 		<Collapsible open={showAdvanced} onOpenChange={onShowAdvancedChange}>
 			<div className="flex items-center justify-between">
 				<CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-					<HiChevronDown
+					<ChevronDown
 						className={`size-3 transition-transform ${showAdvanced ? "" : "-rotate-90"}`}
 					/>
 					Advanced options
@@ -97,7 +97,7 @@ export function PromptGroupAdvancedOptions({
 							onClick={onEditPrefix}
 							className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
 						>
-							<HiOutlinePencil className="size-3" />
+							<Pencil className="size-3" />
 							<span>Edit prefix</span>
 						</button>
 					</div>
@@ -132,7 +132,7 @@ export function PromptGroupAdvancedOptions({
 										disabled={isBranchesLoading}
 									>
 										<span className="flex items-center gap-2 truncate">
-											<GoGitBranch className="size-3.5 shrink-0 text-muted-foreground" />
+											<GitBranchIcon className="size-3.5 shrink-0 text-muted-foreground" />
 											<span className="truncate font-mono text-sm">
 												{effectiveCompareBaseBranch || "Select branch..."}
 											</span>
@@ -142,7 +142,7 @@ export function PromptGroupAdvancedOptions({
 												</span>
 											)}
 										</span>
-										<HiChevronUpDown className="size-4 shrink-0 text-muted-foreground" />
+										<ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
 									</Button>
 								</PopoverTrigger>
 								<PopoverContent
@@ -168,7 +168,7 @@ export function PromptGroupAdvancedOptions({
 													className="flex items-center justify-between"
 												>
 													<span className="flex items-center gap-2 truncate">
-														<GoGitBranch className="size-3.5 shrink-0 text-muted-foreground" />
+														<GitBranchIcon className="size-3.5 shrink-0 text-muted-foreground" />
 														<span className="truncate">{branch.name}</span>
 														{branch.name === defaultBranch && (
 															<span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
@@ -183,7 +183,7 @@ export function PromptGroupAdvancedOptions({
 															</span>
 														)}
 														{effectiveCompareBaseBranch === branch.name && (
-															<HiCheck className="size-4 text-primary" />
+															<Check className="size-4 text-primary" />
 														)}
 													</span>
 												</CommandItem>

@@ -6,10 +6,10 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
+import { EllipsisVertical, X } from "lucide-react";
 import { useState } from "react";
-import { HiEllipsisVertical, HiOutlineXMark } from "react-icons/hi2";
 import { authClient } from "renderer/lib/auth-client";
+import { toast } from "renderer/lib/toast";
 
 interface InvitationActionsProps {
 	invitation: SelectInvitation;
@@ -38,7 +38,7 @@ export function InvitationActions({ invitation }: InvitationActionsProps) {
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<Button variant="ghost" size="icon" className="h-8 w-8">
-					<HiEllipsisVertical className="h-4 w-4" />
+					<EllipsisVertical className="h-4 w-4" />
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">
@@ -47,7 +47,7 @@ export function InvitationActions({ invitation }: InvitationActionsProps) {
 					disabled={isCanceling}
 					className="text-destructive gap-2"
 				>
-					<HiOutlineXMark className="h-4 w-4" />
+					<X className="h-4 w-4" />
 					Cancel
 				</DropdownMenuItem>
 			</DropdownMenuContent>

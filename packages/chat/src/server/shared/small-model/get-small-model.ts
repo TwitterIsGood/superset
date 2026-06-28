@@ -1,7 +1,8 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { MastraModelConfig } from "@mastra/core/llm";
-import { createAuthStorage } from "mastracode";
+import { createSupersetAuthStorage } from "../../desktop/chat-service/auth-storage";
+import type { AuthStorageLike } from "../../desktop/chat-service/auth-storage-types";
 import {
 	ANTHROPIC_AUTH_PROVIDER_ID,
 	OPENAI_AUTH_PROVIDER_IDS,
@@ -22,13 +23,11 @@ const ANTHROPIC_OAUTH_HEADERS = {
 	"x-app": "cli",
 } as const;
 
-type AuthStorage = ReturnType<typeof createAuthStorage>;
+let cachedAuthStorage: AuthStorageLike | null = null;
 
-let cachedAuthStorage: AuthStorage | null = null;
-
-function getAuthStorage(): AuthStorage {
+function getAuthStorage(): AuthStorageLike {
 	if (!cachedAuthStorage) {
-		cachedAuthStorage = createAuthStorage();
+		cachedAuthStorage = createSupersetAuthStorage();
 	}
 	cachedAuthStorage.reload();
 	return cachedAuthStorage;

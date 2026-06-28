@@ -9,11 +9,11 @@ import {
 } from "@superset/ui/dialog";
 import { Input } from "@superset/ui/input";
 import { Label } from "@superset/ui/label";
-import { toast } from "@superset/ui/sonner";
 import { useEffect, useState } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { showHostServiceUnavailableToast } from "renderer/lib/host-service-unavailable";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 
 interface RenameBranchDialogProps {

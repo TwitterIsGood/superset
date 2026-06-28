@@ -7,17 +7,15 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import {
-	LuArrowDown,
-	LuArrowUp,
-	LuChevronDown,
-	LuChevronUp,
-} from "react-icons/lu";
-import {
-	TbFocus2,
-	TbFold,
-	TbLayoutSidebarRightFilled,
-	TbListDetails,
-} from "react-icons/tb";
+	ArrowDown,
+	ArrowUp,
+	ChevronDown,
+	ChevronUp,
+	Focus,
+	FoldHorizontal,
+	ListTree,
+	PanelRight,
+} from "lucide-react";
 import type { ChangeCategory, DiffViewMode } from "shared/changes-types";
 import type { SectionInfo } from "../../hooks/useFocusMode";
 
@@ -93,13 +91,13 @@ export function DiffToolbar({
 					<span className="flex items-center gap-2">
 						{pushCount > 0 && (
 							<span className="flex items-center gap-0.5">
-								<LuArrowUp className="size-3" />
+								<ArrowUp className="size-3" />
 								{pushCount}
 							</span>
 						)}
 						{pullCount > 0 && (
 							<span className="flex items-center gap-0.5">
-								<LuArrowDown className="size-3" />
+								<ArrowDown className="size-3" />
 								{pullCount}
 							</span>
 						)}
@@ -116,7 +114,7 @@ export function DiffToolbar({
 						className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:pointer-events-none"
 						aria-label="Previous file"
 					>
-						<LuChevronUp className="size-3.5" />
+						<ChevronUp className="size-3.5" />
 						Prev
 					</button>
 
@@ -132,7 +130,7 @@ export function DiffToolbar({
 								<span className="text-muted-foreground font-mono tabular-nums">
 									{indexWithinSection + 1}/{currentSection.count}
 								</span>
-								<LuChevronDown className="size-3 text-muted-foreground" />
+								<ChevronDown className="size-3 text-muted-foreground" />
 							</button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="center" className="min-w-[160px]">
@@ -162,7 +160,7 @@ export function DiffToolbar({
 						aria-label="Next file"
 					>
 						Next
-						<LuChevronDown className="size-3.5" />
+						<ChevronDown className="size-3.5" />
 					</button>
 				</div>
 			)}
@@ -184,7 +182,7 @@ export function DiffToolbar({
 							}
 							aria-pressed={focusMode}
 						>
-							<TbFocus2 className="size-4" />
+							<Focus className="size-4" />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="bottom" showArrow={false}>
@@ -208,9 +206,9 @@ export function DiffToolbar({
 							}
 						>
 							{diffViewMode === "side-by-side" ? (
-								<TbLayoutSidebarRightFilled className="size-4" />
+								<PanelRight className="size-4" />
 							) : (
-								<TbListDetails className="size-4" />
+								<ListTree className="size-4" />
 							)}
 						</button>
 					</TooltipTrigger>
@@ -238,7 +236,7 @@ export function DiffToolbar({
 							}
 							aria-pressed={hideUnchangedRegions}
 						>
-							<TbFold className="size-4" />
+							<FoldHorizontal className="size-4" />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="bottom" showArrow={false}>

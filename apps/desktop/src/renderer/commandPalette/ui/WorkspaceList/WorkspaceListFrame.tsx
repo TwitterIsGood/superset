@@ -6,9 +6,8 @@ import {
 } from "@superset/ui/command";
 import { cn } from "@superset/ui/utils";
 import { useLocation, useNavigate } from "@tanstack/react-router";
+import { Laptop, Monitor } from "lucide-react";
 import { useMemo } from "react";
-import { CgLaptop } from "react-icons/cg";
-import { LuLaptop, LuMonitor } from "react-icons/lu";
 import { navigateToV2Workspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { useAccessibleV2Workspaces } from "renderer/routes/_authenticated/_dashboard/v2-workspaces/hooks/useAccessibleV2Workspaces";
 import { useFrameStackStore } from "../../core/frames";
@@ -67,7 +66,7 @@ function V2WorkspaceList({ query }: { query: string }) {
 				<CommandGroup key={group.projectId} heading={group.projectName}>
 					{group.workspaces.map((workspace) => {
 						const HostIcon =
-							workspace.hostType === "local-device" ? LuLaptop : LuMonitor;
+							workspace.hostType === "local-device" ? Laptop : Monitor;
 						const displayName = workspace.name || workspace.branch;
 						return (
 							<CommandItem
@@ -84,7 +83,7 @@ function V2WorkspaceList({ query }: { query: string }) {
 									<span className="min-w-0 truncate font-normal">
 										{displayName}
 									</span>
-									<CgLaptop className="!size-3.5 shrink-0 text-muted-foreground" />
+									<Laptop className="!size-3.5 shrink-0 text-muted-foreground" />
 								</span>
 								<span className="flex min-w-0 max-w-44 items-center gap-1 text-muted-foreground text-xs">
 									<HostIcon className="!size-3 shrink-0" />

@@ -70,9 +70,6 @@ function isCanaryBuild(): boolean {
  * Root directory of packaged/bundled icon assets.
  */
 function getIconsDir(): string {
-	if (app.isPackaged) {
-		return join(process.resourcesPath, "app.asar/resources/build/icons");
-	}
 	if (env.NODE_ENV === "development") {
 		return join(app.getAppPath(), "src/resources/build/icons");
 	}
@@ -84,6 +81,10 @@ function getIconsDir(): string {
  * stable icon if a build-specific variant is missing.
  */
 function getIconPath(): string {
+	if (app.isPackaged) {
+		return join(process.resourcesPath, "icon.icns");
+	}
+
 	const dir = getIconsDir();
 
 	if (env.NODE_ENV === "development") {

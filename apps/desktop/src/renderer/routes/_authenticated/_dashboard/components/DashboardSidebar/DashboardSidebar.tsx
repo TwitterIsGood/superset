@@ -1,23 +1,3 @@
-import {
-	closestCenter,
-	DndContext,
-	type DragEndEvent,
-	DragOverlay,
-	KeyboardSensor,
-	MeasuringStrategy,
-	MouseSensor,
-	TouchSensor,
-	useSensor,
-	useSensors,
-} from "@dnd-kit/core";
-import {
-	arrayMove,
-	SortableContext,
-	sortableKeyboardCoordinates,
-	useSortable,
-	verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import {
@@ -25,22 +5,16 @@ import {
 	useMatchRoute,
 	useNavigate,
 } from "@tanstack/react-router";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import { HiOutlineCog6Tooth } from "react-icons/hi2";
+import { Settings } from "lucide-react";
+import { lazy, Suspense, useCallback, useMemo } from "react";
 import { useHotkeyDisplay } from "renderer/hotkeys";
-import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
-import { DashboardChatSidebar } from "./components/DashboardChatSidebar";
 import { DashboardModeSwitcher } from "./components/DashboardModeSwitcher";
 import { DashboardSidebarHeader } from "./components/DashboardSidebarHeader";
 import { DashboardSidebarHelpMenu } from "./components/DashboardSidebarHelpMenu";
 import { DashboardSidebarHoverCardOverlay } from "./components/DashboardSidebarHoverCardOverlay";
-import { DashboardSidebarPortsList } from "./components/DashboardSidebarPortsList";
 import { DashboardSidebarProjectSection } from "./components/DashboardSidebarProjectSection";
 import { DashboardSidebarSectionRenameProvider } from "./components/DashboardSidebarSectionRenameContext";
-import { DashboardWorkSidebar } from "./components/DashboardWorkSidebar";
-import { V2SetupScriptCard } from "./components/V2SetupScriptCard";
 import { useDashboardSidebarData } from "./hooks/useDashboardSidebarData";
 import { useDashboardSidebarShortcuts } from "./hooks/useDashboardSidebarShortcuts";
 import { DashboardSidebarHoverProvider } from "./providers/DashboardSidebarHoverProvider";
@@ -54,54 +28,77 @@ interface DashboardSidebarProps {
 	isCollapsed?: boolean;
 }
 
-interface SortableProjectWrapperProps {
-	project: DashboardSidebarProject;
+const DashboardSidebarProjectsDndList = lazy(() =>
+	import("./components/DashboardSidebarProjectsDndList").then((module) => ({
+		default: module.DashboardSidebarProjectsDndList,
+	})),
+);
+
+const DashboardSidebarPortsList = lazy(() =>
+	import("./components/DashboardSidebarPortsList").then((module) => ({
+		default: module.DashboardSidebarPortsList,
+	})),
+);
+
+const DashboardChatSidebar = lazy(() =>
+	import("./components/DashboardChatSidebar").then((module) => ({
+		default: module.DashboardChatSidebar,
+	})),
+);
+
+const DashboardWorkSidebar = lazy(() =>
+	import("./components/DashboardWorkSidebar").then((module) => ({
+		default: module.DashboardWorkSidebar,
+	})),
+);
+
+const V2SetupScriptCard = lazy(() =>
+	import("./components/V2SetupScriptCard").then((module) => ({
+		default: module.V2SetupScriptCard,
+	})),
+);
+
+function shouldEnableDashboardSidebarDnd(pathname: string): boolean {
+	return pathname === "/v2-workspaces" || pathname.startsWith("/v2-workspace/");
+}
+
+function getDashboardRoutePathname(routerPathname: string): string {
+	if (typeof window === "undefined") return routerPathname;
+	const hashPathname = window.location.hash.match(/^#([^?]*)/)?.[1];
+	return hashPathname && hashPathname !== "/" ? hashPathname : routerPathname;
+}
+
+interface DashboardSidebarStaticProjectsListProps {
+	groups: DashboardSidebarProject[];
 	isCollapsed: boolean;
-	isDraggingProject: boolean;
 	workspaceShortcutLabels: Map<string, string>;
 	onWorkspaceHover: (workspaceId: string) => void | Promise<void>;
 	onToggleCollapse: (projectId: string) => void;
 }
 
-const SortableProjectWrapper = memo(function SortableProjectWrapper({
-	project,
+function DashboardSidebarStaticProjectsList({
+	groups,
 	isCollapsed,
-	isDraggingProject,
 	workspaceShortcutLabels,
 	onWorkspaceHover,
 	onToggleCollapse,
-}: SortableProjectWrapperProps) {
-	const {
-		attributes,
-		listeners,
-		setNodeRef,
-		transform,
-		transition,
-		isDragging,
-	} = useSortable({ id: project.id });
-
+}: DashboardSidebarStaticProjectsListProps) {
 	return (
-		<div
-			ref={setNodeRef}
-			style={{
-				transform: CSS.Translate.toString(transform),
-				transition,
-				opacity: isDragging ? 0.5 : undefined,
-			}}
-		>
-			<DashboardSidebarProjectSection
-				project={project}
-				isSidebarCollapsed={isCollapsed}
-				isDraggingProject={isDraggingProject}
-				workspaceShortcutLabels={workspaceShortcutLabels}
-				onWorkspaceHover={onWorkspaceHover}
-				onToggleCollapse={onToggleCollapse}
-				dragHandleListeners={listeners}
-				dragHandleAttributes={attributes}
-			/>
-		</div>
+		<>
+			{groups.map((project) => (
+				<DashboardSidebarProjectSection
+					key={project.id}
+					project={project}
+					isSidebarCollapsed={isCollapsed}
+					enableDnd={false}
+					workspaceShortcutLabels={workspaceShortcutLabels}
+					onWorkspaceHover={onWorkspaceHover}
+					onToggleCollapse={onToggleCollapse}
+				/>
+			))}
+		</>
 	);
-});
+}
 
 function getSearchStringValue(search: unknown, key: string): string | null {
 	if (!search || typeof search !== "object") return null;
@@ -114,7 +111,6 @@ export function DashboardSidebar({
 }: DashboardSidebarProps) {
 	const { groups, refreshWorkspacePullRequest, toggleProjectCollapsed } =
 		useDashboardSidebarData();
-	const { reorderProjects } = useDashboardSidebarState();
 	const navigate = useNavigate();
 	const location = useLocation();
 	const matchRoute = useMatchRoute();
@@ -126,36 +122,13 @@ export function DashboardSidebar({
 	const settingsHotkey = useHotkeyDisplay("OPEN_SETTINGS").text;
 	const isSettingsOpen = !!matchRoute({ to: "/settings", fuzzy: true });
 	const { activeHostUrl } = useLocalHostService();
+	const dashboardRoutePathname = getDashboardRoutePathname(location.pathname);
 	const activeV2WorkspaceId =
-		location.pathname.match(/^\/v2-workspace\/([^/]+)/)?.[1] ?? null;
-
-	const sensors = useSensors(
-		useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
-		useSensor(TouchSensor, {
-			activationConstraint: { delay: 200, tolerance: 5 },
-		}),
-		useSensor(KeyboardSensor, {
-			coordinateGetter: sortableKeyboardCoordinates,
-		}),
+		dashboardRoutePathname.match(/^\/v2-workspace\/([^/]+)/)?.[1] ?? null;
+	const shouldEnableDnd = shouldEnableDashboardSidebarDnd(
+		dashboardRoutePathname,
 	);
-
-	const [activeProject, setActiveProject] =
-		useState<DashboardSidebarProject | null>(null);
-
-	// Local project order — syncs from groups, updated on drag end
-	const [projectOrder, setProjectOrder] = useState(() =>
-		groups.map((p) => p.id),
-	);
-	useEffect(() => {
-		setProjectOrder(groups.map((p) => p.id));
-	}, [groups]);
-
-	const orderedGroups = useMemo(() => {
-		const byId = new Map(groups.map((g) => [g.id, g]));
-		return projectOrder
-			.map((id) => byId.get(id))
-			.filter((g): g is DashboardSidebarProject => g != null);
-	}, [groups, projectOrder]);
+	const orderedGroups = groups;
 
 	const workspaceShortcutLabels = useDashboardSidebarShortcuts(orderedGroups);
 
@@ -178,22 +151,6 @@ export function DashboardSidebar({
 		}
 		return null;
 	}, [groups, activeV2WorkspaceId]);
-
-	const handleDragEnd = useCallback(
-		({ active, over }: DragEndEvent) => {
-			if (over && active.id !== over.id) {
-				const oldIndex = projectOrder.indexOf(String(active.id));
-				const newIndex = projectOrder.indexOf(String(over.id));
-				if (oldIndex !== -1 && newIndex !== -1) {
-					const reordered = arrayMove(projectOrder, oldIndex, newIndex);
-					setProjectOrder(reordered);
-					reorderProjects(reordered);
-				}
-			}
-			setActiveProject(null);
-		},
-		[projectOrder, reorderProjects],
-	);
 
 	const handleModeChange = useCallback(
 		(nextMode: DashboardMode) => {
@@ -247,71 +204,62 @@ export function DashboardSidebar({
 						{dashboardMode === "code" ? (
 							<>
 								<div className="flex-1 overflow-y-auto hide-scrollbar">
-									<DndContext
-										sensors={sensors}
-										collisionDetection={closestCenter}
-										measuring={{
-											droppable: { strategy: MeasuringStrategy.Always },
-										}}
-										onDragStart={({ active }) => {
-											const project = groups.find((p) => p.id === active.id);
-											setActiveProject(project ?? null);
-										}}
-										onDragEnd={handleDragEnd}
-										onDragCancel={() => setActiveProject(null)}
-									>
-										<SortableContext
-											items={projectOrder}
-											strategy={verticalListSortingStrategy}
-										>
-											{orderedGroups.map((project) => (
-												<SortableProjectWrapper
-													key={project.id}
-													project={project}
+									{shouldEnableDnd ? (
+										<Suspense
+											fallback={
+												<DashboardSidebarStaticProjectsList
+													groups={orderedGroups}
 													isCollapsed={isCollapsed}
-													isDraggingProject={activeProject != null}
 													workspaceShortcutLabels={workspaceShortcutLabels}
 													onWorkspaceHover={refreshWorkspacePullRequest}
 													onToggleCollapse={toggleProjectCollapsed}
 												/>
-											))}
-										</SortableContext>
-
-										{createPortal(
-											<DragOverlay dropAnimation={null}>
-												{activeProject && (
-													<div className="bg-background shadow-lg border-b border-border">
-														<DashboardSidebarProjectSection
-															project={activeProject}
-															isSidebarCollapsed={isCollapsed}
-															isDraggingProject
-															workspaceShortcutLabels={workspaceShortcutLabels}
-															onWorkspaceHover={() => {}}
-															onToggleCollapse={() => {}}
-														/>
-													</div>
-												)}
-											</DragOverlay>,
-											document.body,
-										)}
-									</DndContext>
+											}
+										>
+											<DashboardSidebarProjectsDndList
+												groups={orderedGroups}
+												isCollapsed={isCollapsed}
+												workspaceShortcutLabels={workspaceShortcutLabels}
+												onWorkspaceHover={refreshWorkspacePullRequest}
+												onToggleCollapse={toggleProjectCollapsed}
+											/>
+										</Suspense>
+									) : (
+										<DashboardSidebarStaticProjectsList
+											groups={orderedGroups}
+											isCollapsed={isCollapsed}
+											workspaceShortcutLabels={workspaceShortcutLabels}
+											onWorkspaceHover={refreshWorkspacePullRequest}
+											onToggleCollapse={toggleProjectCollapsed}
+										/>
+									)}
 								</div>
-								{!isCollapsed && <DashboardSidebarPortsList />}
+								{!isCollapsed && (
+									<Suspense fallback={null}>
+										<DashboardSidebarPortsList />
+									</Suspense>
+								)}
 								{!isCollapsed && activeV2Project && activeHostUrl && (
-									<V2SetupScriptCard
-										hostUrl={activeHostUrl}
-										projectId={activeV2Project.id}
-										projectName={activeV2Project.name}
-									/>
+									<Suspense fallback={null}>
+										<V2SetupScriptCard
+											hostUrl={activeHostUrl}
+											projectId={activeV2Project.id}
+											projectName={activeV2Project.name}
+										/>
+									</Suspense>
 								)}
 							</>
 						) : dashboardMode === "chat" ? (
-							<DashboardChatSidebar
-								activeSessionId={activeChatSessionId}
-								isCollapsed={isCollapsed}
-							/>
+							<Suspense fallback={null}>
+								<DashboardChatSidebar
+									activeSessionId={activeChatSessionId}
+									isCollapsed={isCollapsed}
+								/>
+							</Suspense>
 						) : (
-							<DashboardWorkSidebar isCollapsed={isCollapsed} />
+							<Suspense fallback={null}>
+								<DashboardWorkSidebar isCollapsed={isCollapsed} />
+							</Suspense>
 						)}
 						<div
 							className={cn(
@@ -335,7 +283,7 @@ export function DashboardSidebar({
 													: "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
 											)}
 										>
-											<HiOutlineCog6Tooth className="size-4" />
+											<Settings className="size-4" />
 										</button>
 									</TooltipTrigger>
 									<TooltipContent side="right">Settings</TooltipContent>
@@ -351,7 +299,7 @@ export function DashboardSidebar({
 											: "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
 									)}
 								>
-									<HiOutlineCog6Tooth className="size-4 shrink-0" />
+									<Settings className="size-4 shrink-0" />
 									<span className="flex-1 text-left">Settings</span>
 									{settingsHotkey !== "Unassigned" && (
 										<span

@@ -1,6 +1,5 @@
 import { ExploringGroup } from "@superset/ui/ai-elements/exploring-group";
 import type { UIMessage } from "ai";
-import { getToolName, isToolUIPart } from "ai";
 import {
 	AlertCircleIcon,
 	FileIcon,
@@ -19,7 +18,12 @@ import {
 	normalizeWorkspaceFilePath,
 } from "../../utils/file-paths";
 import type { ToolPart } from "../../utils/tool-helpers";
-import { getArgs, normalizeToolName } from "../../utils/tool-helpers";
+import {
+	getArgs,
+	getToolName,
+	isToolUIPart,
+	normalizeToolName,
+} from "../../utils/tool-helpers";
 import { ReadOnlyToolCall } from "../ReadOnlyToolCall";
 import { ReasoningBlock } from "../ReasoningBlock";
 import { ToolCallBlock } from "../ToolCallBlock";

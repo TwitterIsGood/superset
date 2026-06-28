@@ -30,7 +30,7 @@ export function useWorkspaceHotkeys({
 }: {
 	store: StoreApi<WorkspaceStore<PaneViewerData>>;
 	matchedPresets: V2TerminalPresetRow[];
-	executePreset: (preset: V2TerminalPresetRow) => void | Promise<void>;
+	executePreset: (preset: V2TerminalPresetRow) => boolean | Promise<boolean>;
 	addTerminalTab: () => Promise<void>;
 	paneRegistry: PaneRegistry<PaneViewerData>;
 	launcher: TerminalLauncher;

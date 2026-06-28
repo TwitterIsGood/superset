@@ -22,14 +22,14 @@ import TaskList from "@tiptap/extension-task-list";
 import { Text } from "@tiptap/extension-text";
 import { Underline } from "@tiptap/extension-underline";
 import { ReactNodeViewRenderer } from "@tiptap/react";
-import { common, createLowlight } from "lowlight";
 import type { MutableRefObject } from "react";
+import { createMarkdownLowlight } from "renderer/lib/tiptap/createMarkdownLowlight";
 import { Markdown } from "tiptap-markdown";
 import { EditableCodeBlockView } from "./components/EditableCodeBlockView";
 import { ReadOnlyCodeBlockView } from "./components/ReadOnlyCodeBlockView";
 import { ReadOnlySafeImageView } from "./components/ReadOnlySafeImageView";
 
-const lowlight = createLowlight(common);
+const lowlight = createMarkdownLowlight();
 const ENABLE_RAW_MARKDOWN_HTML = false;
 
 const SafeImage = Image.extend({

@@ -267,6 +267,7 @@ export class PullRequestRuntimeManager {
 	private projectRefreshTimer: ReturnType<typeof setInterval> | null = null;
 	private unsubscribeFromGitWatcher: (() => void) | null = null;
 	private readonly inFlightProjects = new Map<string, Promise<void>>();
+	private started = false;
 	private readonly workspaceSyncState = new Map<
 		string,
 		{ running: Promise<void>; rerunPending: boolean }
@@ -291,12 +292,17 @@ export class PullRequestRuntimeManager {
 			this.unsubscribeFromGitWatcher
 		)
 			return;
+		this.started = true;
 
 		// One initial sweep so workspaces that existed before this manager
 		// started have correct branch/sha/upstream rows even if no `.git/`
 		// activity has happened since the last process boot.
-		void this.syncWorkspaceBranches();
-		void this.refreshEligibleProjects();
+		this.runBackground("initial workspace branch sync", () =>
+			this.syncWorkspaceBranches(),
+		);
+		this.runBackground("initial project pull-request refresh", () =>
+			this.refreshEligibleProjects(),
+		);
 
 		// Steady-state: react to real `.git/` activity per workspace. Per-workspace
 		// debounce lives in `GitWatcher` (300 ms), and concurrent project refreshes
@@ -304,25 +310,41 @@ export class PullRequestRuntimeManager {
 		// workspace so two debounce-separated bursts can't race their git reads
 		// and have the slower one overwrite the newer snapshot.
 		this.unsubscribeFromGitWatcher = this.gitWatcher.onChanged((event) => {
-			void this.enqueueWorkspaceSync(event.workspaceId);
+			this.runBackground("workspace branch sync", () =>
+				this.enqueueWorkspaceSync(event.workspaceId),
+			);
 		});
 
 		// Long-cadence safety net for `GitWatcher` overflow / error paths.
 		this.safetyNetTimer = setInterval(() => {
-			void this.syncWorkspaceBranches();
+			this.runBackground("safety-net workspace branch sync", () =>
+				this.syncWorkspaceBranches(),
+			);
 		}, SAFETY_NET_INTERVAL_MS);
 		this.projectRefreshTimer = setInterval(() => {
-			void this.refreshEligibleProjects();
+			this.runBackground("safety-net project pull-request refresh", () =>
+				this.refreshEligibleProjects(),
+			);
 		}, PROJECT_REFRESH_INTERVAL_MS);
 	}
 
 	stop() {
+		this.started = false;
 		if (this.safetyNetTimer) clearInterval(this.safetyNetTimer);
 		if (this.projectRefreshTimer) clearInterval(this.projectRefreshTimer);
 		this.unsubscribeFromGitWatcher?.();
 		this.safetyNetTimer = null;
 		this.projectRefreshTimer = null;
 		this.unsubscribeFromGitWatcher = null;
+	}
+
+	private runBackground(label: string, work: () => Promise<void>): void {
+		void work().catch((error) => {
+			if (!this.started) return;
+			console.warn(`[host-service:pull-request-runtime] ${label} failed`, {
+				error,
+			});
+		});
 	}
 
 	async getPullRequestsByWorkspaces(
@@ -450,6 +472,7 @@ export class PullRequestRuntimeManager {
 	}
 
 	private async syncWorkspaceBranches(): Promise<void> {
+		if (!this.started) return;
 		// Route every workspace through the same per-workspace queue as the
 		// watcher path, so a concurrent watcher-triggered sync can't race the
 		// sweep's read+write and clobber the newer snapshot. enqueueWorkspaceSync
@@ -461,6 +484,7 @@ export class PullRequestRuntimeManager {
 		// original sweep's behavior. refreshProject inside each sync still
 		// dedupes across workspaces in the same project via inFlightProjects.
 		for (const row of ids) {
+			if (!this.started) return;
 			await this.enqueueWorkspaceSync(row.id);
 		}
 	}
@@ -569,6 +593,7 @@ export class PullRequestRuntimeManager {
 	}
 
 	private async refreshEligibleProjects(): Promise<void> {
+		if (!this.started) return;
 		const rows = this.db
 			.select({
 				projectId: workspaces.projectId,
@@ -577,7 +602,9 @@ export class PullRequestRuntimeManager {
 			.all();
 		const projectIds = [...new Set(rows.map((row) => row.projectId))];
 		await Promise.all(
-			projectIds.map((projectId) => this.refreshProject(projectId)),
+			projectIds.map((projectId) =>
+				this.started ? this.refreshProject(projectId) : Promise.resolve(),
+			),
 		);
 	}
 

@@ -14,14 +14,14 @@ import {
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
 import { Label } from "@superset/ui/label";
-import { toast } from "@superset/ui/sonner";
 import { Switch } from "@superset/ui/switch";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { useMemo } from "react";
-import { HiArrowRight, HiChevronDown } from "react-icons/hi2";
 import { AgentSelect } from "renderer/components/AgentSelect";
 import { useAgentLaunchPreferences } from "renderer/hooks/useAgentLaunchPreferences";
 import { launchAgentSession } from "renderer/lib/agent-session-orchestrator";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { useCreateWorkspace } from "renderer/react-query/workspaces";
 import { ProjectThumbnail } from "renderer/screens/main/components/WorkspaceSidebar/ProjectSection/ProjectThumbnail";
 import type { TaskWithStatus } from "../../../../../components/TasksView/hooks/useTasksTable";
@@ -184,7 +184,7 @@ export function OpenInWorkspace({ task }: OpenInWorkspaceProps) {
 									<span className="text-muted-foreground">Select project</span>
 								)}
 							</span>
-							<HiChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+							<ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -225,7 +225,7 @@ export function OpenInWorkspace({ task }: OpenInWorkspaceProps) {
 					disabled={!effectiveProjectId || createWorkspace.isPending}
 					onClick={handleOpen}
 				>
-					<HiArrowRight className="w-3.5 h-3.5" />
+					<ArrowRight className="w-3.5 h-3.5" />
 				</Button>
 			</div>
 			<AgentSelect<TaskLaunchAgent>

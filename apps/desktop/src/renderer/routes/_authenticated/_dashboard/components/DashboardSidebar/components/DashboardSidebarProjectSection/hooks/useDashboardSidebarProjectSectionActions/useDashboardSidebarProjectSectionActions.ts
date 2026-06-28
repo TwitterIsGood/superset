@@ -1,7 +1,7 @@
 import { alert } from "@superset/ui/atoms/Alert";
-import { toast } from "@superset/ui/sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "renderer/lib/toast";
 import { useDashboardSidebarSectionRename } from "renderer/routes/_authenticated/_dashboard/components/DashboardSidebar/components/DashboardSidebarSectionRenameContext";
 import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";
 import { useOptimisticCollectionActions } from "renderer/routes/_authenticated/hooks/useOptimisticCollectionActions";

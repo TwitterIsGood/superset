@@ -100,4 +100,85 @@ describe("EventBus port events", () => {
 			occurredAt: 1_700_000_000_000,
 		});
 	});
+
+	it("targets subscribed workspace events while keeping legacy sockets on broadcast", () => {
+		const eventBus = createEventBus();
+		const workspaceOneMessages: string[] = [];
+		const workspaceTwoMessages: string[] = [];
+		const legacyMessages: string[] = [];
+		const socketForWorkspaceOne = {
+			readyState: 1,
+			send(data: string) {
+				workspaceOneMessages.push(data);
+			},
+			close() {},
+		};
+		const socketForWorkspaceTwo = {
+			readyState: 1,
+			send(data: string) {
+				workspaceTwoMessages.push(data);
+			},
+			close() {},
+		};
+		const legacySocket = {
+			readyState: 1,
+			send(data: string) {
+				legacyMessages.push(data);
+			},
+			close() {},
+		};
+		const port: DetectedPort = {
+			port: 5173,
+			pid: 123,
+			processName: "vite",
+			terminalId: "terminal-1",
+			workspaceId: "workspace-1",
+			detectedAt: 1_700_000_000_000,
+			address: "127.0.0.1",
+		};
+
+		eventBus.handleOpen(socketForWorkspaceOne);
+		eventBus.handleOpen(socketForWorkspaceTwo);
+		eventBus.handleOpen(legacySocket);
+		eventBus.handleMessage(
+			socketForWorkspaceOne,
+			JSON.stringify({
+				type: "subscribe",
+				event: "port:changed",
+				workspaceId: "workspace-1",
+			}),
+		);
+		eventBus.handleMessage(
+			socketForWorkspaceTwo,
+			JSON.stringify({
+				type: "subscribe",
+				event: "port:changed",
+				workspaceId: "workspace-2",
+			}),
+		);
+		eventBus.start();
+		portManager.emit("port:add", port);
+
+		expect(workspaceOneMessages).toHaveLength(1);
+		expect(workspaceTwoMessages).toHaveLength(0);
+		expect(legacyMessages).toHaveLength(1);
+		expect(JSON.parse(workspaceOneMessages[0] ?? "{}")).toMatchObject({
+			type: "port:changed",
+			workspaceId: "workspace-1",
+		});
+
+		eventBus.handleMessage(
+			socketForWorkspaceOne,
+			JSON.stringify({
+				type: "unsubscribe",
+				event: "port:changed",
+				workspaceId: "workspace-1",
+			}),
+		);
+		portManager.emit("port:add", port);
+
+		expect(workspaceOneMessages).toHaveLength(1);
+		expect(legacyMessages).toHaveLength(2);
+		eventBus.close();
+	});
 });

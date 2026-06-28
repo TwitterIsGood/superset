@@ -1,8 +1,7 @@
 import type { RendererContext } from "@superset/panes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
+import { Check, Copy, ExternalLink } from "lucide-react";
 import { useCallback } from "react";
-import { LuCheck, LuCopy } from "react-icons/lu";
-import { TbExternalLink } from "react-icons/tb";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { useOpenInExternalEditor } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/hooks/useOpenInExternalEditor";
 import { useSharedFileDocument } from "../../../../../../state/fileDocumentStore";
@@ -66,9 +65,9 @@ export function FilePaneHeaderExtras({
 						className="rounded p-1 text-muted-foreground/60 transition-colors hover:text-muted-foreground"
 					>
 						{copied ? (
-							<LuCheck className="size-3.5" />
+							<Check className="size-3.5" />
 						) : (
-							<LuCopy className="size-3.5" />
+							<Copy className="size-3.5" />
 						)}
 					</button>
 				</TooltipTrigger>
@@ -84,7 +83,7 @@ export function FilePaneHeaderExtras({
 						onClick={handleOpenExternal}
 						className="rounded p-1 text-muted-foreground/60 transition-colors hover:text-muted-foreground"
 					>
-						<TbExternalLink className="size-3.5" />
+						<ExternalLink className="size-3.5" />
 					</button>
 				</TooltipTrigger>
 				<TooltipContent side="bottom" showArrow={false}>

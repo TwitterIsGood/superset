@@ -7,9 +7,8 @@ import {
 	CommandList,
 } from "@superset/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
+import { Check, Folder } from "lucide-react";
 import { useState } from "react";
-import { HiCheck } from "react-icons/hi2";
-import { LuFolder } from "react-icons/lu";
 import { PickerTrigger } from "renderer/components/PickerTrigger";
 import type { ProjectOption } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/PromptGroup/types";
 import { ProjectThumbnail } from "renderer/routes/_authenticated/components/ProjectThumbnail";
@@ -42,7 +41,7 @@ export function ProjectPicker({
 								className="!size-5"
 							/>
 						) : (
-							<LuFolder className="size-5 shrink-0" />
+							<Folder className="size-5 shrink-0" />
 						)
 					}
 					label={selectedProject?.name ?? "No project context"}
@@ -61,9 +60,9 @@ export function ProjectPicker({
 									setOpen(false);
 								}}
 							>
-								<LuFolder className="size-4" />
+								<Folder className="size-4" />
 								<span>No project context</span>
-								{!selectedProject && <HiCheck className="ml-auto size-4" />}
+								{!selectedProject && <Check className="ml-auto size-4" />}
 							</CommandItem>
 							{recentProjects.map((project) => (
 								<CommandItem
@@ -80,7 +79,7 @@ export function ProjectPicker({
 									/>
 									{project.name}
 									{project.id === selectedProject?.id && (
-										<HiCheck className="ml-auto size-4" />
+										<Check className="ml-auto size-4" />
 									)}
 								</CommandItem>
 							))}

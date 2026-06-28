@@ -4,8 +4,8 @@ import {
 } from "@superset/shared/auth";
 import { alert } from "@superset/ui/atoms/Alert";
 import { Button } from "@superset/ui/button";
+import { Plus } from "lucide-react";
 import { useState } from "react";
-import { HiOutlinePlus } from "react-icons/hi2";
 import { GATED_FEATURES, usePaywall } from "renderer/components/Paywall";
 import { InviteMemberDialog } from "./components/InviteMemberDialog";
 
@@ -47,7 +47,7 @@ export function InviteMemberButton({
 	return (
 		<>
 			<Button size="sm" onClick={handleClick} className="gap-1.5">
-				<HiOutlinePlus className="h-3.5 w-3.5" />
+				<Plus className="h-3.5 w-3.5" />
 				Invite member
 			</Button>
 

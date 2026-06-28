@@ -1,14 +1,14 @@
 import { Input } from "@superset/ui/input";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { useMatchRoute, useNavigate } from "@tanstack/react-router";
+import { X } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
-import { HiMiniXMark } from "react-icons/hi2";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { HotkeyLabel } from "renderer/hotkeys";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useHoverGitHubStatus } from "renderer/lib/githubQueryPolicy";
+import { toast } from "renderer/lib/toast";
 import { useWorkspaceDeleteHandler } from "renderer/react-query/workspaces";
 import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { WorkspaceRunIndicator } from "renderer/screens/main/components/WorkspaceRunIndicator";
@@ -422,7 +422,7 @@ export function WorkspaceListItem({
 													className="flex items-center justify-center text-muted-foreground hover:text-foreground"
 													aria-label="Close workspace"
 												>
-													<HiMiniXMark className="size-3.5" />
+													<X className="size-3.5" />
 												</button>
 											</TooltipTrigger>
 											<TooltipContent side="top" sideOffset={4}>

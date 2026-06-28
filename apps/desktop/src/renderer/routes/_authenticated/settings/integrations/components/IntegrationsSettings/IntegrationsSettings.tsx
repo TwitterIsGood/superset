@@ -1,10 +1,9 @@
 import { Button } from "@superset/ui/button";
 import { Skeleton } from "@superset/ui/skeleton";
 import { useLiveQuery } from "@tanstack/react-db";
+import { ExternalLink, Github, Slack } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { FaGithub, FaSlack } from "react-icons/fa";
-import { HiOutlineArrowTopRightOnSquare } from "react-icons/hi2";
-import { SiLinear } from "react-icons/si";
+import { LinearIcon } from "renderer/components/icons/LinearIcon";
 import { env } from "renderer/env.renderer";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { authClient } from "renderer/lib/auth-client";
@@ -126,7 +125,7 @@ export function IntegrationsSettings({
 					<IntegrationRow
 						name="Linear"
 						description="Sync issues bidirectionally with Linear."
-						icon={<SiLinear className="size-5" />}
+						icon={<LinearIcon className="size-5" />}
 						isConnected={isLinearConnected}
 						connectedOrgName={linearConnection?.externalOrgName}
 						onManage={() => handleOpenWeb("/integrations/linear")}
@@ -137,7 +136,7 @@ export function IntegrationsSettings({
 					<IntegrationRow
 						name="GitHub"
 						description="Connect repos and sync pull requests."
-						icon={<FaGithub className="size-5" />}
+						icon={<Github className="size-5" />}
 						isConnected={isGithubConnected}
 						connectedOrgName={githubInstallation?.accountLogin}
 						isLoading={isLoadingGithub}
@@ -149,7 +148,7 @@ export function IntegrationsSettings({
 					<IntegrationRow
 						name="Slack"
 						description="Manage tasks from Slack conversations."
-						icon={<FaSlack className="size-5" />}
+						icon={<Slack className="size-5" />}
 						isConnected={isSlackConnected}
 						connectedOrgName={slackConnection?.externalOrgName}
 						onManage={() => handleOpenWeb("/integrations/slack")}
@@ -225,7 +224,7 @@ function IntegrationRow({
 					onClick={onManage}
 					className="gap-2"
 				>
-					<HiOutlineArrowTopRightOnSquare className="size-4" />
+					<ExternalLink className="size-4" />
 					{isConnected ? "Manage" : "Connect"}
 				</Button>
 			</div>

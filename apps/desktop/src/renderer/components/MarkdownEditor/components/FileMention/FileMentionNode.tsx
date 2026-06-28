@@ -6,7 +6,7 @@ import {
 	NodeViewWrapper,
 	ReactNodeViewRenderer,
 } from "@tiptap/react";
-import { LuX } from "react-icons/lu";
+import { X } from "lucide-react";
 import { FileIcon } from "renderer/lib/fileIcons";
 
 function FileMentionChip({ node, selected, deleteNode }: NodeViewProps) {
@@ -48,7 +48,7 @@ function FileMentionChip({ node, selected, deleteNode }: NodeViewProps) {
 							}}
 							className="ml-0.5 inline-flex size-3.5 items-center justify-center rounded-sm text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
 						>
-							<LuX className="size-3" />
+							<X className="size-3" />
 						</button>
 					</TooltipTrigger>
 					<TooltipContent side="top">Remove mention</TooltipContent>

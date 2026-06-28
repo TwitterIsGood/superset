@@ -4,12 +4,12 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
+import { ExternalLink } from "lucide-react";
 import { useState } from "react";
-import { LuExternalLink } from "react-icons/lu";
 import { OpenInExternalDropdownItems } from "renderer/components/OpenInExternalDropdown";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { useThemeStore } from "renderer/stores/theme";
 
 interface ClickablePathProps {
@@ -72,7 +72,7 @@ export function ClickablePath({
 					<span className={truncate ? "min-w-0 truncate" : undefined}>
 						{path}
 					</span>
-					<LuExternalLink className="size-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+					<ExternalLink className="size-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="w-48">

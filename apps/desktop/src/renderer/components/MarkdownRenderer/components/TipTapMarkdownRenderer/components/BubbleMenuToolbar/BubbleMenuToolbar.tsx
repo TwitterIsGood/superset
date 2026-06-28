@@ -1,20 +1,17 @@
 import type { Editor } from "@tiptap/core";
+import {
+	Bold,
+	CircleCheck,
+	Italic,
+	Link,
+	List,
+	ListOrdered,
+	Quote,
+	SquareCode,
+	Strikethrough,
+	Underline,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-	HiOutlineBold,
-	HiOutlineCodeBracket,
-	HiOutlineItalic,
-	HiOutlineLink,
-	HiOutlineListBullet,
-	HiOutlineNumberedList,
-	HiOutlineStrikethrough,
-} from "react-icons/hi2";
-import {
-	RiCheckboxCircleLine,
-	RiCodeBoxLine,
-	RiDoubleQuotesL,
-	RiUnderline,
-} from "react-icons/ri";
 
 interface BubbleMenuToolbarProps {
 	editor: Editor;
@@ -210,7 +207,7 @@ function ListDropdown({ editor }: { editor: Editor }) {
 					setOpen((prev) => !prev);
 				}}
 			>
-				<HiOutlineListBullet className="size-3.5" />
+				<List className="size-3.5" />
 				<svg
 					className="size-3 opacity-60"
 					viewBox="0 0 12 12"
@@ -236,7 +233,7 @@ function ListDropdown({ editor }: { editor: Editor }) {
 						}`}
 						onMouseDown={(e) => handleSelect("bullet", e)}
 					>
-						<HiOutlineListBullet className="size-4" />
+						<List className="size-4" />
 						Bullet list
 					</button>
 					<button
@@ -246,7 +243,7 @@ function ListDropdown({ editor }: { editor: Editor }) {
 						}`}
 						onMouseDown={(e) => handleSelect("ordered", e)}
 					>
-						<HiOutlineNumberedList className="size-4" />
+						<ListOrdered className="size-4" />
 						Numbered list
 					</button>
 					<button
@@ -256,7 +253,7 @@ function ListDropdown({ editor }: { editor: Editor }) {
 						}`}
 						onMouseDown={(e) => handleSelect("task", e)}
 					>
-						<RiCheckboxCircleLine className="size-4" />
+						<CircleCheck className="size-4" />
 						Checklist
 					</button>
 				</div>
@@ -295,7 +292,7 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
 	if (showLinkInput) {
 		return (
 			<div className="flex items-center gap-1 bg-popover border rounded-lg shadow-md px-1.5 py-0.5">
-				<HiOutlineLink className="size-3.5 text-muted-foreground shrink-0" />
+				<Link className="size-3.5 text-muted-foreground shrink-0" />
 				<input
 					ref={linkInputRef}
 					type="url"
@@ -332,7 +329,7 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
 					editor.chain().focus().toggleBold().run();
 				}}
 			>
-				<HiOutlineBold className="size-3.5" />
+				<Bold className="size-3.5" />
 			</ToolbarButton>
 
 			<ToolbarButton
@@ -343,7 +340,7 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
 					editor.chain().focus().toggleItalic().run();
 				}}
 			>
-				<HiOutlineItalic className="size-3.5" />
+				<Italic className="size-3.5" />
 			</ToolbarButton>
 
 			<ToolbarButton
@@ -354,7 +351,7 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
 					editor.chain().focus().toggleUnderline().run();
 				}}
 			>
-				<RiUnderline className="size-3.5" />
+				<Underline className="size-3.5" />
 			</ToolbarButton>
 
 			<ToolbarButton
@@ -365,7 +362,7 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
 					editor.chain().focus().toggleStrike().run();
 				}}
 			>
-				<HiOutlineStrikethrough className="size-3.5" />
+				<Strikethrough className="size-3.5" />
 			</ToolbarButton>
 
 			<ToolbarButton
@@ -376,7 +373,7 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
 					editor.chain().focus().toggleCode().run();
 				}}
 			>
-				<HiOutlineCodeBracket className="size-3.5" />
+				<SquareCode className="size-3.5" />
 			</ToolbarButton>
 
 			<div className="w-px h-4 bg-border mx-0.5" />
@@ -394,7 +391,7 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
 					}
 				}}
 			>
-				<HiOutlineLink className="size-3.5" />
+				<Link className="size-3.5" />
 			</ToolbarButton>
 
 			<ToolbarButton
@@ -405,7 +402,7 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
 					editor.chain().focus().toggleBlockquote().run();
 				}}
 			>
-				<RiDoubleQuotesL className="size-3.5" />
+				<Quote className="size-3.5" />
 			</ToolbarButton>
 
 			<ToolbarButton
@@ -416,7 +413,7 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
 					editor.chain().focus().toggleCodeBlock().run();
 				}}
 			>
-				<RiCodeBoxLine className="size-3.5" />
+				<SquareCode className="size-3.5" />
 			</ToolbarButton>
 
 			<div className="w-px h-4 bg-border mx-0.5" />

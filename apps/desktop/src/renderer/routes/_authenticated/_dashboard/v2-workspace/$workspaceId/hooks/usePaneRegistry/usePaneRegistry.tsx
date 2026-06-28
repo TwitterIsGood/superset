@@ -5,23 +5,36 @@ import type {
 	WorkspaceStore,
 } from "@superset/panes";
 import { alert } from "@superset/ui/atoms/Alert";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { workspaceTrpc } from "@superset/workspace-client";
-import { Circle, GitCompareArrows, Globe, MessageSquare } from "lucide-react";
-import { useCallback, useMemo } from "react";
 import {
-	LuArrowDownToLine,
-	LuClipboard,
-	LuClipboardCopy,
-	LuEraser,
-	LuPower,
-} from "react-icons/lu";
+	ArrowDownToLine,
+	Circle,
+	Clipboard,
+	ClipboardCopy,
+	Eraser,
+	GitCompareArrows,
+	Globe,
+	MessageSquare,
+	Power,
+	TerminalSquare,
+} from "lucide-react";
+import { lazy, type ReactNode, Suspense, useCallback, useMemo } from "react";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import { FileIcon } from "renderer/lib/fileIcons";
 import { getBaseName } from "renderer/lib/pathBasename";
 import { consumeTerminalBackgroundIntent } from "renderer/lib/terminal/terminal-background-intents";
-import { terminalRuntimeRegistry } from "renderer/lib/terminal/terminal-runtime-registry";
+import {
+	clearTerminalLazy,
+	disposeTerminalRuntimeLazy,
+	getTerminalSelectionLazy,
+	getTerminalTitleSnapshotLazy,
+	pasteTerminalLazy,
+	releaseTerminalRuntimeLazy,
+	scrollTerminalToBottomLazy,
+	subscribeTerminalTitleLazy,
+} from "renderer/lib/terminal/terminal-runtime-registry-lazy";
+import { toast } from "renderer/lib/toast";
 import { useWorkspace } from "renderer/routes/_authenticated/_dashboard/v2-workspace/providers/WorkspaceProvider";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import {
@@ -44,19 +57,57 @@ import type {
 	TerminalPaneData,
 } from "../../types";
 import type { TerminalLauncher } from "../useV2TerminalLauncher";
-import { BrowserPane, BrowserPaneToolbar } from "./components/BrowserPane";
-import { ChatPane } from "./components/ChatPane";
-import { ChatPaneTitle } from "./components/ChatPane/components/ChatPaneTitle";
-import { CommentPane } from "./components/CommentPane";
-import { CommentPaneHeaderExtras } from "./components/CommentPane/components/CommentPaneHeaderExtras";
-import { CommentPaneTitle } from "./components/CommentPane/components/CommentPaneTitle";
-import { DiffPane } from "./components/DiffPane";
-import { DiffPaneHeaderExtras } from "./components/DiffPane/components/DiffPaneHeaderExtras";
-import { FilePane } from "./components/FilePane";
-import { FilePaneHeaderExtras } from "./components/FilePane/components/FilePaneHeaderExtras";
-import { TerminalPane } from "./components/TerminalPane";
-import { TerminalPaneIcon } from "./components/TerminalPane/components/TerminalPaneIcon";
-import { TerminalSessionDropdown } from "./components/TerminalPane/components/TerminalSessionDropdown";
+
+const LazyBrowserPane = lazy(async () => ({
+	default: (await import("./components/BrowserPane")).BrowserPane,
+}));
+const LazyBrowserPaneToolbar = lazy(async () => ({
+	default: (await import("./components/BrowserPane")).BrowserPaneToolbar,
+}));
+const LazyChatPane = lazy(async () => ({
+	default: (await import("./components/ChatPane")).ChatPane,
+}));
+const LazyChatPaneTitle = lazy(async () => ({
+	default: (await import("./components/ChatPane/components/ChatPaneTitle"))
+		.ChatPaneTitle,
+}));
+const LazyCommentPane = lazy(async () => ({
+	default: (await import("./components/CommentPane")).CommentPane,
+}));
+const LazyCommentPaneHeaderExtras = lazy(async () => ({
+	default: (
+		await import("./components/CommentPane/components/CommentPaneHeaderExtras")
+	).CommentPaneHeaderExtras,
+}));
+const LazyCommentPaneTitle = lazy(async () => ({
+	default: (
+		await import("./components/CommentPane/components/CommentPaneTitle")
+	).CommentPaneTitle,
+}));
+const LazyDiffPane = lazy(async () => ({
+	default: (await import("./components/DiffPane")).DiffPane,
+}));
+const LazyDiffPaneHeaderExtras = lazy(async () => ({
+	default: (
+		await import("./components/DiffPane/components/DiffPaneHeaderExtras")
+	).DiffPaneHeaderExtras,
+}));
+const LazyFilePane = lazy(async () => ({
+	default: (await import("./components/FilePane")).FilePane,
+}));
+const LazyFilePaneHeaderExtras = lazy(async () => ({
+	default: (
+		await import("./components/FilePane/components/FilePaneHeaderExtras")
+	).FilePaneHeaderExtras,
+}));
+const LazyTerminalPane = lazy(async () => ({
+	default: (await import("./components/TerminalPane")).TerminalPane,
+}));
+const LazyTerminalSessionDropdown = lazy(async () => ({
+	default: (
+		await import("./components/TerminalPane/components/TerminalSessionDropdown")
+	).TerminalSessionDropdown,
+}));
 
 function getFileName(filePath: string): string {
 	return getBaseName(filePath);
@@ -100,6 +151,24 @@ function FilePaneTabTitle({
 const MOD_KEY = navigator.platform.toLowerCase().includes("mac")
 	? "⌘"
 	: "Ctrl+";
+
+function PaneRenderFallback() {
+	return (
+		<div className="flex h-full min-h-0 flex-1 flex-col gap-2 p-3">
+			<div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
+			<div className="h-4 w-full animate-pulse rounded bg-muted/70" />
+			<div className="h-4 w-5/6 animate-pulse rounded bg-muted/70" />
+		</div>
+	);
+}
+
+function LazyPaneContent({ children }: { children: ReactNode }) {
+	return <Suspense fallback={<PaneRenderFallback />}>{children}</Suspense>;
+}
+
+function LazyPaneHeader({ children }: { children: ReactNode }) {
+	return <Suspense fallback={null}>{children}</Suspense>;
+}
 
 interface UsePaneRegistryOptions {
 	onOpenFile: (path: string, openInNewTab?: boolean) => void;
@@ -225,10 +294,14 @@ export function usePaneRegistry({
 					);
 				},
 				renderPane: (ctx: RendererContext<PaneViewerData>) => (
-					<FilePane context={ctx} workspaceId={workspaceId} />
+					<LazyPaneContent>
+						<LazyFilePane context={ctx} workspaceId={workspaceId} />
+					</LazyPaneContent>
 				),
 				renderHeaderExtras: (ctx: RendererContext<PaneViewerData>) => (
-					<FilePaneHeaderExtras context={ctx} workspaceId={workspaceId} />
+					<LazyPaneHeader>
+						<LazyFilePaneHeaderExtras context={ctx} workspaceId={workspaceId} />
+					</LazyPaneHeader>
 				),
 				onHeaderClick: (ctx: RendererContext<PaneViewerData>) =>
 					ctx.actions.pin(),
@@ -284,94 +357,87 @@ export function usePaneRegistry({
 				getIcon: () => <GitCompareArrows className="size-3.5" />,
 				getTitle: () => "Changes",
 				renderPane: (ctx: RendererContext<PaneViewerData>) => (
-					<DiffPane
-						context={ctx}
-						workspaceId={workspaceId}
-						onOpenFile={onOpenFile}
-						onCreateNewAgentSession={createNewAgentSession}
-					/>
+					<LazyPaneContent>
+						<LazyDiffPane
+							context={ctx}
+							workspaceId={workspaceId}
+							onOpenFile={onOpenFile}
+							onCreateNewAgentSession={createNewAgentSession}
+						/>
+					</LazyPaneContent>
 				),
-				renderHeaderExtras: () => <DiffPaneHeaderExtras />,
+				renderHeaderExtras: () => (
+					<LazyPaneHeader>
+						<LazyDiffPaneHeaderExtras />
+					</LazyPaneHeader>
+				),
 				contextMenuActions: (_ctx, defaults) =>
 					defaults.map((d) =>
 						d.key === "close-pane" ? { ...d, label: "Close Diff" } : d,
 					),
 			},
 			terminal: {
-				getIcon: (ctx) => {
-					const { terminalId } = ctx.pane.data as TerminalPaneData;
-					return (
-						<TerminalPaneIcon
-							workspaceId={workspaceId}
-							terminalId={terminalId}
-						/>
-					);
-				},
+				getIcon: () => <TerminalSquare className="size-3.5" />,
 				getTitle: () => "Terminal",
 				titleSource: (pane) => {
 					const { terminalId } = pane.data as TerminalPaneData;
 					const instanceId = pane.id;
 					return {
 						subscribe: (callback) =>
-							terminalRuntimeRegistry.onTitleChange(
+							subscribeTerminalTitleLazy({
 								terminalId,
 								callback,
 								instanceId,
-							),
+							}),
 						getSnapshot: () =>
-							terminalRuntimeRegistry
-								.getTitle(terminalId, instanceId)
-								?.trim() || undefined,
+							getTerminalTitleSnapshotLazy({ terminalId, instanceId }),
 					};
 				},
 				onAfterClose: (pane) => {
 					const { terminalId } = pane.data as TerminalPaneData;
 					if (consumeTerminalBackgroundIntent(terminalId)) {
-						terminalRuntimeRegistry.release(terminalId);
+						void releaseTerminalRuntimeLazy(terminalId);
 						return;
 					}
 					clearV2TerminalRunStatus(terminalId, workspaceId);
 					clearWorkspaceRunTerminal(terminalId);
-					terminalRuntimeRegistry.dispose(terminalId);
+					void disposeTerminalRuntimeLazy(terminalId);
 					killTerminalSessionSilently({ terminalId, workspaceId });
 				},
 				renderTitle: (ctx: RendererContext<PaneViewerData>) => (
 					<div className="flex min-w-0 flex-1 items-center gap-1.5">
-						<TerminalSessionDropdown
-							context={ctx}
-							launcher={launcher}
-							workspaceId={workspaceId}
-						/>
+						<LazyPaneHeader>
+							<LazyTerminalSessionDropdown
+								context={ctx}
+								launcher={launcher}
+								workspaceId={workspaceId}
+							/>
+						</LazyPaneHeader>
 						<V2NotificationStatusIndicator
 							sources={getV2NotificationSourcesForPane(ctx.pane)}
 						/>
 					</div>
 				),
 				renderPane: (ctx: RendererContext<PaneViewerData>) => (
-					<TerminalPane
-						ctx={ctx}
-						workspaceId={workspaceId}
-						onOpenFile={onOpenFile}
-						onRevealPath={onRevealPath}
-					/>
+					<LazyPaneContent>
+						<LazyTerminalPane
+							ctx={ctx}
+							workspaceId={workspaceId}
+							onOpenFile={onOpenFile}
+							onRevealPath={onRevealPath}
+						/>
+					</LazyPaneContent>
 				),
 				contextMenuActions: (_ctx, defaults) => {
 					const terminalActions: ContextMenuActionConfig<PaneViewerData>[] = [
 						{
 							key: "copy",
 							label: "Copy",
-							icon: <LuClipboardCopy />,
+							icon: <ClipboardCopy />,
 							shortcut: `${MOD_KEY}C`,
-							disabled: (ctx) => {
+							onSelect: async (ctx) => {
 								const { terminalId } = ctx.pane.data as TerminalPaneData;
-								return !terminalRuntimeRegistry.getSelection(
-									terminalId,
-									ctx.pane.id,
-								);
-							},
-							onSelect: (ctx) => {
-								const { terminalId } = ctx.pane.data as TerminalPaneData;
-								const text = terminalRuntimeRegistry.getSelection(
+								const text = await getTerminalSelectionLazy(
 									terminalId,
 									ctx.pane.id,
 								);
@@ -381,18 +447,14 @@ export function usePaneRegistry({
 						{
 							key: "paste",
 							label: "Paste",
-							icon: <LuClipboard />,
+							icon: <Clipboard />,
 							shortcut: `${MOD_KEY}V`,
 							onSelect: async (ctx) => {
 								const { terminalId } = ctx.pane.data as TerminalPaneData;
 								try {
 									const text = await navigator.clipboard.readText();
 									if (text) {
-										terminalRuntimeRegistry.paste(
-											terminalId,
-											text,
-											ctx.pane.id,
-										);
+										await pasteTerminalLazy(terminalId, text, ctx.pane.id);
 									}
 								} catch {
 									// Clipboard access denied
@@ -403,25 +465,25 @@ export function usePaneRegistry({
 						{
 							key: "clear-terminal",
 							label: "Clear Terminal",
-							icon: <LuEraser />,
+							icon: <Eraser />,
 							shortcut:
 								clearShortcut !== "Unassigned" ? clearShortcut : undefined,
 							onSelect: (ctx) => {
 								const { terminalId } = ctx.pane.data as TerminalPaneData;
-								terminalRuntimeRegistry.clear(terminalId, ctx.pane.id);
+								void clearTerminalLazy(terminalId, ctx.pane.id);
 							},
 						},
 						{
 							key: "scroll-to-bottom",
 							label: "Scroll to Bottom",
-							icon: <LuArrowDownToLine />,
+							icon: <ArrowDownToLine />,
 							shortcut:
 								scrollToBottomShortcut !== "Unassigned"
 									? scrollToBottomShortcut
 									: undefined,
 							onSelect: (ctx) => {
 								const { terminalId } = ctx.pane.data as TerminalPaneData;
-								terminalRuntimeRegistry.scrollToBottom(terminalId, ctx.pane.id);
+								void scrollTerminalToBottomLazy(terminalId, ctx.pane.id);
 							},
 						},
 						{ key: "sep-terminal-defaults", type: "separator" },
@@ -434,7 +496,7 @@ export function usePaneRegistry({
 					const killAction: ContextMenuActionConfig<PaneViewerData> = {
 						key: "kill-terminal-session",
 						label: "Kill Terminal Session",
-						icon: <LuPower />,
+						icon: <Power />,
 						variant: "destructive",
 						disabled: isKillingTerminalSession,
 						onSelect: (ctx) => {
@@ -467,10 +529,14 @@ export function usePaneRegistry({
 					return "Browser";
 				},
 				renderPane: (ctx: RendererContext<PaneViewerData>) => (
-					<BrowserPane ctx={ctx} />
+					<LazyPaneContent>
+						<LazyBrowserPane ctx={ctx} />
+					</LazyPaneContent>
 				),
 				renderToolbar: (ctx: RendererContext<PaneViewerData>) => (
-					<BrowserPaneToolbar ctx={ctx} />
+					<LazyPaneHeader>
+						<LazyBrowserPaneToolbar ctx={ctx} />
+					</LazyPaneHeader>
 				),
 				// Destruction handled by useGlobalBrowserLifecycle for now.
 				contextMenuActions: (_ctx, defaults) =>
@@ -482,22 +548,26 @@ export function usePaneRegistry({
 				getIcon: () => <MessageSquare className="size-3.5" />,
 				getTitle: () => "Chat",
 				renderTitle: (ctx: RendererContext<PaneViewerData>) => (
-					<ChatPaneTitle context={ctx} workspaceId={workspaceId} />
+					<LazyPaneHeader>
+						<LazyChatPaneTitle context={ctx} workspaceId={workspaceId} />
+					</LazyPaneHeader>
 				),
 				renderPane: (ctx: RendererContext<PaneViewerData>) => {
 					const data = ctx.pane.data as ChatPaneData;
 					return (
-						<ChatPane
-							workspaceId={workspaceId}
-							sessionId={data.sessionId}
-							onSessionIdChange={(id) =>
-								ctx.actions.updateData({ ...data, sessionId: id })
-							}
-							initialLaunchConfig={data.launchConfig ?? null}
-							onConsumeLaunchConfig={() =>
-								ctx.actions.updateData({ ...data, launchConfig: null })
-							}
-						/>
+						<LazyPaneContent>
+							<LazyChatPane
+								workspaceId={workspaceId}
+								sessionId={data.sessionId}
+								onSessionIdChange={(id) =>
+									ctx.actions.updateData({ ...data, sessionId: id })
+								}
+								initialLaunchConfig={data.launchConfig ?? null}
+								onConsumeLaunchConfig={() =>
+									ctx.actions.updateData({ ...data, launchConfig: null })
+								}
+							/>
+						</LazyPaneContent>
 					);
 				},
 				contextMenuActions: (_ctx, defaults) =>
@@ -524,13 +594,19 @@ export function usePaneRegistry({
 					return data.authorLogin;
 				},
 				renderTitle: (ctx: RendererContext<PaneViewerData>) => (
-					<CommentPaneTitle context={ctx} />
+					<LazyPaneHeader>
+						<LazyCommentPaneTitle context={ctx} />
+					</LazyPaneHeader>
 				),
 				renderPane: (ctx: RendererContext<PaneViewerData>) => (
-					<CommentPane context={ctx} />
+					<LazyPaneContent>
+						<LazyCommentPane context={ctx} />
+					</LazyPaneContent>
 				),
 				renderHeaderExtras: (ctx: RendererContext<PaneViewerData>) => (
-					<CommentPaneHeaderExtras context={ctx} />
+					<LazyPaneHeader>
+						<LazyCommentPaneHeaderExtras context={ctx} />
+					</LazyPaneHeader>
 				),
 				contextMenuActions: (_ctx, defaults) =>
 					defaults.map((d) =>

@@ -9,9 +9,9 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@superset/ui/dialog";
-import { toast } from "@superset/ui/sonner";
 import { useEffect, useRef } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { useOpenProject } from "renderer/react-query/projects";
 import { useOpenNewProjectModal } from "renderer/stores/add-repository-modal";
 import {

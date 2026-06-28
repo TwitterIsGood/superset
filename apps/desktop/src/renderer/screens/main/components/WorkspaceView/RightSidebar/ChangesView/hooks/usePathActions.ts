@@ -1,8 +1,8 @@
 import type { ExternalApp } from "@superset/local-db";
-import { toast } from "@superset/ui/sonner";
 import { useCallback } from "react";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 
 interface UsePathActionsProps {
 	absolutePath: string | null;

@@ -4,36 +4,36 @@ import {
 	CollapsibleTrigger,
 } from "@superset/ui/collapsible";
 import { cn } from "@superset/ui/utils";
-import { useMemo, useState } from "react";
 import {
-	LuArrowUpRight,
-	LuCheck,
-	LuLoaderCircle,
-	LuMinus,
-	LuX,
-} from "react-icons/lu";
-import { VscChevronRight } from "react-icons/vsc";
+	ArrowUpRight,
+	Check,
+	ChevronRight,
+	LoaderCircle,
+	Minus,
+	X,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import type { NormalizedCheck, NormalizedPR } from "../../types";
 
 const checkIconConfig = {
 	success: {
-		icon: LuCheck,
+		icon: Check,
 		className: "text-emerald-600 dark:text-emerald-400",
 	},
-	failure: { icon: LuX, className: "text-red-600 dark:text-red-400" },
+	failure: { icon: X, className: "text-red-600 dark:text-red-400" },
 	pending: {
-		icon: LuLoaderCircle,
+		icon: LoaderCircle,
 		className: "text-amber-600 dark:text-amber-400",
 	},
-	skipped: { icon: LuMinus, className: "text-muted-foreground" },
-	cancelled: { icon: LuMinus, className: "text-muted-foreground" },
+	skipped: { icon: Minus, className: "text-muted-foreground" },
+	cancelled: { icon: Minus, className: "text-muted-foreground" },
 } as const;
 
 const checkSummaryIconConfig = {
 	success: checkIconConfig.success,
 	failure: checkIconConfig.failure,
 	pending: checkIconConfig.pending,
-	none: { icon: LuMinus, className: "text-muted-foreground" },
+	none: { icon: Minus, className: "text-muted-foreground" },
 } as const;
 
 interface ChecksSectionProps {
@@ -76,7 +76,7 @@ export function ChecksSection({
 				)}
 			>
 				<div className="flex min-w-0 items-center gap-1.5">
-					<VscChevronRight
+					<ChevronRight
 						className={cn(
 							"size-3 shrink-0 text-muted-foreground transition-transform duration-150",
 							open && "rotate-90",
@@ -149,7 +149,7 @@ function CheckRow({ check, prUrl }: { check: NormalizedCheck; prUrl: string }) {
 			<div className="flex min-w-0 flex-1 items-center gap-1">
 				<span className="min-w-0 truncate">{check.name}</span>
 				{checkUrl && (
-					<LuArrowUpRight className="size-3.5 shrink-0 text-muted-foreground/70 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+					<ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground/70 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
 				)}
 			</div>
 			{check.durationText && (

@@ -126,9 +126,25 @@ describe("BackgroundTerminalsButton utils", () => {
 		).toEqual(["term-b"]);
 	});
 
-	test("uses shallow count polling only while closed", () => {
-		expect(getBackgroundTerminalCountRefetchInterval(false)).toBe(10_000);
-		expect(getBackgroundTerminalCountRefetchInterval(true)).toBe(false);
+	test("uses shallow count polling only when the sidebar is visible and the menu is closed", () => {
+		expect(
+			getBackgroundTerminalCountRefetchInterval({
+				isMenuOpen: false,
+				sidebarOpen: true,
+			}),
+		).toBe(10_000);
+		expect(
+			getBackgroundTerminalCountRefetchInterval({
+				isMenuOpen: true,
+				sidebarOpen: true,
+			}),
+		).toBe(false);
+		expect(
+			getBackgroundTerminalCountRefetchInterval({
+				isMenuOpen: false,
+				sidebarOpen: false,
+			}),
+		).toBe(false);
 		expect(getBackgroundTerminalListRefetchInterval(false)).toBe(false);
 		expect(getBackgroundTerminalListRefetchInterval(true)).toBe(2_000);
 	});

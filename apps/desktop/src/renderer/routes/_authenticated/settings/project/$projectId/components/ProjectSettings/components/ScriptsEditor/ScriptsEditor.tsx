@@ -1,12 +1,8 @@
 import { Button } from "@superset/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@superset/ui/tabs";
 import { cn } from "@superset/ui/utils";
+import { CircleCheck, ExternalLink, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-	HiArrowTopRightOnSquare,
-	HiCheckCircle,
-	HiDocumentArrowUp,
-} from "react-icons/hi2";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { invalidateProjectScriptQueries } from "renderer/lib/project-scripts";
 import { EXTERNAL_LINKS } from "shared/constants";
@@ -136,7 +132,7 @@ function ScriptTextarea({
 				{isDragOver && (
 					<div className="absolute inset-0 flex items-center justify-center bg-primary/10 rounded-lg pointer-events-none">
 						<div className="flex items-center gap-2 text-primary text-sm font-medium">
-							<HiDocumentArrowUp className="h-5 w-5" />
+							<Upload className="h-5 w-5" />
 							Drop to import
 						</div>
 					</div>
@@ -149,7 +145,7 @@ function ScriptTextarea({
 				onClick={() => fileInputRef.current?.click()}
 				className="gap-1.5 text-muted-foreground"
 			>
-				<HiDocumentArrowUp className="h-3.5 w-3.5" />
+				<Upload className="h-3.5 w-3.5" />
 				Import file
 			</Button>
 			<input
@@ -357,7 +353,7 @@ export function ScriptsEditor({ projectId, className }: ScriptsEditorProps) {
 					)}
 					{saveStatus === "saved" && (
 						<span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-							<HiCheckCircle className="h-3.5 w-3.5" />
+							<CircleCheck className="h-3.5 w-3.5" />
 							Saved
 						</span>
 					)}
@@ -369,7 +365,7 @@ export function ScriptsEditor({ projectId, className }: ScriptsEditorProps) {
 						rel="noopener noreferrer"
 					>
 						Docs
-						<HiArrowTopRightOnSquare className="h-3.5 w-3.5" />
+						<ExternalLink className="h-3.5 w-3.5" />
 					</a>
 				</Button>
 			</div>

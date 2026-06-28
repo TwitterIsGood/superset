@@ -80,6 +80,10 @@ function isNetworkError(error: Error | string): boolean {
 	return SILENT_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
 }
 
+function isAutoUpdateDisabled(): boolean {
+	return process.env.SUPERSET_DISABLE_AUTO_UPDATES === "1";
+}
+
 let currentStatus: AutoUpdateStatus = AUTO_UPDATE_STATUS.IDLE;
 let currentVersion: string | undefined;
 let isDismissed = false;
@@ -145,7 +149,11 @@ export function dismissUpdate(): void {
 }
 
 export function checkForUpdates(): void {
-	if (env.NODE_ENV === "development" || !IS_AUTO_UPDATE_PLATFORM) {
+	if (
+		env.NODE_ENV === "development" ||
+		!IS_AUTO_UPDATE_PLATFORM ||
+		isAutoUpdateDisabled()
+	) {
 		return;
 	}
 	isDismissed = false;
@@ -167,6 +175,14 @@ export function checkForUpdatesInteractive(): void {
 			type: "info",
 			title: "Updates",
 			message: "Auto-updates are disabled in development mode.",
+		});
+		return;
+	}
+	if (isAutoUpdateDisabled()) {
+		dialog.showMessageBox({
+			type: "info",
+			title: "Updates",
+			message: "Auto-updates are disabled for this session.",
 		});
 		return;
 	}
@@ -243,7 +259,14 @@ export function simulateError(): void {
 }
 
 export function setupAutoUpdater(): void {
-	if (env.NODE_ENV === "development" || !IS_AUTO_UPDATE_PLATFORM) {
+	if (
+		env.NODE_ENV === "development" ||
+		!IS_AUTO_UPDATE_PLATFORM ||
+		isAutoUpdateDisabled()
+	) {
+		if (isAutoUpdateDisabled()) {
+			log.info("[auto-updater] Disabled by SUPERSET_DISABLE_AUTO_UPDATES");
+		}
 		return;
 	}
 

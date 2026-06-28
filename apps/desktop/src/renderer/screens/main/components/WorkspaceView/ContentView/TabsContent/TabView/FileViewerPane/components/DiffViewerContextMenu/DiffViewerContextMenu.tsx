@@ -1,6 +1,6 @@
 import { ContextMenuItem } from "@superset/ui/context-menu";
+import { SquarePen } from "lucide-react";
 import { type MutableRefObject, type ReactNode, useCallback } from "react";
-import { LuSquarePen } from "react-icons/lu";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import type { Tab } from "renderer/stores/tabs/types";
 import {
@@ -122,7 +122,7 @@ export function DiffViewerContextMenu({
 			}}
 			leadingItems={
 				<ContextMenuItem onSelect={onEditAtLocation}>
-					<LuSquarePen className="size-4" />
+					<SquarePen className="size-4" />
 					Edit Here
 				</ContextMenuItem>
 			}

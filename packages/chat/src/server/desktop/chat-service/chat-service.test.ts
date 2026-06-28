@@ -119,15 +119,8 @@ const originalOpenAIEnvValues = {
 };
 let testSupersetHomeDir: string | null = null;
 
-mock.module("mastracode", () => ({
-	createAuthStorage: createAuthStorageMock,
-	createMastraCode: mock(async () => ({
-		harness: {},
-		mcpManager: null,
-		hookManager: null,
-		authStorage: null,
-		storageWarning: undefined,
-	})),
+mock.module("./auth-storage", () => ({
+	createSupersetAuthStorage: createAuthStorageMock,
 }));
 
 mock.module("../auth/anthropic", () => ({
@@ -202,7 +195,7 @@ describe("ChatService OpenAI auth storage", () => {
 		}
 	});
 
-	it("uses standalone createAuthStorage and reuses it across calls", async () => {
+	it("uses standalone auth storage and reuses it across calls", async () => {
 		const chatService = new ChatService();
 
 		await chatService.setOpenAIApiKey({ apiKey: " test-key " });

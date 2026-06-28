@@ -7,8 +7,7 @@ import {
 } from "@superset/ui/dropdown-menu";
 import { getPresetIcon } from "@superset/ui/icons/preset-icons";
 import { useNavigate } from "@tanstack/react-router";
-import { HiCheck } from "react-icons/hi2";
-import { LuCpu, LuSettings } from "react-icons/lu";
+import { Check, Cpu, Settings } from "lucide-react";
 import { useIsDarkTheme } from "renderer/assets/app-icons/preset-icons";
 import { PickerTrigger } from "renderer/components/PickerTrigger";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
@@ -54,7 +53,7 @@ export function AgentPicker({
 								className="size-3.5 shrink-0 object-contain"
 							/>
 						) : (
-							<LuCpu className="size-4 shrink-0" />
+							<Cpu className="size-4 shrink-0" />
 						)
 					}
 					label={selected.label}
@@ -76,18 +75,18 @@ export function AgentPicker({
 									className="size-3.5 shrink-0 object-contain"
 								/>
 							) : (
-								<LuCpu className="size-4 shrink-0" />
+								<Cpu className="size-4 shrink-0" />
 							)}
 							<span className="flex-1 truncate">{agent.label}</span>
 							{(value === agent.id || value === portableAgentId) && (
-								<HiCheck className="size-4" />
+								<Check className="size-4" />
 							)}
 						</DropdownMenuItem>
 					);
 				})}
 				<DropdownMenuSeparator />
 				<DropdownMenuItem onSelect={() => navigate({ to: "/settings/agents" })}>
-					<LuSettings className="size-4 shrink-0" />
+					<Settings className="size-4 shrink-0" />
 					<span className="flex-1">Configure agents…</span>
 				</DropdownMenuItem>
 			</DropdownMenuContent>

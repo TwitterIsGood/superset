@@ -5,11 +5,10 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
+import { Github, ImagePlus, Trash2, Upload } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import { FaGithub } from "react-icons/fa";
-import { LuImagePlus, LuTrash2, LuUpload } from "react-icons/lu";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
+import { toast } from "renderer/lib/toast";
 
 const ACCEPTED_MIME_TYPES = "image/png,image/jpeg,image/webp";
 const MAX_SIZE_MB = 4.5;
@@ -134,7 +133,7 @@ export function IconUploadField({
 					className="size-full object-cover"
 				/>
 			) : (
-				<LuImagePlus className="size-4" />
+				<ImagePlus className="size-4" />
 			)}
 		</button>
 	);
@@ -146,12 +145,12 @@ export function IconUploadField({
 					<DropdownMenuTrigger asChild>{Thumbnail}</DropdownMenuTrigger>
 					<DropdownMenuContent align="start" className="w-48">
 						<DropdownMenuItem onSelect={handleClickUpload}>
-							<LuUpload className="size-4" />
+							<Upload className="size-4" />
 							Upload image…
 						</DropdownMenuItem>
 						{hasGitHubRepo && (
 							<DropdownMenuItem onSelect={handleUseGitHub}>
-								<FaGithub className="size-4" />
+								<Github className="size-4" />
 								Use GitHub icon
 							</DropdownMenuItem>
 						)}
@@ -159,7 +158,7 @@ export function IconUploadField({
 							<>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem variant="destructive" onSelect={handleRemove}>
-									<LuTrash2 className="size-4" />
+									<Trash2 className="size-4" />
 									Remove icon
 								</DropdownMenuItem>
 							</>

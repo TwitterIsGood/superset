@@ -1,5 +1,5 @@
 import { cn } from "@superset/ui/utils";
-import { LuCircleCheck, LuCircleDashed, LuCircleX } from "react-icons/lu";
+import { CircleCheck, CircleDashed, CircleX } from "lucide-react";
 import type { ChecksRollup } from "../../../../utils/computeChecksStatus";
 
 interface PRStatusIndicatorsProps {
@@ -23,7 +23,7 @@ export function PRStatusIndicators({ checks }: PRStatusIndicatorsProps) {
 function ChecksDot({ status }: { status: ChecksRollup["overall"] }) {
 	if (status === "success") {
 		return (
-			<LuCircleCheck
+			<CircleCheck
 				aria-hidden="true"
 				className={cn("size-3 shrink-0", "text-emerald-500")}
 			/>
@@ -31,14 +31,14 @@ function ChecksDot({ status }: { status: ChecksRollup["overall"] }) {
 	}
 	if (status === "failure") {
 		return (
-			<LuCircleX
+			<CircleX
 				aria-hidden="true"
 				className={cn("size-3 shrink-0", "text-rose-500")}
 			/>
 		);
 	}
 	return (
-		<LuCircleDashed
+		<CircleDashed
 			aria-hidden="true"
 			className={cn("size-3 shrink-0", "text-amber-500")}
 		/>

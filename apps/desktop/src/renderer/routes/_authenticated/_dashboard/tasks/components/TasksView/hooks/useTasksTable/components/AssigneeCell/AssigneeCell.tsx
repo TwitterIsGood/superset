@@ -7,8 +7,8 @@ import {
 } from "@superset/ui/dropdown-menu";
 import { useLiveQuery } from "@tanstack/react-db";
 import type { CellContext } from "@tanstack/react-table";
+import CircleUserRound from "lucide-react/dist/esm/icons/circle-user-round.js";
 import { useMemo, useState } from "react";
-import { HiOutlineUserCircle } from "react-icons/hi2";
 import { useOptimisticCollectionActions } from "renderer/routes/_authenticated/hooks/useOptimisticCollectionActions";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import type { TaskWithStatus } from "../../useTasksTable";
@@ -26,8 +26,8 @@ export function AssigneeCell({ info }: AssigneeCellProps) {
 	const assigneeId = info.getValue();
 
 	const { data: allUsers } = useLiveQuery(
-		(q) => q.from({ users: collections.users }),
-		[collections],
+		(q) => (open ? q.from({ users: collections.users }) : null),
+		[collections, open],
 	);
 
 	const users = useMemo(() => allUsers || [], [allUsers]);
@@ -65,7 +65,7 @@ export function AssigneeCell({ info }: AssigneeCellProps) {
 							image={task.assigneeAvatarUrl}
 						/>
 					) : (
-						<HiOutlineUserCircle className="size-5 text-muted-foreground" />
+						<CircleUserRound className="size-5 text-muted-foreground" />
 					)}
 				</button>
 			</DropdownMenuTrigger>
@@ -79,7 +79,7 @@ export function AssigneeCell({ info }: AssigneeCellProps) {
 						onSelect={() => handleSelectUser(null)}
 						className="flex items-center gap-2"
 					>
-						<HiOutlineUserCircle className="size-5 text-muted-foreground shrink-0" />
+						<CircleUserRound className="size-5 text-muted-foreground shrink-0" />
 						<span className="text-sm">No assignee</span>
 						{!assigneeId && !task.assigneeExternalId && (
 							<span className="ml-auto text-xs text-muted-foreground">✓</span>

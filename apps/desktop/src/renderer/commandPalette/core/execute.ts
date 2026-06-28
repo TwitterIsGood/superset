@@ -1,5 +1,5 @@
-import { toast } from "@superset/ui/sonner";
 import { track } from "renderer/lib/analytics";
+import { toast } from "renderer/lib/toast";
 import type { Command, CommandContext } from "./types";
 
 export async function executeCommand(

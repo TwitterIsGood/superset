@@ -11,7 +11,7 @@ This guide captures repo-wide rules imported from `AGENTS.md`, package AGENTS fi
 ## Non-Negotiable Rules
 
 - Use Bun only. Do not introduce npm, yarn, pnpm, or package-lock/yarn/pnpm lockfiles.
-- Run quality commands from the repo root unless a package script explicitly says otherwise: `bun run lint`, `bun run lint:fix`, `bun run typecheck`, `bun test`.
+- Run quality commands from the repo root unless a package script explicitly says otherwise: `bun run lint`, `bun run lint:fix`, `bun run typecheck`, `bun run test`. Use bare `bun test` only for focused file/package test runs where bypassing Turbo and package scripts is intentional.
 - Biome is root-scoped. Lint warnings fail CI, so run `bun run lint:fix` after edits and verify `bun run lint` exits 0 before pushing.
 - Prefer strong TypeScript types. Avoid `any`; when boundary data is untyped, validate or narrow it close to the boundary.
 - Keep plans in `plans/` or `apps/<app>/plans/`; shipped plans move to `plans/done/`. Architecture docs belong in `<app>/docs/`.
@@ -39,7 +39,7 @@ This guide captures repo-wide rules imported from `AGENTS.md`, package AGENTS fi
 - Use `TRPCError` for expected API errors and typed result unions when callers need recoverable domain outcomes.
 - Keep long-running local runtime state out of renderer React state. Terminal and host work belong in host-service / pty-daemon layers.
 - Log operational failures with enough structured context to debug, but never log auth tokens, host secrets, provider credentials, or refresh tokens.
-- Tests should sit next to risky behavior: `.test.ts` for unit tests, `.node-test.ts` for real Node/PTY flows, integration tests for cross-layer contracts.
+- Tests should sit next to risky behavior: `.test.ts` for unit tests, `.node-test.ts` for real Node/PTY flows that must not be discovered by Bun's default test scan, integration tests for cross-layer contracts.
 
 ## Desktop-Specific Rules
 

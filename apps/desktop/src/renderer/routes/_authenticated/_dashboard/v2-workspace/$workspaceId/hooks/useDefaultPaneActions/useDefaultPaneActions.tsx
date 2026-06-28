@@ -1,7 +1,6 @@
 import type { PaneActionConfig } from "@superset/panes";
+import { Columns2, Rows2, X } from "lucide-react";
 import { useMemo } from "react";
-import { HiMiniXMark } from "react-icons/hi2";
-import { TbLayoutColumns, TbLayoutRows } from "react-icons/tb";
 import { HotkeyLabel } from "renderer/hotkeys";
 import type { PaneViewerData, TerminalPaneData } from "../../types";
 import type { TerminalLauncher } from "../useV2TerminalLauncher";
@@ -17,9 +16,9 @@ export function useDefaultPaneActions({
 				key: "split",
 				icon: (ctx) =>
 					ctx.pane.parentDirection === "horizontal" ? (
-						<TbLayoutRows className="size-3.5" />
+						<Rows2 className="size-3.5" />
 					) : (
-						<TbLayoutColumns className="size-3.5" />
+						<Columns2 className="size-3.5" />
 					),
 				tooltip: <HotkeyLabel label="Split pane" id="SPLIT_AUTO" />,
 				onClick: async (ctx) => {
@@ -34,7 +33,7 @@ export function useDefaultPaneActions({
 			},
 			{
 				key: "close",
-				icon: <HiMiniXMark className="size-3.5" />,
+				icon: <X className="size-3.5" />,
 				tooltip: <HotkeyLabel label="Close pane" id="CLOSE_PANE" />,
 				onClick: (ctx) => ctx.actions.close(),
 			},

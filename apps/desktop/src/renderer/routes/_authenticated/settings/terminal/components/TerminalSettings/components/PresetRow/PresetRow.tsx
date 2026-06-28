@@ -2,11 +2,9 @@ import type { HostAgentConfig } from "@superset/host-service/settings";
 import { normalizeExecutionMode } from "@superset/local-db";
 import { Badge } from "@superset/ui/badge";
 import { cn } from "@superset/ui/utils";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, GripVertical, SquareTerminal } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useDrag, useDrop } from "react-dnd";
-import { HiMiniCommandLine } from "react-icons/hi2";
-import { LuGripVertical } from "react-icons/lu";
 import { useIsDarkTheme } from "renderer/assets/app-icons/preset-icons";
 import { resolvePresetLaunchCommands } from "renderer/lib/agent-launch-command";
 import { resolveV2PresetIcon } from "renderer/lib/preset-icon";
@@ -135,7 +133,7 @@ export function PresetRow({
 				{presetIcon ? (
 					<img src={presetIcon} alt="" className="size-4 object-contain" />
 				) : (
-					<HiMiniCommandLine className="size-4 text-muted-foreground" />
+					<SquareTerminal className="size-4 text-muted-foreground" />
 				)}
 			</div>
 
@@ -212,7 +210,7 @@ export function PresetRow({
 				)}
 				aria-label="Drag to reorder"
 			>
-				<LuGripVertical className="size-4" />
+				<GripVertical className="size-4" />
 			</button>
 		</div>
 	);

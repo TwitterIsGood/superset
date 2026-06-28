@@ -4,22 +4,22 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { useMatchRoute, useNavigate } from "@tanstack/react-router";
-import type { ReactNode } from "react";
-import { HiMiniPlus, HiOutlineClipboardDocumentList } from "react-icons/hi2";
 import {
-	LuClock,
-	LuFolderInput,
-	LuFolderPlus,
-	LuLayers,
-	LuLayoutTemplate,
-	LuPlus,
-} from "react-icons/lu";
+	ClipboardList,
+	Clock,
+	FolderInput,
+	FolderPlus,
+	Layers,
+	LayoutTemplate,
+	Plus,
+} from "lucide-react";
+import type { ReactNode } from "react";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { useFolderFirstImport } from "renderer/routes/_authenticated/_dashboard/components/AddRepositoryModals/hooks/useFolderFirstImport";
 import { NavigationControls } from "renderer/routes/_authenticated/_dashboard/components/NavigationControls";
 import { SidebarToggle } from "renderer/routes/_authenticated/_dashboard/components/SidebarToggle";
@@ -131,7 +131,7 @@ export function DashboardSidebarHeader({
 											: "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
 									)}
 								>
-									<LuLayers className="size-4" />
+									<Layers className="size-4" />
 								</button>
 							</TooltipTrigger>
 							<TooltipContent side="right">Workspaces</TooltipContent>
@@ -149,7 +149,7 @@ export function DashboardSidebarHeader({
 											: "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
 									)}
 								>
-									<LuClock className="size-4" />
+									<Clock className="size-4" />
 								</button>
 							</TooltipTrigger>
 							<TooltipContent side="right">Automations</TooltipContent>
@@ -167,7 +167,7 @@ export function DashboardSidebarHeader({
 											: "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
 									)}
 								>
-									<HiOutlineClipboardDocumentList className="size-4" />
+									<ClipboardList className="size-4" />
 								</button>
 							</TooltipTrigger>
 							<TooltipContent side="right">Tasks & PRs</TooltipContent>
@@ -180,7 +180,7 @@ export function DashboardSidebarHeader({
 									onClick={() => openModal()}
 									className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
 								>
-									<LuPlus className="size-4" strokeWidth={STROKE_WIDTH_THICK} />
+									<Plus className="size-4" strokeWidth={STROKE_WIDTH_THICK} />
 								</button>
 							</TooltipTrigger>
 							<TooltipContent side="right">
@@ -197,7 +197,7 @@ export function DashboardSidebarHeader({
 											aria-label="Add repository"
 											className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
 										>
-											<LuFolderPlus className="size-4" />
+											<FolderPlus className="size-4" />
 										</button>
 									</DropdownMenuTrigger>
 								</TooltipTrigger>
@@ -208,15 +208,15 @@ export function DashboardSidebarHeader({
 								onCloseAutoFocus={(event) => event.preventDefault()}
 							>
 								<DropdownMenuItem onSelect={() => openNewProject()}>
-									<HiMiniPlus className="size-4" />
+									<Plus className="size-4" />
 									Clone from URL
 								</DropdownMenuItem>
 								<DropdownMenuItem onSelect={handleImportFolder}>
-									<LuFolderInput className="size-4" />
+									<FolderInput className="size-4" />
 									Open from folder
 								</DropdownMenuItem>
 								<DropdownMenuItem onSelect={() => openTemplateGallery()}>
-									<LuLayoutTemplate className="size-4" />
+									<LayoutTemplate className="size-4" />
 									Start from a template
 								</DropdownMenuItem>
 							</DropdownMenuContent>
@@ -255,7 +255,7 @@ export function DashboardSidebarHeader({
 								: "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
 						)}
 					>
-						<LuLayers className="size-4 shrink-0" />
+						<Layers className="size-4 shrink-0" />
 						<span className="flex-1 text-left">Workspaces</span>
 					</button>
 
@@ -269,7 +269,7 @@ export function DashboardSidebarHeader({
 								: "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
 						)}
 					>
-						<LuClock className="size-4 shrink-0" />
+						<Clock className="size-4 shrink-0" />
 						<span className="flex-1 text-left">Automations</span>
 					</button>
 
@@ -283,7 +283,7 @@ export function DashboardSidebarHeader({
 								: "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
 						)}
 					>
-						<HiOutlineClipboardDocumentList className="size-4 shrink-0" />
+						<ClipboardList className="size-4 shrink-0" />
 						<span className="flex-1 text-left">Tasks & PRs</span>
 					</button>
 
@@ -293,7 +293,7 @@ export function DashboardSidebarHeader({
 							onClick={() => openModal()}
 							className="group flex flex-1 min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
 						>
-							<LuPlus
+							<Plus
 								className="size-4 shrink-0"
 								strokeWidth={STROKE_WIDTH_THICK}
 							/>
@@ -318,7 +318,7 @@ export function DashboardSidebarHeader({
 											aria-label="Add repository"
 											className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
 										>
-											<LuFolderPlus className="size-4" />
+											<FolderPlus className="size-4" />
 										</button>
 									</DropdownMenuTrigger>
 								</TooltipTrigger>
@@ -329,15 +329,15 @@ export function DashboardSidebarHeader({
 								onCloseAutoFocus={(event) => event.preventDefault()}
 							>
 								<DropdownMenuItem onSelect={() => openNewProject()}>
-									<HiMiniPlus className="size-4" />
+									<Plus className="size-4" />
 									Clone from URL
 								</DropdownMenuItem>
 								<DropdownMenuItem onSelect={handleImportFolder}>
-									<LuFolderInput className="size-4" />
+									<FolderInput className="size-4" />
 									Open from folder
 								</DropdownMenuItem>
 								<DropdownMenuItem onSelect={() => openTemplateGallery()}>
-									<LuLayoutTemplate className="size-4" />
+									<LayoutTemplate className="size-4" />
 									Start from a template
 								</DropdownMenuItem>
 							</DropdownMenuContent>

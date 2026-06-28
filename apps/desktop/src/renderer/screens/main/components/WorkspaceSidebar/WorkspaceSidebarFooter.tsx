@@ -5,14 +5,14 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import {
-	LuFolderOpen,
-	LuFolderPlus,
-	LuGitBranch,
-	LuLayoutTemplate,
-} from "react-icons/lu";
+	FolderOpen,
+	FolderPlus,
+	GitBranch,
+	LayoutTemplate,
+} from "lucide-react";
+import { toast } from "renderer/lib/toast";
 import { useOpenProject } from "renderer/react-query/projects";
 import { useOpenMainRepoWorkspace } from "renderer/react-query/workspaces";
 import {
@@ -93,7 +93,7 @@ export function WorkspaceSidebarFooter({
 									className="size-8 text-muted-foreground hover:text-foreground"
 									disabled={isLoading}
 								>
-									<LuFolderPlus className="size-4" strokeWidth={STROKE_WIDTH} />
+									<FolderPlus className="size-4" strokeWidth={STROKE_WIDTH} />
 								</Button>
 							</DropdownMenuTrigger>
 						</TooltipTrigger>
@@ -101,15 +101,15 @@ export function WorkspaceSidebarFooter({
 					</Tooltip>
 					<DropdownMenuContent side="top" align="start">
 						<DropdownMenuItem onClick={handleOpenProject} disabled={isLoading}>
-							<LuFolderOpen className="size-4" strokeWidth={STROKE_WIDTH} />
+							<FolderOpen className="size-4" strokeWidth={STROKE_WIDTH} />
 							Open project
 						</DropdownMenuItem>
 						<DropdownMenuItem onClick={handleCloneProject}>
-							<LuGitBranch className="size-4" strokeWidth={STROKE_WIDTH} />
+							<GitBranch className="size-4" strokeWidth={STROKE_WIDTH} />
 							Clone from URL
 						</DropdownMenuItem>
 						<DropdownMenuItem onClick={handleTemplateProject}>
-							<LuLayoutTemplate className="size-4" strokeWidth={STROKE_WIDTH} />
+							<LayoutTemplate className="size-4" strokeWidth={STROKE_WIDTH} />
 							Start from a template
 						</DropdownMenuItem>
 					</DropdownMenuContent>
@@ -128,21 +128,21 @@ export function WorkspaceSidebarFooter({
 						className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
 						disabled={isLoading}
 					>
-						<LuFolderPlus className="w-4 h-4" strokeWidth={STROKE_WIDTH} />
+						<FolderPlus className="w-4 h-4" strokeWidth={STROKE_WIDTH} />
 						<span>Add repository</span>
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent side="top" align="start">
 					<DropdownMenuItem onClick={handleOpenProject} disabled={isLoading}>
-						<LuFolderOpen className="size-4" strokeWidth={STROKE_WIDTH} />
+						<FolderOpen className="size-4" strokeWidth={STROKE_WIDTH} />
 						Open project
 					</DropdownMenuItem>
 					<DropdownMenuItem onClick={handleCloneProject}>
-						<LuGitBranch className="size-4" strokeWidth={STROKE_WIDTH} />
+						<GitBranch className="size-4" strokeWidth={STROKE_WIDTH} />
 						Clone from URL
 					</DropdownMenuItem>
 					<DropdownMenuItem onClick={handleTemplateProject}>
-						<LuLayoutTemplate className="size-4" strokeWidth={STROKE_WIDTH} />
+						<LayoutTemplate className="size-4" strokeWidth={STROKE_WIDTH} />
 						Start from a template
 					</DropdownMenuItem>
 				</DropdownMenuContent>

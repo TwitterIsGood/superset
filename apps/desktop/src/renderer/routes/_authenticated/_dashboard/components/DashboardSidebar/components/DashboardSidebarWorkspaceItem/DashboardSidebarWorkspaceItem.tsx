@@ -117,6 +117,7 @@ export function DashboardSidebarWorkspaceItem({
 			// biome-ignore lint/a11y/noStaticElementInteractions: hover handlers drive a non-interactive popover, no new keyboard semantics
 			<div
 				ref={rowRef}
+				data-dashboard-sidebar-collapsed-workspace-row={id}
 				onMouseEnter={handleMouseEnter}
 				onMouseLeave={handleMouseLeave}
 				className="relative flex w-full justify-center"
@@ -203,6 +204,7 @@ export function DashboardSidebarWorkspaceItem({
 		// biome-ignore lint/a11y/noStaticElementInteractions: hover handlers drive a non-interactive popover, no new keyboard semantics
 		<div
 			ref={rowRef}
+			data-dashboard-sidebar-expanded-workspace-wrapper={id}
 			onMouseEnter={handleMouseEnter}
 			onMouseLeave={handleMouseLeave}
 		>
@@ -222,6 +224,7 @@ export function DashboardSidebarWorkspaceItem({
 				onRenameValueChange={setRenameValue}
 				onSubmitRename={submitRename}
 				onCancelRename={cancelRename}
+				data-dashboard-sidebar-expanded-workspace-row={id}
 			/>
 		</div>
 	);

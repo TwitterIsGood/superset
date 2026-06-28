@@ -1,35 +1,32 @@
-import { mermaid } from "@streamdown/mermaid";
+import { CodeBlock as UiCodeBlock } from "@superset/ui/ai-elements/code-block";
 import { Avatar, AvatarFallback, AvatarImage } from "@superset/ui/avatar";
+import { ArrowUpRight, Check, Copy, Github, MessageSquare } from "lucide-react";
 import {
+	lazy,
 	type ReactNode,
+	Suspense,
 	useCallback,
 	useEffect,
 	useRef,
 	useState,
 } from "react";
-import { FaGithub } from "react-icons/fa";
-import {
-	LuArrowUpRight,
-	LuCheck,
-	LuCopy,
-	LuMessageSquare,
-} from "react-icons/lu";
 import ReactMarkdown from "react-markdown";
 import type { MosaicBranch } from "react-mosaic-component";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import {
-	oneDark,
-	oneLight,
-} from "react-syntax-highlighter/dist/esm/styles/prism";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import { useTheme } from "renderer/stores/theme";
-import { Streamdown } from "streamdown";
+import type { BundledLanguage } from "shiki";
 import { BasePaneWindow, PaneTitle, PaneToolbarActions } from "../components";
 import "./comment-pane.css";
+
+const LazyMermaidCodeBlock = lazy(() =>
+	import("renderer/components/MermaidCodeBlock").then((module) => ({
+		default: module.MermaidCodeBlock,
+	})),
+);
 
 interface CommentPaneProps {
 	paneId: string;
@@ -104,7 +101,7 @@ export function CommentPane({
 								className="size-4 shrink-0 rounded-full"
 							/>
 						) : (
-							<LuMessageSquare className="size-4 shrink-0 text-muted-foreground" />
+							<MessageSquare className="size-4 shrink-0 text-muted-foreground" />
 						)}
 						<PaneTitle
 							name={paneName ?? ""}
@@ -119,8 +116,8 @@ export function CommentPane({
 								className="flex shrink-0 items-center gap-0.5 text-muted-foreground hover:text-foreground"
 								aria-label="View on GitHub"
 							>
-								<FaGithub className="size-3.5" />
-								<LuArrowUpRight className="size-3" />
+								<Github className="size-3.5" />
+								<ArrowUpRight className="size-3" />
 							</a>
 						)}
 					</div>
@@ -167,12 +164,12 @@ export function CommentPane({
 						>
 							{copied ? (
 								<>
-									<LuCheck className="size-3" />
+									<Check className="size-3" />
 									Copied
 								</>
 							) : (
 								<>
-									<LuCopy className="size-3" />
+									<Copy className="size-3" />
 									Copy All
 								</>
 							)}
@@ -194,8 +191,6 @@ export function CommentPane({
 		</BasePaneWindow>
 	);
 }
-
-const mermaidPlugins = { mermaid };
 
 const MERMAID_DARK_VARS = {
 	background: "#1e1e2e",
@@ -243,18 +238,15 @@ function CommentCodeBlock({
 
 	if (language === "mermaid") {
 		return (
-			<Streamdown
-				mode="static"
-				plugins={mermaidPlugins}
-				mermaid={{
-					config: {
-						theme: "base",
-						themeVariables: isDark ? MERMAID_DARK_VARS : MERMAID_LIGHT_VARS,
-					},
-				}}
-			>
-				{`\`\`\`mermaid\n${codeString}\n\`\`\``}
-			</Streamdown>
+			<Suspense fallback={<pre>{codeString}</pre>}>
+				<LazyMermaidCodeBlock
+					source={codeString}
+					isDark={isDark}
+					mode="base"
+					darkThemeVariables={MERMAID_DARK_VARS}
+					lightThemeVariables={MERMAID_LIGHT_VARS}
+				/>
+			</Suspense>
 		);
 	}
 
@@ -267,16 +259,11 @@ function CommentCodeBlock({
 	}
 
 	return (
-		<SyntaxHighlighter
-			style={
-				(isDark ? oneDark : oneLight) as Record<string, React.CSSProperties>
-			}
-			language={language}
-			PreTag="div"
-			className="rounded-md text-sm"
-		>
-			{codeString}
-		</SyntaxHighlighter>
+		<UiCodeBlock
+			code={codeString}
+			language={language as BundledLanguage}
+			className="border-0 bg-muted/50 text-sm"
+		/>
 	);
 }
 
@@ -341,7 +328,7 @@ function CopyableTable({ children }: { children?: ReactNode }) {
 			>
 				{copied ? (
 					<span className="flex items-center gap-1">
-						<LuCheck className="size-3" />
+						<Check className="size-3" />
 						Copied
 					</span>
 				) : (

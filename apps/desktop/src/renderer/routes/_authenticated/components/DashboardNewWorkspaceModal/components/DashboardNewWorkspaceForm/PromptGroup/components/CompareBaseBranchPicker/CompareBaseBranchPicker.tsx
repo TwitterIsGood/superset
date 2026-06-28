@@ -7,10 +7,14 @@ import {
 } from "@superset/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@superset/ui/tabs";
+import {
+	Check,
+	ChevronsUpDown,
+	FolderOpen,
+	GitBranchIcon,
+	GlobeIcon,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { GoGitBranch, GoGlobe } from "react-icons/go";
-import { HiCheck, HiChevronUpDown } from "react-icons/hi2";
-import { LuFolderOpen } from "react-icons/lu";
 import { PLATFORM } from "renderer/hotkeys";
 import { formatRelativeTime } from "renderer/lib/formatRelativeTime";
 import type { BranchFilter, BranchRow } from "../../../hooks/useBranchContext";
@@ -109,7 +113,7 @@ export function CompareBaseBranchPicker({
 					disabled={isBranchesLoading && branches.length === 0}
 					className="max-w-full"
 				>
-					<GoGitBranch className="size-3 shrink-0" />
+					<GitBranchIcon className="size-3 shrink-0" />
 					{isBranchesLoading && branches.length === 0 ? (
 						<span className="h-2.5 w-14 rounded-sm bg-muted-foreground/15 animate-pulse" />
 					) : effectiveCompareBaseBranch ? (
@@ -121,7 +125,7 @@ export function CompareBaseBranchPicker({
 							Select base branch…
 						</span>
 					)}
-					<HiChevronUpDown className="size-3 shrink-0" />
+					<ChevronsUpDown className="size-3 shrink-0" />
 				</FormPickerTrigger>
 			</PopoverTrigger>
 			<PopoverContent
@@ -190,11 +194,11 @@ export function CompareBaseBranchPicker({
 									className="group items-start gap-3 rounded-md px-2.5 py-2"
 								>
 									{isWorktree ? (
-										<LuFolderOpen className="mt-0.5 size-4 shrink-0 text-primary/80" />
+										<FolderOpen className="mt-0.5 size-4 shrink-0 text-primary/80" />
 									) : isRemoteOnly ? (
-										<GoGlobe className="mt-0.5 size-4 shrink-0 text-muted-foreground/60" />
+										<GlobeIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground/60" />
 									) : (
-										<GoGitBranch className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+										<GitBranchIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 									)}
 									<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 										<span className="truncate text-sm leading-snug">
@@ -242,7 +246,7 @@ export function CompareBaseBranchPicker({
 											</span>
 										</button>
 										{effectiveCompareBaseBranch === branch.name && (
-											<HiCheck className="size-4 text-primary group-hover:hidden group-data-[selected=true]:hidden" />
+											<Check className="size-4 text-primary group-hover:hidden group-data-[selected=true]:hidden" />
 										)}
 									</span>
 								</CommandItem>

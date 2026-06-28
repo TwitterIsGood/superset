@@ -1030,3 +1030,47 @@ Removed the `local-neon-http-proxy` dependency from online/dev DB access by movi
 ### Status
 
 [OK] **Ready for commit**
+
+
+## Session 30: Desktop performance overhaul completion
+
+**Date**: 2026-06-28
+**Task**: Desktop performance overhaul completion
+**Package**: desktop
+**Branch**: `codex/desktop-perf-architecture-overhaul`
+
+### Summary
+
+Completed the desktop performance overhaul: added the low-memory desktop online profile for loaded desktop development, fixed loaded workspace route/sidebar readiness regressions, verified loaded UI behavior against seeded data, brought quick Canary artifact readiness under the target with the latest successful GitHub Actions run at 2m29s total, kept macOS ZIP under the 100MiB budget, and captured performance budget guardrails in Trellis specs.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `335772117` | (see git log) |
+| `7da63db49` | (see git log) |
+| `54e0355bd` | (see git log) |
+| `ce46b9402` | (see git log) |
+| `23c5ce321` | (see git log) |
+| `4dbfc0fde` | (see git log) |
+| `3be49b102` | (see git log) |
+| `0e576662b` | (see git log) |
+| `4c73e4308` | (see git log) |
+| `356b3342a` | (see git log) |
+| `ee2132c47` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

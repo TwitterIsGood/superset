@@ -10,14 +10,10 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@superset/ui/select";
-import { toast } from "@superset/ui/sonner";
+import { Download, ExternalLink, Upload } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
-import {
-	HiOutlineArrowDownTray,
-	HiOutlineArrowTopRightOnSquare,
-	HiOutlineArrowUpTray,
-} from "react-icons/hi2";
 import { ThemeSwatch } from "renderer/components/ThemeSwatch";
+import { toast } from "renderer/lib/toast";
 import {
 	SYSTEM_THEME_ID,
 	useSetSystemThemePreference,
@@ -291,7 +287,7 @@ export function ThemeSection() {
 							className="inline-flex items-center gap-0.5 text-primary hover:underline"
 						>
 							marketplace
-							<HiOutlineArrowTopRightOnSquare className="h-3 w-3" />
+							<ExternalLink className="h-3 w-3" />
 						</a>{" "}
 						or{" "}
 						<a
@@ -301,7 +297,7 @@ export function ThemeSection() {
 							className="inline-flex items-center gap-0.5 text-primary hover:underline"
 						>
 							docs
-							<HiOutlineArrowTopRightOnSquare className="h-3 w-3" />
+							<ExternalLink className="h-3 w-3" />
 						</a>
 						.
 					</>
@@ -356,7 +352,7 @@ export function ThemeSection() {
 						size="sm"
 						onClick={handleDownloadBaseTheme}
 					>
-						<HiOutlineArrowDownTray className="mr-1.5 h-4 w-4" />
+						<Download className="mr-1.5 h-4 w-4" />
 						Download starter
 					</Button>
 					<Button
@@ -366,7 +362,7 @@ export function ThemeSection() {
 						onClick={() => fileInputRef.current?.click()}
 						disabled={isImporting}
 					>
-						<HiOutlineArrowUpTray className="mr-1.5 h-4 w-4" />
+						<Upload className="mr-1.5 h-4 w-4" />
 						{isImporting ? "Importing..." : "Import"}
 					</Button>
 				</div>

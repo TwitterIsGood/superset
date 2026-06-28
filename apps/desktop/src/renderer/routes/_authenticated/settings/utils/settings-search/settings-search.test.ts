@@ -78,4 +78,17 @@ describe("settings search - font settings", () => {
 			SETTING_ITEM_ID.GIT_WORKTREE_LOCATION,
 		]);
 	});
+
+	it("keeps usage analytics discoverable and visible in v2 behavior settings", () => {
+		const ids = getIds(searchSettings("telemetry"));
+
+		expect(ids).toContain(SETTING_ITEM_ID.BEHAVIOR_TELEMETRY);
+		expect(
+			getVisibleItemsForSection({
+				section: "behavior",
+				searchQuery: "",
+				isV2: true,
+			}),
+		).toContain(SETTING_ITEM_ID.BEHAVIOR_TELEMETRY);
+	});
 });

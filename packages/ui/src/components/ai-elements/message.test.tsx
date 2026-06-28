@@ -4,10 +4,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const streamdownCalls: Array<Record<string, unknown>> = [];
 
-mock.module("@streamdown/mermaid", () => ({
-	mermaid: {},
-}));
-
 mock.module("streamdown", () => ({
 	Streamdown: (props: Record<string, unknown>) => {
 		streamdownCalls.push(props);
@@ -15,7 +11,7 @@ mock.module("streamdown", () => ({
 	},
 }));
 
-const { MessageResponse } = await import("./message");
+const { MessageResponse } = await import("./message-response");
 
 describe("MessageResponse", () => {
 	it("preserves assistant soft line breaks in markdown paragraphs", () => {

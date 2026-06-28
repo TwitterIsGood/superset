@@ -68,8 +68,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-superset}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-superset-local-artifacts}
     ports:
-      - "127.0.0.1:${LOCAL_S3_PORT:-9000}:9000"
-      - "127.0.0.1:${LOCAL_S3_CONSOLE_PORT:-9001}:9001"
+      - "${LOCAL_S3_BIND_HOST:-127.0.0.1}:${LOCAL_S3_PORT:-9000}:9000"
+      - "${LOCAL_S3_CONSOLE_BIND_HOST:-127.0.0.1}:${LOCAL_S3_CONSOLE_PORT:-9001}:9001"
     volumes:
       - superset_minio_data:/data
 
@@ -81,8 +81,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-superset}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-superset-local-artifacts}
       SUPERSET_OBJECT_STORAGE_BUCKET: ${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}
-      NO_PROXY: minio,localhost,127.0.0.1
-      no_proxy: minio,localhost,127.0.0.1
+      NO_PROXY: localhost,127.0.0.1,minio
+      no_proxy: localhost,127.0.0.1,minio
     entrypoint:
       - /bin/sh
       - -c
@@ -92,6 +92,7 @@ services:
         done
         mc mb --ignore-existing "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}"
         mc anonymous set none "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}"
+        mc anonymous set download "superset/${SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}/packs"
 
 volumes:
   superset_db_data:

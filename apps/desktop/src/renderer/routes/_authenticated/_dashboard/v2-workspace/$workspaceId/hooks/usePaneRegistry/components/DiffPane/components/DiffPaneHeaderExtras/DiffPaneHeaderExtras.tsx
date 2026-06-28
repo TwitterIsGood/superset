@@ -5,9 +5,9 @@ import {
 	EyeOff,
 	MessageSquare,
 	MessageSquareOff,
+	Scan,
 	SquareSplitHorizontal,
 } from "lucide-react";
-import { TbScan } from "react-icons/tb";
 import { useSettings } from "renderer/stores/settings";
 
 export function DiffPaneHeaderExtras() {
@@ -35,7 +35,7 @@ export function DiffPaneHeaderExtras() {
 						aria-pressed={diffStyle === "unified"}
 						className={buttonClass(diffStyle === "unified")}
 					>
-						<TbScan className="size-3.5" />
+						<Scan className="size-3.5" />
 					</button>
 				</TooltipTrigger>
 				<TooltipContent side="bottom" showArrow={false}>

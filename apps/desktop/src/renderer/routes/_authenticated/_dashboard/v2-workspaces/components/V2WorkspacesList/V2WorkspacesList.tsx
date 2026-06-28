@@ -7,16 +7,15 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@superset/ui/empty";
-import { ScrollArea } from "@superset/ui/scroll-area";
 import { cn } from "@superset/ui/utils";
 import { useMatchRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
 import {
-	LuChevronDown,
-	LuChevronRight,
-	LuLayers,
-	LuSearchX,
-} from "react-icons/lu";
+	defaultRangeExtractor,
+	type Range,
+	useVirtualizer,
+} from "@tanstack/react-virtual";
+import { ChevronDown, ChevronRight, Layers, SearchX } from "lucide-react";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import type {
 	AccessibleV2Workspace,
 	V2WorkspaceHostType,
@@ -32,17 +31,15 @@ import { SortableHeader } from "./components/SortableHeader";
 import { V2WorkspaceRow } from "./components/V2WorkspaceRow";
 import { V2_WORKSPACES_ROW_GRID } from "./constants";
 import type { SortDirection, SortField } from "./types";
+import {
+	buildV2WorkspacesVirtualRows,
+	getV2WorkspaceProjectHeaderIndices,
+	type V2WorkspacesProjectGroup,
+	type V2WorkspacesVirtualRow,
+} from "./utils/buildV2WorkspacesVirtualRows";
 
 interface V2WorkspacesListProps {
 	workspaces: AccessibleV2Workspace[];
-}
-
-interface ProjectGroup {
-	projectId: string;
-	projectName: string;
-	githubOwner: string | null;
-	workspaces: AccessibleV2Workspace[];
-	latestCreatedAt: number;
 }
 
 function hostTypeRank(hostType: V2WorkspaceHostType): number {
@@ -83,8 +80,8 @@ function groupByProject(
 	workspaces: AccessibleV2Workspace[],
 	sortField: SortField,
 	sortDirection: SortDirection,
-): ProjectGroup[] {
-	const projectsById = new Map<string, ProjectGroup>();
+): V2WorkspacesProjectGroup[] {
+	const projectsById = new Map<string, V2WorkspacesProjectGroup>();
 
 	for (const workspace of workspaces) {
 		let project = projectsById.get(workspace.projectId);
@@ -124,7 +121,12 @@ const DEFAULT_DIRECTION_BY_FIELD: Record<SortField, SortDirection> = {
 	created: "desc",
 };
 
+const PROJECT_HEADER_ESTIMATED_HEIGHT = 33;
+const WORKSPACE_ROW_ESTIMATED_HEIGHT = 42;
+const V2_WORKSPACES_OVERSCAN = 20;
+
 export function V2WorkspacesList({ workspaces }: V2WorkspacesListProps) {
+	const scrollRef = useRef<HTMLDivElement>(null);
 	const matchRoute = useMatchRoute();
 	const currentWorkspaceMatch = matchRoute({
 		to: "/v2-workspace/$workspaceId",
@@ -143,6 +145,7 @@ export function V2WorkspacesList({ workspaces }: V2WorkspacesListProps) {
 
 	const [sortField, setSortField] = useState<SortField>("host");
 	const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+	const projectMetaById = useV2ProjectLocalMetaStore((state) => state.projects);
 
 	const handleSort = (field: SortField) => {
 		if (sortField === field) {
@@ -157,6 +160,53 @@ export function V2WorkspacesList({ workspaces }: V2WorkspacesListProps) {
 		() => groupByProject(workspaces, sortField, sortDirection),
 		[workspaces, sortField, sortDirection],
 	);
+
+	const virtualRows = useMemo(
+		() =>
+			buildV2WorkspacesVirtualRows({
+				currentWorkspaceId,
+				projectGroups,
+				projectMetaById,
+			}),
+		[currentWorkspaceId, projectGroups, projectMetaById],
+	);
+	const projectHeaderIndices = useMemo(
+		() => getV2WorkspaceProjectHeaderIndices(virtualRows),
+		[virtualRows],
+	);
+
+	const rangeExtractor = useCallback(
+		(range: Range) => {
+			let activeStickyIndex: number | null = null;
+			for (const index of projectHeaderIndices) {
+				if (index <= range.startIndex) {
+					activeStickyIndex = index;
+				} else {
+					break;
+				}
+			}
+			const next = defaultRangeExtractor(range);
+			if (activeStickyIndex !== null && !next.includes(activeStickyIndex)) {
+				next.push(activeStickyIndex);
+				next.sort((a, b) => a - b);
+			}
+			return next;
+		},
+		[projectHeaderIndices],
+	);
+
+	const virtualizer = useVirtualizer({
+		count: virtualRows.length,
+		getItemKey: (index) => getVirtualRowKey(virtualRows[index]),
+		getScrollElement: () => scrollRef.current,
+		estimateSize: (index) =>
+			virtualRows[index]?.type === "project"
+				? PROJECT_HEADER_ESTIMATED_HEIGHT
+				: WORKSPACE_ROW_ESTIMATED_HEIGHT,
+		overscan: V2_WORKSPACES_OVERSCAN,
+		rangeExtractor,
+	});
+	const virtualItems = virtualizer.getVirtualItems();
 
 	const totalCount = projectGroups.reduce(
 		(total, project) => total + project.workspaces.length,
@@ -227,7 +277,7 @@ export function V2WorkspacesList({ workspaces }: V2WorkspacesListProps) {
 							variant="icon"
 							className="size-14 [&_svg:not([class*='size-'])]:size-7"
 						>
-							{hasActiveFilters ? <LuSearchX /> : <LuLayers />}
+							{hasActiveFilters ? <SearchX /> : <Layers />}
 						</EmptyMedia>
 						<EmptyTitle>
 							{hasActiveFilters
@@ -257,79 +307,89 @@ export function V2WorkspacesList({ workspaces }: V2WorkspacesListProps) {
 	}
 
 	return (
-		<ScrollArea className="min-h-0 flex-1">
+		<div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
 			<div className="flex w-full flex-col">
 				{columnHeader}
 
-				{projectGroups.map((project) => (
-					<ProjectSection
-						key={project.projectId}
-						project={project}
-						currentWorkspaceId={currentWorkspaceId}
-					/>
-				))}
+				<div style={{ height: virtualizer.getTotalSize() }}>
+					<div style={{ height: virtualItems[0]?.start ?? 0 }} />
+					{virtualItems.map((virtualRow, index) => {
+						const row = virtualRows[virtualRow.index];
+						if (!row) return null;
+						const previousEnd =
+							index === 0
+								? virtualItems[0].start
+								: virtualItems[index - 1].start + virtualItems[index - 1].size;
+						const gap = virtualRow.start - previousEnd;
+
+						return (
+							<Fragment key={virtualRow.key}>
+								{gap > 0 ? <div style={{ height: gap }} /> : null}
+								<div
+									data-index={virtualRow.index}
+									ref={virtualizer.measureElement}
+								>
+									{row.type === "project" ? (
+										<ProjectHeader
+											project={row.project}
+											isCollapsed={row.isCollapsed}
+										/>
+									) : (
+										<V2WorkspaceRow
+											workspace={row.workspace}
+											isCurrentRoute={row.workspace.id === currentWorkspaceId}
+										/>
+									)}
+								</div>
+							</Fragment>
+						);
+					})}
+				</div>
 			</div>
-		</ScrollArea>
+		</div>
 	);
 }
 
-interface ProjectSectionProps {
-	project: ProjectGroup;
-	currentWorkspaceId: string | null;
+function getVirtualRowKey(row: V2WorkspacesVirtualRow | undefined): string {
+	if (!row) return "missing";
+	if (row.type === "project") return `project-${row.project.projectId}`;
+	return `workspace-${row.workspace.id}`;
 }
 
-function ProjectSection({ project, currentWorkspaceId }: ProjectSectionProps) {
-	const persistedCollapsed = useV2ProjectLocalMetaStore(
-		(state) => state.projects[project.projectId]?.isCollapsed ?? false,
-	);
+interface ProjectHeaderProps {
+	project: V2WorkspacesProjectGroup;
+	isCollapsed: boolean;
+}
+
+function ProjectHeader({ project, isCollapsed }: ProjectHeaderProps) {
 	const toggleCollapsed = useV2ProjectLocalMetaStore(
 		(state) => state.toggleProjectCollapsed,
 	);
-	const containsCurrent = project.workspaces.some(
-		(workspace) => workspace.id === currentWorkspaceId,
-	);
-	const isCollapsed = persistedCollapsed && !containsCurrent;
-	const Chevron = isCollapsed ? LuChevronRight : LuChevronDown;
+	const Chevron = isCollapsed ? ChevronRight : ChevronDown;
 
 	return (
-		<div className="flex flex-col">
-			<button
-				type="button"
-				onClick={() => toggleCollapsed(project.projectId)}
-				aria-expanded={!isCollapsed}
-				aria-controls={`v2-workspaces-project-${project.projectId}`}
-				className="sticky top-8 z-[5] flex w-full items-center gap-2 border-b border-border/60 bg-muted px-6 py-1.5 text-left transition-colors hover:bg-muted/80"
+		<button
+			type="button"
+			onClick={() => toggleCollapsed(project.projectId)}
+			aria-expanded={!isCollapsed}
+			data-v2-workspaces-project-header={project.projectId}
+			className="sticky top-8 z-[5] flex w-full items-center gap-2 border-b border-border/60 bg-muted px-6 py-1.5 text-left transition-colors hover:bg-muted/80"
+		>
+			<Chevron className="size-3 shrink-0 text-muted-foreground" />
+			<V2WorkspaceProjectIcon
+				projectName={project.projectName}
+				githubOwner={project.githubOwner}
+				size="sm"
+			/>
+			<h3
+				className="min-w-0 truncate text-xs font-semibold text-foreground/80"
+				title={project.projectName}
 			>
-				<Chevron className="size-3 shrink-0 text-muted-foreground" />
-				<V2WorkspaceProjectIcon
-					projectName={project.projectName}
-					githubOwner={project.githubOwner}
-					size="sm"
-				/>
-				<h3
-					className="min-w-0 truncate text-xs font-semibold text-foreground/80"
-					title={project.projectName}
-				>
-					{project.projectName}
-				</h3>
-				<span className="shrink-0 text-xs tabular-nums text-muted-foreground/60">
-					{project.workspaces.length}
-				</span>
-			</button>
-			{isCollapsed ? null : (
-				<ul
-					id={`v2-workspaces-project-${project.projectId}`}
-					className="flex flex-col"
-				>
-					{project.workspaces.map((workspace) => (
-						<V2WorkspaceRow
-							key={workspace.id}
-							workspace={workspace}
-							isCurrentRoute={workspace.id === currentWorkspaceId}
-						/>
-					))}
-				</ul>
-			)}
-		</div>
+				{project.projectName}
+			</h3>
+			<span className="shrink-0 text-xs tabular-nums text-muted-foreground/60">
+				{project.workspaces.length}
+			</span>
+		</button>
 	);
 }

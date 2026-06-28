@@ -5,18 +5,19 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
-import { toast } from "@superset/ui/sonner";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { HiArrowRight, HiChevronDown } from "react-icons/hi2";
 import { AgentSelect } from "renderer/components/AgentSelect";
 import { env } from "renderer/env.renderer";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { useV2AgentChoices } from "renderer/hooks/useV2AgentChoices";
 import { authClient } from "renderer/lib/auth-client";
 import { showHostServiceUnavailableToast } from "renderer/lib/host-service-unavailable";
+import { useTrellisRuntimePack } from "renderer/lib/pack-system";
+import { toast } from "renderer/lib/toast";
 import { DevicePicker } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker";
 import { useWorkspaceHostOptions } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker/hooks/useWorkspaceHostOptions";
 import {
@@ -65,6 +66,7 @@ export function OpenInWorkspaceV2({ task }: OpenInWorkspaceV2Props) {
 		: (session?.session?.activeOrganizationId ?? null);
 
 	const { submit } = useWorkspaceCreates();
+	const trellisRuntimePack = useTrellisRuntimePack();
 	const lastProjectId = useV2WorkspaceCreateDefaultsStore(
 		(state) => state.lastProjectId,
 	);
@@ -209,7 +211,7 @@ export function OpenInWorkspaceV2({ task }: OpenInWorkspaceV2Props) {
 		activeHostUrl,
 	]);
 
-	const handleOpen = () => {
+	const handleOpen = async () => {
 		if (submitBlocker) {
 			if (hostId === machineId && !activeHostUrl) {
 				showHostServiceUnavailableToast(hostService, {
@@ -233,6 +235,10 @@ export function OpenInWorkspaceV2({ task }: OpenInWorkspaceV2Props) {
 							prompt: synthesizeTaskPrompt(task),
 						},
 					];
+		const trellisSetup = await trellisRuntimePack.prepareTrellisSetup({
+			initialize: trellisInitialize,
+			useLocalPack: hostId === machineId,
+		});
 
 		// Navigate optimistically — the host service uses our supplied id for new
 		// workspaces, so the route is correct in the common case. If the server
@@ -252,7 +258,7 @@ export function OpenInWorkspaceV2({ task }: OpenInWorkspaceV2Props) {
 				branch,
 				taskId: task.id,
 				agents,
-				trellisSetup: trellisInitialize ? { initialize: true } : undefined,
+				trellisSetup,
 			},
 		});
 
@@ -302,7 +308,7 @@ export function OpenInWorkspaceV2({ task }: OpenInWorkspaceV2Props) {
 									<span className="text-muted-foreground">Select project</span>
 								)}
 							</span>
-							<HiChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+							<ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -338,10 +344,10 @@ export function OpenInWorkspaceV2({ task }: OpenInWorkspaceV2Props) {
 					size="icon"
 					aria-label="Open in workspace"
 					className="h-8 w-8 shrink-0"
-					disabled={!!submitBlocker}
-					onClick={handleOpen}
+					disabled={!!submitBlocker || trellisRuntimePack.isResolving}
+					onClick={() => void handleOpen()}
 				>
-					<HiArrowRight className="w-3.5 h-3.5" />
+					<ArrowRight className="w-3.5 h-3.5" />
 				</Button>
 			</div>
 			<AgentSelect<SelectedAgent>

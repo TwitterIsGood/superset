@@ -1,9 +1,24 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { HOTKEYS, type HotkeyId } from "../registry";
 import { useHotkeyOverridesStore } from "../stores/hotkeyOverridesStore";
 import type { HotkeyDefinition, ShortcutBinding } from "../types";
 import { parseBinding } from "./binding";
-import {
+
+mock.module("renderer/lib/trpc-client", () => ({
+	electronReactClient: {},
+	electronTrpcClient: {
+		keyboardLayout: {
+			changes: {
+				subscribe: () => ({ unsubscribe: () => undefined }),
+			},
+			getCurrent: {
+				query: async () => null,
+			},
+		},
+	},
+}));
+
+const {
 	canonicalizeChord,
 	eventToChord,
 	isIgnorableKey,
@@ -12,7 +27,7 @@ import {
 	normalizeToken,
 	resolveHotkeyFromEvent,
 	TERMINAL_RESERVED_CHORDS,
-} from "./resolveHotkeyFromEvent";
+} = await import("./resolveHotkeyFromEvent");
 
 // Minimal stub — the renderer references `navigator` only at import time.
 // Bun's test runtime doesn't have a DOM navigator by default; registry.ts

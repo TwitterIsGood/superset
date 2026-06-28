@@ -1,6 +1,6 @@
 import { format } from "date-fns";
+import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
-import { HiArrowTopRightOnSquare } from "react-icons/hi2";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 
@@ -66,7 +66,7 @@ export function RecentInvoices() {
 								className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
 							>
 								View
-								<HiArrowTopRightOnSquare className="h-3 w-3" />
+								<ExternalLink className="h-3 w-3" />
 							</button>
 						) : null}
 					</div>

@@ -1,12 +1,12 @@
 import { cn } from "@superset/ui/utils";
 import { formatDistanceToNow } from "date-fns";
 import {
-	LuArrowUpRight,
-	LuCircleCheck,
-	LuCircleDashed,
-	LuCircleX,
-	LuGitBranch,
-} from "react-icons/lu";
+	ArrowUpRight,
+	CircleCheck,
+	CircleDashed,
+	CircleX,
+	GitBranch,
+} from "lucide-react";
 import { PRIcon, type PRState } from "renderer/screens/main/components/PRIcon";
 import type { ChecksRollup } from "../../../../utils/computeChecksStatus";
 import type { PullRequest } from "../../../../utils/getPRFlowState";
@@ -62,7 +62,7 @@ export function PRDetailCard({ pr, checks, linkState }: PRDetailCardProps) {
 
 			{pr.headRefName && (
 				<div className="flex items-center gap-1.5 px-3 pb-2 text-[11px] text-muted-foreground">
-					<LuGitBranch
+					<GitBranch
 						aria-hidden="true"
 						className="size-3 shrink-0 text-muted-foreground/70"
 					/>
@@ -89,7 +89,7 @@ export function PRDetailCard({ pr, checks, linkState }: PRDetailCardProps) {
 				className="group flex items-center justify-between border-t border-border/60 px-3 py-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 			>
 				<span>View on GitHub</span>
-				<LuArrowUpRight
+				<ArrowUpRight
 					aria-hidden="true"
 					className="size-3.5 text-muted-foreground/70 transition-transform group-hover:translate-x-px group-hover:-translate-y-px"
 				/>
@@ -107,7 +107,7 @@ function ChecksLine({ checks }: { checks: ChecksRollup }) {
 		return (
 			<DetailLine
 				icon={
-					<LuCircleCheck
+					<CircleCheck
 						aria-hidden="true"
 						className="size-3.5 shrink-0 text-emerald-500"
 					/>
@@ -121,7 +121,7 @@ function ChecksLine({ checks }: { checks: ChecksRollup }) {
 		return (
 			<DetailLine
 				icon={
-					<LuCircleX
+					<CircleX
 						aria-hidden="true"
 						className="size-3.5 shrink-0 text-rose-500"
 					/>
@@ -135,7 +135,7 @@ function ChecksLine({ checks }: { checks: ChecksRollup }) {
 	return (
 		<DetailLine
 			icon={
-				<LuCircleDashed
+				<CircleDashed
 					aria-hidden="true"
 					className="size-3.5 shrink-0 text-amber-500"
 				/>

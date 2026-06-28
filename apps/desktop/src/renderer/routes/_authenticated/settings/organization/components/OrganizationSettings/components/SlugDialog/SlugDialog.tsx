@@ -1,4 +1,3 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@superset/ui/button";
 import {
 	Dialog,
@@ -16,27 +15,41 @@ import {
 	FormMessage,
 } from "@superset/ui/form";
 import { Input } from "@superset/ui/input";
-import { toast } from "@superset/ui/sonner";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type FieldErrors, type Resolver, useForm } from "react-hook-form";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { authClient } from "renderer/lib/auth-client";
-import { z } from "zod";
+import { toast } from "renderer/lib/toast";
 
-const slugSchema = z.object({
-	slug: z
-		.string()
-		.min(3, "Slug must be at least 3 characters")
-		.max(50)
-		.regex(
-			/^[a-z0-9-]+$/,
-			"Slug can only contain lowercase letters, numbers, and hyphens",
-		)
-		.regex(/^[a-z0-9]/, "Slug must start with a letter or number")
-		.regex(/[a-z0-9]$/, "Slug must end with a letter or number"),
-});
+interface SlugFormValues {
+	slug: string;
+}
 
-type SlugFormValues = z.infer<typeof slugSchema>;
+function getSlugValidationMessage(slug: string): string | null {
+	if (slug.length < 3) return "Slug must be at least 3 characters";
+	if (slug.length > 50) return "Slug must be at most 50 characters";
+	if (!/^[a-z0-9-]+$/.test(slug)) {
+		return "Slug can only contain lowercase letters, numbers, and hyphens";
+	}
+	if (!/^[a-z0-9]/.test(slug)) {
+		return "Slug must start with a letter or number";
+	}
+	if (!/[a-z0-9]$/.test(slug)) {
+		return "Slug must end with a letter or number";
+	}
+	return null;
+}
+
+const slugFormResolver: Resolver<SlugFormValues> = async (values) => {
+	const message = getSlugValidationMessage(values.slug);
+	const errors: FieldErrors<SlugFormValues> = {};
+	if (message) {
+		errors.slug = { type: "validate", message };
+	}
+	return Object.keys(errors).length
+		? { values: {}, errors }
+		: { values, errors: {} };
+};
 
 interface SlugDialogProps {
 	open: boolean;
@@ -57,7 +70,7 @@ export function SlugDialog({
 	const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
 
 	const slugForm = useForm<SlugFormValues>({
-		resolver: zodResolver(slugSchema),
+		resolver: slugFormResolver,
 		defaultValues: {
 			slug: currentSlug,
 		},

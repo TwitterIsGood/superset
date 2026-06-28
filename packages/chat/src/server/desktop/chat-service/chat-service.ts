@@ -1,4 +1,3 @@
-import { createAuthStorage } from "mastracode";
 import {
 	getCredentialsFromConfig as getAnthropicCredentialsFromConfig,
 	getCredentialsFromKeychain as getAnthropicCredentialsFromKeychain,
@@ -23,7 +22,11 @@ import {
 	parseAnthropicEnvText,
 	setAnthropicEnvConfig as setAnthropicEnvConfigOnDisk,
 } from "./anthropic-env-config";
-import type { AuthStatus } from "./auth-storage-types";
+import {
+	createSupersetAuthStorage,
+	type ResolveMastracodeAuthStorageImport,
+} from "./auth-storage";
+import type { AuthStatus, AuthStorageLike } from "./auth-storage-types";
 import {
 	backupApiKeyBeforeOAuth,
 	clearApiKeyForProvider,
@@ -40,8 +43,6 @@ import {
 	OpenAIOAuthLoopback,
 	parseLoopbackTargetFromAuthUrl,
 } from "./openai-oauth-loopback";
-
-type OpenAIAuthStorage = ReturnType<typeof createAuthStorage>;
 
 function hasAnthropicEnvCredential(variables: AnthropicEnvVariables): boolean {
 	return Boolean(
@@ -61,16 +62,20 @@ function stripAnthropicCredentialEnvVariables(
 
 interface ChatServiceOptions {
 	anthropicEnvConfigPath?: string;
+	resolveMastracodeImportPath?: ResolveMastracodeAuthStorageImport;
 }
 
 export class ChatService {
-	private authStorage: OpenAIAuthStorage | null = null;
+	private authStorage: AuthStorageLike | null = null;
 	private readonly oauthFlowController = new OAuthFlowController(() =>
 		this.getAuthStorage(),
 	);
 	private openAIOAuthLoopback: OpenAIOAuthLoopback | null = null;
 	private pendingOpenAIOAuthCallbackUrl: string | null = null;
 	private readonly anthropicEnvConfigPath: string | undefined;
+	private readonly resolveMastracodeImportPath:
+		| ResolveMastracodeAuthStorageImport
+		| undefined;
 	private currentAnthropicRuntimeEnv: AnthropicRuntimeEnv = {};
 	private static readonly ANTHROPIC_AUTH_SESSION_TTL_MS = 10 * 60 * 1000;
 	private static readonly OPENAI_AUTH_SESSION_TTL_MS = 10 * 60 * 1000;
@@ -78,6 +83,7 @@ export class ChatService {
 
 	constructor(options?: ChatServiceOptions) {
 		this.anthropicEnvConfigPath = options?.anthropicEnvConfigPath;
+		this.resolveMastracodeImportPath = options?.resolveMastracodeImportPath;
 		const persistedConfig = getAnthropicEnvConfigFromDisk({
 			configPath: this.anthropicEnvConfigPath,
 		});
@@ -613,11 +619,11 @@ export class ChatService {
 		};
 	}
 
-	private getAuthStorage(): OpenAIAuthStorage {
+	private getAuthStorage(): AuthStorageLike {
 		if (!this.authStorage) {
-			// Standalone auth storage bootstrap.
-			// This path intentionally avoids full createMastraCode runtime initialization.
-			this.authStorage = createAuthStorage();
+			this.authStorage = createSupersetAuthStorage({
+				resolveMastracodeImportPath: this.resolveMastracodeImportPath,
+			});
 		}
 		return this.authStorage;
 	}

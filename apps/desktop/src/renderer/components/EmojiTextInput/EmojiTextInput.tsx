@@ -1,14 +1,16 @@
 import { cn } from "@superset/ui/utils";
 import { Extension } from "@tiptap/core";
 import { Document } from "@tiptap/extension-document";
-import { EmojiSuggestionPluginKey } from "@tiptap/extension-emoji";
 import { History } from "@tiptap/extension-history";
 import { Paragraph } from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Text } from "@tiptap/extension-text";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { useEffect } from "react";
-import { EmojiSuggestion } from "renderer/components/MarkdownEditor/components/EmojiSuggestion";
+import {
+	EmojiSuggestion,
+	emojiSuggestionKey,
+} from "renderer/components/MarkdownEditor/components/EmojiSuggestion";
 
 /** Doc that allows exactly one paragraph — no block splitting. */
 const SingleLineDocument = Document.extend({
@@ -24,8 +26,8 @@ const NoLineBreaks = Extension.create<{ onEnter?: () => void }>({
 	addKeyboardShortcuts() {
 		const guarded = ({ editor }: { editor: { state: unknown } }) => {
 			// If the emoji suggestion popup is open, let it handle Enter (select).
-			const emojiState = EmojiSuggestionPluginKey.getState(
-				editor.state as Parameters<typeof EmojiSuggestionPluginKey.getState>[0],
+			const emojiState = emojiSuggestionKey.getState(
+				editor.state as Parameters<typeof emojiSuggestionKey.getState>[0],
 			) as { active?: boolean } | undefined;
 			if (emojiState?.active) return false;
 			this.options.onEnter?.();

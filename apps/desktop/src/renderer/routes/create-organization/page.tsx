@@ -1,4 +1,3 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@superset/ui/button";
 import { Card, CardContent, CardHeader } from "@superset/ui/card";
 import {
@@ -11,37 +10,64 @@ import {
 	FormMessage,
 } from "@superset/ui/form";
 import { Input } from "@superset/ui/input";
-import { toast } from "@superset/ui/sonner";
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type FieldErrors, type Resolver, useForm } from "react-hook-form";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { authClient } from "renderer/lib/auth-client";
 import { electronTrpc } from "renderer/lib/electron-trpc";
-import { z } from "zod";
+import { toast } from "renderer/lib/toast";
 
 export const Route = createFileRoute("/create-organization/")({
 	component: CreateOrganization,
 });
 
-const formSchema = z.object({
-	name: z.string().min(1, "Organization name is required").max(100),
-	slug: z
-		.string()
-		.min(3, "Slug must be at least 3 characters")
-		.max(50)
-		.regex(
-			/^[a-z0-9-]+$/,
-			"Slug can only contain lowercase letters, numbers, and hyphens",
-		)
-		.regex(/^[a-z0-9]/, "Slug must start with a letter or number")
-		.regex(/[a-z0-9]$/, "Slug must end with a letter or number"),
-});
+interface FormValues {
+	name: string;
+	slug: string;
+}
 
-type FormValues = z.infer<typeof formSchema>;
+function getSlugValidationMessage(slug: string): string | null {
+	if (slug.length < 3) return "Slug must be at least 3 characters";
+	if (slug.length > 50) return "Slug must be at most 50 characters";
+	if (!/^[a-z0-9-]+$/.test(slug)) {
+		return "Slug can only contain lowercase letters, numbers, and hyphens";
+	}
+	if (!/^[a-z0-9]/.test(slug)) {
+		return "Slug must start with a letter or number";
+	}
+	if (!/[a-z0-9]$/.test(slug)) {
+		return "Slug must end with a letter or number";
+	}
+	return null;
+}
 
-export function CreateOrganization() {
+const organizationFormResolver: Resolver<FormValues> = async (values) => {
+	const errors: FieldErrors<FormValues> = {};
+	if (!values.name.trim()) {
+		errors.name = {
+			type: "validate",
+			message: "Organization name is required",
+		};
+	} else if (values.name.length > 100) {
+		errors.name = {
+			type: "validate",
+			message: "Organization name must be at most 100 characters",
+		};
+	}
+
+	const slugMessage = getSlugValidationMessage(values.slug);
+	if (slugMessage) {
+		errors.slug = { type: "validate", message: slugMessage };
+	}
+
+	return Object.keys(errors).length
+		? { values: {}, errors }
+		: { values, errors: {} };
+};
+
+function CreateOrganization() {
 	const { data: session } = authClient.useSession();
 	const isSignedIn = !!session?.user;
 	const activeOrganizationId = session?.session?.activeOrganizationId;
@@ -53,7 +79,7 @@ export function CreateOrganization() {
 	const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
 
 	const form = useForm<FormValues>({
-		resolver: zodResolver(formSchema),
+		resolver: organizationFormResolver,
 		defaultValues: {
 			name: "",
 			slug: "",

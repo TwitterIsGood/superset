@@ -2,9 +2,6 @@ import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import { z } from "zod";
 import type { ChatService } from "../chat-service";
-import { getSlashCommands, resolveSlashCommand } from "../slash-commands";
-import { searchFiles } from "./file-search";
-import { getMcpOverview } from "./mcp-overview";
 
 const t = initTRPC.create({ transformer: superjson });
 
@@ -49,7 +46,34 @@ export const openAIApiKeyInput = z.object({
 	apiKey: z.string().min(1),
 });
 
-function resolveWorkspaceSlashCommand(input: { cwd: string; text: string }) {
+type SlashCommandsModule = typeof import("../slash-commands");
+type FileSearchModule = typeof import("./file-search");
+type McpOverviewModule = typeof import("./mcp-overview");
+
+let slashCommandsModulePromise: Promise<SlashCommandsModule> | null = null;
+let fileSearchModulePromise: Promise<FileSearchModule> | null = null;
+let mcpOverviewModulePromise: Promise<McpOverviewModule> | null = null;
+
+function loadSlashCommandsModule(): Promise<SlashCommandsModule> {
+	slashCommandsModulePromise ??= import("../slash-commands");
+	return slashCommandsModulePromise;
+}
+
+function loadFileSearchModule(): Promise<FileSearchModule> {
+	fileSearchModulePromise ??= import("./file-search");
+	return fileSearchModulePromise;
+}
+
+function loadMcpOverviewModule(): Promise<McpOverviewModule> {
+	mcpOverviewModulePromise ??= import("./mcp-overview");
+	return mcpOverviewModulePromise;
+}
+
+async function resolveWorkspaceSlashCommand(input: {
+	cwd: string;
+	text: string;
+}) {
+	const { resolveSlashCommand } = await loadSlashCommandsModule();
 	return resolveSlashCommand(input.cwd, input.text);
 }
 
@@ -59,6 +83,7 @@ export function createChatServiceRouter(service: ChatService) {
 			searchFiles: t.procedure
 				.input(searchFilesInput)
 				.query(async ({ input }) => {
+					const { searchFiles } = await loadFileSearchModule();
 					return searchFiles({
 						rootPath: input.rootPath,
 						query: input.query,
@@ -70,12 +95,14 @@ export function createChatServiceRouter(service: ChatService) {
 			getSlashCommands: t.procedure
 				.input(getSlashCommandsInput)
 				.query(async ({ input }) => {
+					const { getSlashCommands } = await loadSlashCommandsModule();
 					return getSlashCommands(input.cwd);
 				}),
 
 			getMcpOverview: t.procedure
 				.input(getMcpOverviewInput)
 				.query(async ({ input }) => {
+					const { getMcpOverview } = await loadMcpOverviewModule();
 					return getMcpOverview(input.cwd);
 				}),
 

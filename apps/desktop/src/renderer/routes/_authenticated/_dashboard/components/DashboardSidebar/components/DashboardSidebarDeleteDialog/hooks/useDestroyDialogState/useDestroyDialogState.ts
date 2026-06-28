@@ -1,4 +1,3 @@
-import { toast } from "@superset/ui/sonner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
 	DestroyWorkspacePreview,
@@ -9,6 +8,7 @@ import {
 	useDestroyWorkspace,
 } from "renderer/hooks/host-service/useDestroyWorkspace";
 import { useV2UserPreferences } from "renderer/hooks/useV2UserPreferences/useV2UserPreferences";
+import { toast } from "renderer/lib/toast";
 import { useNavigateAwayFromWorkspace } from "renderer/routes/_authenticated/_dashboard/components/DashboardSidebar/hooks/useNavigateAwayFromWorkspace";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { waitForWorkspaceDeleted } from "renderer/routes/_authenticated/providers/CollectionsProvider/workspaceSyncWaits";

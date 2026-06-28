@@ -1,17 +1,15 @@
-import { toast } from "@superset/ui/sonner";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { FitAddon } from "@xterm/addon-fit";
-import { ImageAddon } from "@xterm/addon-image";
-import { LigaturesAddon } from "@xterm/addon-ligatures";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
-import { WebglAddon } from "@xterm/addon-webgl";
+import type { WebglAddon } from "@xterm/addon-webgl";
 import type { ITheme } from "@xterm/xterm";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { applyTerminalFontFamilyCssVariable } from "renderer/lib/terminal/appearance";
 import { Utf8Base64 } from "renderer/lib/terminal/clipboard-base64";
 import type { DetectedLink } from "renderer/lib/terminal/links";
 import { TerminalLinkManager } from "renderer/lib/terminal/terminal-link-manager";
+import { toast } from "renderer/lib/toast";
 import { electronTrpcClient as trpcClient } from "renderer/lib/trpc-client";
 import { toXtermTheme } from "renderer/stores/theme/utils";
 import {
@@ -61,6 +59,10 @@ export function getDefaultTerminalBg(): string {
 // Once WebGL fails, skip it for all subsequent terminals (VS Code pattern).
 let suggestedRendererType: "webgl" | "dom" | undefined;
 
+function canUseWebglRenderer(): boolean {
+	return suggestedRendererType !== "dom";
+}
+
 export interface CreateTerminalOptions {
 	/**
 	 * Workspace id used for worktree lookup during path stat/resolution.
@@ -104,7 +106,6 @@ export function createTerminalInWrapper(options: CreateTerminalOptions = {}): {
 	// Utf8Base64 replaces the addon's UTF-8-unsafe default codec (#4839).
 	const clipboardAddon = new ClipboardAddon(new Utf8Base64());
 	const unicode11Addon = new Unicode11Addon();
-	const imageAddon = new ImageAddon();
 
 	let disposed = false;
 	let webglAddon: WebglAddon | null = null;
@@ -123,31 +124,34 @@ export function createTerminalInWrapper(options: CreateTerminalOptions = {}): {
 	xterm.loadAddon(searchAddon);
 	xterm.loadAddon(clipboardAddon);
 	xterm.loadAddon(unicode11Addon);
-	xterm.loadAddon(imageAddon);
-
-	try {
-		xterm.loadAddon(new LigaturesAddon());
-	} catch {
-		// Ligatures not supported by current font
-	}
 
 	// Defer WebGL to rAF to avoid racing xterm's post-open viewport sync.
 	const rafId = requestAnimationFrame(() => {
-		if (disposed || suggestedRendererType === "dom") return;
+		void (async () => {
+			if (disposed || !canUseWebglRenderer()) return;
 
-		try {
-			webglAddon = new WebglAddon();
-			webglAddon.onContextLoss(() => {
-				webglAddon?.dispose();
+			try {
+				const { WebglAddon } = await import("@xterm/addon-webgl");
+				if (disposed || !canUseWebglRenderer()) return;
+
+				const addon = new WebglAddon();
+				webglAddon = addon;
+				addon.onContextLoss(() => {
+					addon.dispose();
+					if (webglAddon === addon) {
+						webglAddon = null;
+					}
+					suggestedRendererType = "dom";
+					xterm.refresh(0, xterm.rows - 1);
+				});
+				xterm.loadAddon(addon);
+			} catch {
+				if (!disposed) {
+					suggestedRendererType = "dom";
+				}
 				webglAddon = null;
-				suggestedRendererType = "dom";
-				xterm.refresh(0, xterm.rows - 1);
-			});
-			xterm.loadAddon(webglAddon);
-		} catch {
-			suggestedRendererType = "dom";
-			webglAddon = null;
-		}
+			}
+		})();
 	});
 
 	const cleanupQuerySuppression = suppressQueryResponses(xterm);

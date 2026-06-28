@@ -7,7 +7,7 @@ import {
 	SelectValue,
 } from "@superset/ui/select";
 import { TableCell, TableRow } from "@superset/ui/table";
-import { HiOutlineTrash } from "react-icons/hi2";
+import { Trash2 } from "lucide-react";
 
 export interface MemberRowData {
 	usersHostsId: string;
@@ -62,7 +62,7 @@ export function MemberRow({
 						onClick={() => onRemove(member)}
 						aria-label={`Remove ${member.name}`}
 					>
-						<HiOutlineTrash className="h-4 w-4" />
+						<Trash2 className="h-4 w-4" />
 					</Button>
 				</TableCell>
 			)}

@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+	hasObjectStorageObject,
+	probeObjectStorageWriteAccess,
+	putObjectStorageObject,
 	readCapabilityArtifactReference,
 	storeCapabilityArtifact,
 } from "./artifact-storage";
@@ -56,6 +59,112 @@ afterEach(() => {
 });
 
 describe("capability artifact storage", () => {
+	test("uploads generic object-storage objects with signed S3 PUT", async () => {
+		configureObjectStorage();
+		const calls: Array<{ url: string; method: string; headers: Headers }> = [];
+		globalThis.fetch = async (input, init) => {
+			calls.push({
+				url: input.toString(),
+				method: init?.method ?? "GET",
+				headers: new Headers(init?.headers),
+			});
+			return new Response(null, { status: 200 });
+		};
+
+		await putObjectStorageObject({
+			key: "packs/trellis-runtime/1.0.0/manifest.json",
+			body: new TextEncoder().encode("{}"),
+			contentType: "application/json",
+		});
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0]).toMatchObject({
+			method: "PUT",
+			url: "http://127.0.0.1:9000/superset-artifacts/packs/trellis-runtime/1.0.0/manifest.json",
+		});
+		expect(calls[0]?.headers.get("content-type")).toBe("application/json");
+		expect(calls[0]?.headers.get("authorization")).toContain(
+			"AWS4-HMAC-SHA256",
+		);
+	});
+
+	test("checks object-storage object existence with signed S3 HEAD", async () => {
+		configureObjectStorage();
+		const calls: Array<{ url: string; method: string; headers: Headers }> = [];
+		globalThis.fetch = async (input, init) => {
+			calls.push({
+				url: input.toString(),
+				method: init?.method ?? "GET",
+				headers: new Headers(init?.headers),
+			});
+			return new Response(null, { status: 200 });
+		};
+
+		await expect(
+			hasObjectStorageObject("packs/trellis-runtime/1.0.0/manifest.json"),
+		).resolves.toBe(true);
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0]).toMatchObject({
+			method: "HEAD",
+			url: "http://127.0.0.1:9000/superset-artifacts/packs/trellis-runtime/1.0.0/manifest.json",
+		});
+		expect(calls[0]?.headers.get("authorization")).toContain(
+			"AWS4-HMAC-SHA256",
+		);
+	});
+
+	test("treats missing object-storage objects as absent", async () => {
+		configureObjectStorage();
+		globalThis.fetch = async () => new Response(null, { status: 404 });
+
+		await expect(
+			hasObjectStorageObject("packs/trellis-runtime/1.0.0/missing.tgz"),
+		).resolves.toBe(false);
+	});
+
+	test("probes object-storage write access with a small temporary object", async () => {
+		configureObjectStorage();
+		const calls: Array<{ url: string; method: string; body?: unknown }> = [];
+		globalThis.fetch = async (input, init) => {
+			calls.push({
+				url: input.toString(),
+				method: init?.method ?? "GET",
+				body: init?.body,
+			});
+			return new Response(null, { status: 200 });
+		};
+
+		await expect(probeObjectStorageWriteAccess()).resolves.toBeUndefined();
+
+		expect(calls).toHaveLength(2);
+		expect(calls[0]?.method).toBe("PUT");
+		expect(calls[0]?.url).toMatch(
+			/^http:\/\/127\.0\.0\.1:9000\/superset-artifacts\/packs\/\.release-probe\/probe-/,
+		);
+		expect(calls[1]?.method).toBe("DELETE");
+		expect(calls[1]?.url).toBe(calls[0]?.url);
+	});
+
+	test("explains object-storage endpoint connectivity failures", async () => {
+		configureObjectStorage();
+		globalThis.fetch = async () => {
+			throw new Error(
+				"Unable to connect. Is the computer able to access the url?",
+			);
+		};
+
+		await expect(
+			putObjectStorageObject({
+				key: "packs/trellis-runtime/1.0.0/manifest.json",
+				body: new TextEncoder().encode("{}"),
+				contentType: "application/json",
+			}),
+		).rejects.toThrow(
+			"Object storage PUT request could not reach http://127.0.0.1:9000",
+		);
+	});
+
 	test("stores object-storage artifacts behind an internal reference", async () => {
 		configureObjectStorage();
 		const calls: Array<{ url: string; method: string; headers: Headers }> = [];

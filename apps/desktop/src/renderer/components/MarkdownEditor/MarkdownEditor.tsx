@@ -2,7 +2,7 @@ import "highlight.js/styles/github-dark.css";
 import "./markdown-editor.css";
 
 import { cn } from "@superset/ui/utils";
-import { Extension } from "@tiptap/core";
+import { type AnyExtension, Extension } from "@tiptap/core";
 import { Blockquote } from "@tiptap/extension-blockquote";
 import { Bold } from "@tiptap/extension-bold";
 import { BulletList } from "@tiptap/extension-bullet-list";
@@ -33,15 +33,14 @@ import {
 	useEditor,
 } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { common, createLowlight } from "lowlight";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BubbleMenuToolbar } from "renderer/components/MarkdownRenderer/components/TipTapMarkdownRenderer/components/BubbleMenuToolbar";
 import { env } from "renderer/env.renderer";
 import { useInlineUrlPolicy } from "renderer/lib/clickPolicy";
+import { createMarkdownLowlight } from "renderer/lib/tiptap/createMarkdownLowlight";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { Markdown } from "tiptap-markdown";
 import { CodeBlockView } from "./components/CodeBlockView";
-import { EmojiSuggestion } from "./components/EmojiSuggestion";
 import {
 	FileMentionNode,
 	type FileMentionSearchFn,
@@ -49,7 +48,7 @@ import {
 } from "./components/FileMention";
 import { SlashCommand } from "./components/SlashCommand";
 
-const lowlight = createLowlight(common);
+const lowlight = createMarkdownLowlight();
 
 const LINEAR_IMAGE_HOST = "uploads.linear.app";
 
@@ -189,6 +188,8 @@ export function MarkdownEditor({
 	const showEmoji = features?.emoji ?? true;
 	const showFileMention = features?.fileMention ?? true;
 	const showBubbleMenu = features?.bubbleMenu ?? true;
+	const [EmojiSuggestionExtension, setEmojiSuggestionExtension] =
+		useState<AnyExtension | null>(null);
 	// useEditor captures extensions on first render, so searchFiles gets frozen
 	// at its initial (likely stale, since projectId resolves in an effect) value.
 	// Thread through a ref so the extension reads the live callback each fire.
@@ -198,179 +199,197 @@ export function MarkdownEditor({
 
 	const urlPolicy = useInlineUrlPolicy();
 
-	const editor = useEditor({
-		autofocus: autoFocus === true ? "end" : autoFocus || false,
-		extensions: [
-			Document,
-			Text,
-			Paragraph.configure({
-				HTMLAttributes: { class: "my-0 leading-relaxed" },
-			}),
-			StyledHeading.configure({ levels: [1, 2, 3, 4, 5, 6] }),
-			Bold.configure({
-				HTMLAttributes: { class: "font-semibold" },
-			}),
-			Italic.configure({
-				HTMLAttributes: { class: "italic" },
-			}),
-			Strike.configure({
-				HTMLAttributes: { class: "line-through" },
-			}),
-			Underline.configure({
-				HTMLAttributes: { class: "underline" },
-			}),
-			Code.configure({
-				HTMLAttributes: {
-					class: "font-mono text-sm px-1 py-0.5 rounded bg-muted",
-				},
-			}),
-			CodeBlockLowlight.extend({
-				addNodeView() {
-					return ReactNodeViewRenderer(CodeBlockView);
-				},
-			}).configure({
-				lowlight,
-				HTMLAttributes: {
-					class:
-						"my-3 p-3 rounded-md bg-muted overflow-x-auto font-mono text-sm",
-				},
-			}),
-			BulletList.configure({
-				HTMLAttributes: {
-					class: "task-markdown-list mt-0 pl-6",
-				},
-			}),
-			OrderedList.configure({
-				HTMLAttributes: { class: "mt-0 mb-3 pl-6 list-decimal" },
-			}),
-			ListItem.configure({
-				HTMLAttributes: {},
-			}),
-			TaskList.configure({
-				HTMLAttributes: { class: "mt-0 mb-3 pl-0 list-none" },
-			}),
-			TaskItem.configure({
-				HTMLAttributes: { class: "flex items-start gap-2 mb-1" },
-				nested: true,
-			}),
-			Blockquote.configure({
-				HTMLAttributes: {
-					class: "my-3 pl-4 border-l-2 border-border text-muted-foreground",
-				},
-			}),
-			HorizontalRule.configure({
-				HTMLAttributes: { class: "my-6 border-none border-t border-border" },
-			}),
-			HardBreak,
-			History,
-			Link.configure({
-				openOnClick: false,
-				HTMLAttributes: { class: "text-primary underline" },
-			}),
-			LinearImage.configure({
-				HTMLAttributes: { class: "max-w-full h-auto rounded-md my-3" },
-			}),
-			TableKit.configure({
-				table: {
-					resizable: false,
-					cellMinWidth: 192,
+	useEffect(() => {
+		if (!showEmoji || EmojiSuggestionExtension) return;
+
+		let cancelled = false;
+		void import("./components/EmojiSuggestion").then(({ EmojiSuggestion }) => {
+			if (!cancelled) {
+				setEmojiSuggestionExtension(EmojiSuggestion);
+			}
+		});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [EmojiSuggestionExtension, showEmoji]);
+
+	const editor = useEditor(
+		{
+			autofocus: autoFocus === true ? "end" : autoFocus || false,
+			extensions: [
+				Document,
+				Text,
+				Paragraph.configure({
+					HTMLAttributes: { class: "my-0 leading-relaxed" },
+				}),
+				StyledHeading.configure({ levels: [1, 2, 3, 4, 5, 6] }),
+				Bold.configure({
+					HTMLAttributes: { class: "font-semibold" },
+				}),
+				Italic.configure({
+					HTMLAttributes: { class: "italic" },
+				}),
+				Strike.configure({
+					HTMLAttributes: { class: "line-through" },
+				}),
+				Underline.configure({
+					HTMLAttributes: { class: "underline" },
+				}),
+				Code.configure({
 					HTMLAttributes: {
-						class: "markdown-table my-4 min-w-full border-collapse",
+						class: "font-mono text-sm px-1 py-0.5 rounded bg-muted",
 					},
-				},
-				tableHeader: {
+				}),
+				CodeBlockLowlight.extend({
+					addNodeView() {
+						return ReactNodeViewRenderer(CodeBlockView);
+					},
+				}).configure({
+					lowlight,
 					HTMLAttributes: {
 						class:
-							"bg-muted px-4 py-2 text-left text-sm font-semibold align-top",
+							"my-3 p-3 rounded-md bg-muted overflow-x-auto font-mono text-sm",
 					},
-				},
-				tableCell: {
+				}),
+				BulletList.configure({
 					HTMLAttributes: {
-						class: "border-t border-border px-4 py-2 text-sm align-top",
+						class: "task-markdown-list mt-0 pl-6",
 					},
+				}),
+				OrderedList.configure({
+					HTMLAttributes: { class: "mt-0 mb-3 pl-6 list-decimal" },
+				}),
+				ListItem.configure({
+					HTMLAttributes: {},
+				}),
+				TaskList.configure({
+					HTMLAttributes: { class: "mt-0 mb-3 pl-0 list-none" },
+				}),
+				TaskItem.configure({
+					HTMLAttributes: { class: "flex items-start gap-2 mb-1" },
+					nested: true,
+				}),
+				Blockquote.configure({
+					HTMLAttributes: {
+						class: "my-3 pl-4 border-l-2 border-border text-muted-foreground",
+					},
+				}),
+				HorizontalRule.configure({
+					HTMLAttributes: { class: "my-6 border-none border-t border-border" },
+				}),
+				HardBreak,
+				History,
+				Link.configure({
+					openOnClick: false,
+					HTMLAttributes: { class: "text-primary underline" },
+				}),
+				LinearImage.configure({
+					HTMLAttributes: { class: "max-w-full h-auto rounded-md my-3" },
+				}),
+				TableKit.configure({
+					table: {
+						resizable: false,
+						cellMinWidth: 192,
+						HTMLAttributes: {
+							class: "markdown-table my-4 min-w-full border-collapse",
+						},
+					},
+					tableHeader: {
+						HTMLAttributes: {
+							class:
+								"bg-muted px-4 py-2 text-left text-sm font-semibold align-top",
+						},
+					},
+					tableCell: {
+						HTMLAttributes: {
+							class: "border-t border-border px-4 py-2 text-sm align-top",
+						},
+					},
+				}),
+				Placeholder.configure({
+					placeholder: ({ node }) => {
+						if (node.type.name === "paragraph") {
+							return placeholder;
+						}
+						return "";
+					},
+					showOnlyCurrent: false,
+					emptyNodeClass:
+						"first:before:text-muted-foreground first:before:float-left first:before:h-0 first:before:pointer-events-none first:before:content-[attr(data-placeholder)]",
+				}),
+				Markdown.configure({
+					html: true,
+					transformPastedText: true,
+					transformCopiedText: true,
+				}),
+				...(showSlashCommand ? [SlashCommand] : []),
+				...(EmojiSuggestionExtension ? [EmojiSuggestionExtension] : []),
+				...(showFileMention
+					? [
+							FileMentionNode,
+							FileMentionSuggestion.configure({
+								searchFiles: (query) =>
+									searchFilesRef.current?.(query) ?? Promise.resolve([]),
+							}),
+						]
+					: []),
+				KeyboardHandler,
+			],
+			content,
+			editorProps: {
+				attributes: {
+					class: cn("focus:outline-none min-h-[100px]", editorClassName),
 				},
-			}),
-			Placeholder.configure({
-				placeholder: ({ node }) => {
-					if (node.type.name === "paragraph") {
-						return placeholder;
+				handleKeyDown: (_, event) => {
+					if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+						onModEnter?.();
+						return true;
 					}
-					return "";
-				},
-				showOnlyCurrent: false,
-				emptyNodeClass:
-					"first:before:text-muted-foreground first:before:float-left first:before:h-0 first:before:pointer-events-none first:before:content-[attr(data-placeholder)]",
-			}),
-			Markdown.configure({
-				html: true,
-				transformPastedText: true,
-				transformCopiedText: true,
-			}),
-			...(showSlashCommand ? [SlashCommand] : []),
-			...(showEmoji ? [EmojiSuggestion] : []),
-			...(showFileMention
-				? [
-						FileMentionNode,
-						FileMentionSuggestion.configure({
-							searchFiles: (query) =>
-								searchFilesRef.current?.(query) ?? Promise.resolve([]),
-						}),
-					]
-				: []),
-			KeyboardHandler,
-		],
-		content,
-		editorProps: {
-			attributes: {
-				class: cn("focus:outline-none min-h-[100px]", editorClassName),
-			},
-			handleKeyDown: (_, event) => {
-				if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-					onModEnter?.();
-					return true;
-				}
-				return false;
-			},
-			handlePaste: (_, event) => {
-				const text = event.clipboardData?.getData("text/plain") ?? "";
-				const currentEditor = editorRef.current;
-				if (!currentEditor || !isMarkdownTable(text)) {
 					return false;
-				}
+				},
+				handlePaste: (_, event) => {
+					const text = event.clipboardData?.getData("text/plain") ?? "";
+					const currentEditor = editorRef.current;
+					if (!currentEditor || !isMarkdownTable(text)) {
+						return false;
+					}
 
-				event.preventDefault();
-				return currentEditor.commands.insertContentAt(
-					{
-						from: currentEditor.state.selection.from,
-						to: currentEditor.state.selection.to,
-					},
-					text,
-				);
+					event.preventDefault();
+					return currentEditor.commands.insertContentAt(
+						{
+							from: currentEditor.state.selection.from,
+							to: currentEditor.state.selection.to,
+						},
+						text,
+					);
+				},
+				handleClickOn: (_view, _pos, _node, _nodePos, event) => {
+					const target = event.target as HTMLElement | null;
+					const anchor = target?.closest?.("a") as HTMLAnchorElement | null;
+					if (!anchor) return false;
+					const href = anchor.getAttribute("href");
+					if (!href) return false;
+					// No pane context here, so "pane" and "external" both route to the
+					// system browser. Null means do nothing — fall through to ProseMirror
+					// so the user can still click into the link to place a cursor.
+					if (urlPolicy.getAction(event) === null) return false;
+					event.preventDefault();
+					electronTrpcClient.external.openUrl.mutate(href).catch((error) => {
+						console.error("[MarkdownEditor] Failed to open URL:", href, error);
+					});
+					return true;
+				},
 			},
-			handleClickOn: (_view, _pos, _node, _nodePos, event) => {
-				const target = event.target as HTMLElement | null;
-				const anchor = target?.closest?.("a") as HTMLAnchorElement | null;
-				if (!anchor) return false;
-				const href = anchor.getAttribute("href");
-				if (!href) return false;
-				// No pane context here, so "pane" and "external" both route to the
-				// system browser. Null means do nothing — fall through to ProseMirror
-				// so the user can still click into the link to place a cursor.
-				if (urlPolicy.getAction(event) === null) return false;
-				event.preventDefault();
-				electronTrpcClient.external.openUrl.mutate(href).catch((error) => {
-					console.error("[MarkdownEditor] Failed to open URL:", href, error);
-				});
-				return true;
+			onUpdate: ({ editor }) => {
+				onChange?.(getMarkdown(editor));
+			},
+			onBlur: ({ editor }) => {
+				onSave?.(getMarkdown(editor));
 			},
 		},
-		onUpdate: ({ editor }) => {
-			onChange?.(getMarkdown(editor));
-		},
-		onBlur: ({ editor }) => {
-			onSave?.(getMarkdown(editor));
-		},
-	});
+		[EmojiSuggestionExtension],
+	);
 	editorRef.current = editor;
 
 	useEffect(() => {

@@ -1,4 +1,5 @@
 import type { RendererContext } from "@superset/panes";
+import { Check } from "lucide-react";
 import {
 	type ReactNode,
 	useCallback,
@@ -6,7 +7,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { LuCheck } from "react-icons/lu";
 import { CommentMarkdown } from "renderer/components/CommentMarkdown";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import type { CommentPaneData, PaneViewerData } from "../../../../types";
@@ -88,7 +88,7 @@ function CopyableTable({ children }: { children?: ReactNode }) {
 			>
 				{copied ? (
 					<span className="flex items-center gap-1">
-						<LuCheck className="size-3" />
+						<Check className="size-3" />
 						Copied
 					</span>
 				) : (

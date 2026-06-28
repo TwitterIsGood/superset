@@ -1,5 +1,5 @@
 import { cn } from "@superset/ui/utils";
-import { HiMiniPause, HiMiniPlay, HiMiniXMark } from "react-icons/hi2";
+import { Pause, Play, X } from "lucide-react";
 import type { WorkspaceRunState } from "shared/tabs-types";
 
 interface WorkspaceRunIndicatorProps {
@@ -15,11 +15,11 @@ export function WorkspaceRunIndicator({
 }: WorkspaceRunIndicatorProps) {
 	const icon =
 		state === "running" ? (
-			<HiMiniPlay className="size-[0.45rem] translate-x-[0.5px]" />
+			<Play className="size-[0.45rem] translate-x-[0.5px]" />
 		) : state === "stopped-by-user" ? (
-			<HiMiniPause className="size-2" />
+			<Pause className="size-2" />
 		) : (
-			<HiMiniXMark className="size-[0.6rem]" />
+			<X className="size-[0.6rem]" />
 		);
 
 	const colorClasses =
@@ -60,11 +60,11 @@ export function WorkspaceRunIndicator({
 	if (variant === "toolbar") {
 		const toolbarIcon =
 			state === "running" ? (
-				<HiMiniPlay className="size-3" />
+				<Play className="size-3" />
 			) : state === "stopped-by-user" ? (
-				<HiMiniPause className="size-3" />
+				<Pause className="size-3" />
 			) : (
-				<HiMiniXMark className="size-3" />
+				<X className="size-3" />
 			);
 		return (
 			<span

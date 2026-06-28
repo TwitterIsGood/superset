@@ -37,6 +37,10 @@ import { app } from "electron";
 import { env } from "main/env.main";
 import { exitImmediately } from "main/index";
 import { setupSingleAgent } from "main/lib/agent-setup";
+import {
+	isTelemetryEnabled,
+	setTelemetryEnabled,
+} from "main/lib/analytics/telemetry-settings";
 import { hasCustomRingtone } from "main/lib/custom-ringtones";
 import { getHostServiceCoordinator } from "main/lib/host-service-coordinator";
 import { localDb } from "main/lib/local-db";
@@ -1020,14 +1024,14 @@ export const createSettingsRouter = () => {
 				return { ran };
 			}),
 
-		// TODO: remove telemetry procedures once telemetry_enabled column is dropped
 		getTelemetryEnabled: publicProcedure.query(() => {
-			return true;
+			return isTelemetryEnabled();
 		}),
 
 		setTelemetryEnabled: publicProcedure
 			.input(z.object({ enabled: z.boolean() }))
-			.mutation(() => {
+			.mutation(({ input }) => {
+				setTelemetryEnabled(input.enabled);
 				return { success: true };
 			}),
 	});

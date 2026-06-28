@@ -1,6 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
-import { HiMiniXMark } from "react-icons/hi2";
-import { TbLayoutColumns, TbLayoutRows } from "react-icons/tb";
+import { Columns2, Rows2, X } from "lucide-react";
 import type { HotkeyId } from "renderer/hotkeys";
 import { HotkeyLabel } from "renderer/hotkeys";
 import type { SplitOrientation } from "../../hooks";
@@ -23,9 +22,9 @@ export function PaneToolbarActions({
 }: PaneToolbarActionsProps) {
 	const splitIcon =
 		splitOrientation === "vertical" ? (
-			<TbLayoutColumns className="size-3.5" />
+			<Columns2 className="size-3.5" />
 		) : (
-			<TbLayoutRows className="size-3.5" />
+			<Rows2 className="size-3.5" />
 		);
 
 	return (
@@ -52,7 +51,7 @@ export function PaneToolbarActions({
 						onClick={onClosePane}
 						className="rounded p-0.5 text-muted-foreground/60 transition-colors hover:text-muted-foreground"
 					>
-						<HiMiniXMark className="size-3.5" />
+						<X className="size-3.5" />
 					</button>
 				</TooltipTrigger>
 				<TooltipContent side="bottom" showArrow={false}>

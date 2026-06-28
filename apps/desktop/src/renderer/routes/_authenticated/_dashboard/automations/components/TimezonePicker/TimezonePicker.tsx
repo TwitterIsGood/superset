@@ -7,9 +7,8 @@ import {
 	CommandList,
 } from "@superset/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
+import { Check, Globe } from "lucide-react";
 import { useMemo, useState } from "react";
-import { HiCheck } from "react-icons/hi2";
-import { LuGlobe } from "react-icons/lu";
 import { PickerTrigger } from "renderer/components/PickerTrigger";
 
 interface TimezonePickerProps {
@@ -39,7 +38,7 @@ export function TimezonePicker({
 			<PopoverTrigger asChild>
 				<PickerTrigger
 					className={className}
-					icon={<LuGlobe className="size-4 shrink-0" />}
+					icon={<Globe className="size-4 shrink-0" />}
 					label={value}
 				/>
 			</PopoverTrigger>
@@ -64,7 +63,7 @@ export function TimezonePicker({
 									}}
 								>
 									<span className="truncate">{tz}</span>
-									{tz === value && <HiCheck className="ml-auto size-4" />}
+									{tz === value && <Check className="ml-auto size-4" />}
 								</CommandItem>
 							))}
 						</CommandGroup>

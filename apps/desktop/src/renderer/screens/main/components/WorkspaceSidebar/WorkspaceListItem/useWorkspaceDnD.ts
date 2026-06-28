@@ -1,7 +1,7 @@
-import { toast } from "@superset/ui/sonner";
 import { useCallback } from "react";
 import { useDrag, useDrop } from "react-dnd";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import {
 	useMoveWorkspacesToSection,
 	useMoveWorkspaceToSection,

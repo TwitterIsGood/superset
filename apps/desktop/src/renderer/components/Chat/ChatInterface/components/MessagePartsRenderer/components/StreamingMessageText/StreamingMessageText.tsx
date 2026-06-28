@@ -1,7 +1,7 @@
 import {
 	MessageResponse,
 	type MessageResponseProps,
-} from "@superset/ui/ai-elements/message";
+} from "@superset/ui/ai-elements/message-response";
 import { useEffect, useState } from "react";
 
 const STREAM_TEXT_TICK_MS = 16;

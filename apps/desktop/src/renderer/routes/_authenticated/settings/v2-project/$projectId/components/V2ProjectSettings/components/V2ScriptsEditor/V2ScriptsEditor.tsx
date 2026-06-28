@@ -2,8 +2,8 @@ import { Skeleton } from "@superset/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@superset/ui/tabs";
 import { cn } from "@superset/ui/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CircleCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { HiCheckCircle } from "react-icons/hi2";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { ScriptField } from "./components/ScriptField";
 
@@ -317,7 +317,7 @@ export function V2ScriptsEditor({
 						{saveStatus === "saving" && <span>Saving…</span>}
 						{saveStatus === "saved" && (
 							<span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-								<HiCheckCircle className="h-3.5 w-3.5" />
+								<CircleCheck className="h-3.5 w-3.5" />
 								Saved
 							</span>
 						)}

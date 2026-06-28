@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { LuExternalLink, LuLoaderCircle, LuX } from "react-icons/lu";
+import { ExternalLink, LoaderCircle, X } from "lucide-react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { useTabsStore } from "renderer/stores/tabs/store";
@@ -78,7 +78,7 @@ export function MergedPortBadge({ port }: MergedPortBadgeProps) {
 						aria-label={`Open ${port.label || `port ${port.port}`} in browser`}
 						className="text-muted-foreground opacity-0 transition-opacity hover:text-primary focus-visible:opacity-100 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 group-hover:opacity-100"
 					>
-						<LuExternalLink className="size-3.5" strokeWidth={STROKE_WIDTH} />
+						<ExternalLink className="size-3.5" strokeWidth={STROKE_WIDTH} />
 					</button>
 					<button
 						type="button"
@@ -89,12 +89,12 @@ export function MergedPortBadge({ port }: MergedPortBadgeProps) {
 						className="pr-1 text-muted-foreground opacity-0 transition-opacity hover:text-primary focus-visible:opacity-100 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-70 group-hover:opacity-100"
 					>
 						{isPending ? (
-							<LuLoaderCircle
+							<LoaderCircle
 								className="size-3.5 animate-spin"
 								strokeWidth={STROKE_WIDTH}
 							/>
 						) : (
-							<LuX className="size-3.5" strokeWidth={STROKE_WIDTH} />
+							<X className="size-3.5" strokeWidth={STROKE_WIDTH} />
 						)}
 					</button>
 				</div>

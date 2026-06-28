@@ -8,12 +8,17 @@ import {
 	CommandSeparator,
 } from "@superset/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { useNavigate } from "@tanstack/react-router";
+import {
+	Check,
+	ChevronsUpDown,
+	FolderInput,
+	Plus,
+	TriangleAlert,
+} from "lucide-react";
 import { useState } from "react";
-import { HiCheck, HiChevronUpDown, HiMiniPlus } from "react-icons/hi2";
-import { LuFolderInput, LuTriangleAlert } from "react-icons/lu";
+import { toast } from "renderer/lib/toast";
 import { useFolderFirstImport } from "renderer/routes/_authenticated/_dashboard/components/AddRepositoryModals/hooks/useFolderFirstImport";
 import { ProjectThumbnail } from "renderer/routes/_authenticated/components/ProjectThumbnail";
 import { useOpenNewProjectModal } from "renderer/stores/add-repository-modal";
@@ -78,7 +83,7 @@ export function ProjectPickerPill({
 					<span className="truncate">
 						{selectedProject?.name ?? "Select project"}
 					</span>
-					<HiChevronUpDown className="size-3 shrink-0" />
+					<ChevronsUpDown className="size-3 shrink-0" />
 				</FormPickerTrigger>
 			</PopoverTrigger>
 			<PopoverContent
@@ -108,13 +113,13 @@ export function ProjectPickerPill({
 									{project.needsSetup === true && (
 										<Tooltip>
 											<TooltipTrigger asChild>
-												<LuTriangleAlert className="size-3.5 shrink-0 text-amber-500" />
+												<TriangleAlert className="size-3.5 shrink-0 text-amber-500" />
 											</TooltipTrigger>
 											<TooltipContent>Not set up on this host</TooltipContent>
 										</Tooltip>
 									)}
 									{project.id === selectedProject?.id && (
-										<HiCheck className="size-4 shrink-0" />
+										<Check className="size-4 shrink-0" />
 									)}
 								</CommandItem>
 							))}
@@ -123,11 +128,11 @@ export function ProjectPickerPill({
 					<CommandSeparator alwaysRender />
 					<CommandGroup forceMount>
 						<CommandItem forceMount onSelect={handleCreateNewProject}>
-							<HiMiniPlus className="size-4" />
+							<Plus className="size-4" />
 							Clone from URL
 						</CommandItem>
 						<CommandItem forceMount onSelect={handleImportProject}>
-							<LuFolderInput className="size-4" />
+							<FolderInput className="size-4" />
 							Open from folder
 						</CommandItem>
 					</CommandGroup>

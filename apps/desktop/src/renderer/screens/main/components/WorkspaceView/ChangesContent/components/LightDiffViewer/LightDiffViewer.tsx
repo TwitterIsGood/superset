@@ -2,6 +2,7 @@ import { MultiFileDiff } from "@pierre/diffs/react";
 import { cn } from "@superset/ui/utils";
 import type { CSSProperties } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { PierreDiffRuntimeProvider } from "renderer/routes/_authenticated/lib/pierreWorker";
 import {
 	getDiffsTheme,
 	getDiffViewerStyle,
@@ -48,28 +49,30 @@ export function LightDiffViewer({
 	});
 
 	return (
-		<MultiFileDiff
-			oldFile={{ name: filePath, contents: contents.original }}
-			newFile={{ name: filePath, contents: contents.modified }}
-			className={cn(className)}
-			style={{
-				...diffStyle,
-				...style,
-			}}
-			options={{
-				diffStyle: viewMode === "side-by-side" ? "split" : "unified",
-				expandUnchanged: !hideUnchangedRegions,
-				theme: shikiTheme,
-				themeType: activeTheme.type,
-				overflow: "wrap",
-				disableFileHeader: true,
-				unsafeCSS: `
+		<PierreDiffRuntimeProvider>
+			<MultiFileDiff
+				oldFile={{ name: filePath, contents: contents.original }}
+				newFile={{ name: filePath, contents: contents.modified }}
+				className={cn(className)}
+				style={{
+					...diffStyle,
+					...style,
+				}}
+				options={{
+					diffStyle: viewMode === "side-by-side" ? "split" : "unified",
+					expandUnchanged: !hideUnchangedRegions,
+					theme: shikiTheme,
+					themeType: activeTheme.type,
+					overflow: "wrap",
+					disableFileHeader: true,
+					unsafeCSS: `
 					* {
 						user-select: text;
 						-webkit-user-select: text;
 					}
 				`,
-			}}
-		/>
+				}}
+			/>
+		</PierreDiffRuntimeProvider>
 	);
 }

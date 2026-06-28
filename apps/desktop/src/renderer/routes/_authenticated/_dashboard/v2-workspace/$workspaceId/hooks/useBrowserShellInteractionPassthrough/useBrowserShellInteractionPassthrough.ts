@@ -1,6 +1,6 @@
 import type { WorkspaceInteractionState } from "@superset/panes";
 import { useCallback, useEffect, useRef } from "react";
-import { browserRuntimeRegistry } from "../usePaneRegistry/components/BrowserPane";
+import { browserRuntimeRegistry } from "../usePaneRegistry/components/BrowserPane/browserRuntimeRegistry";
 
 interface UseBrowserShellInteractionPassthroughArgs {
 	sidebarOpen: boolean;

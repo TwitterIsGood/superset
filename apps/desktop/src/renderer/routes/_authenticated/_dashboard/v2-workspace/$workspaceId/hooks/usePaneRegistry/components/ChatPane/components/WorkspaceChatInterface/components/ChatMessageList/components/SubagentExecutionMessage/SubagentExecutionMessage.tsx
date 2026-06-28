@@ -1,8 +1,5 @@
-import {
-	Message,
-	MessageContent,
-	MessageResponse,
-} from "@superset/ui/ai-elements/message";
+import { Message, MessageContent } from "@superset/ui/ai-elements/message";
+import { MessageResponse } from "@superset/ui/ai-elements/message-response";
 import { cn } from "@superset/ui/lib/utils";
 import { SubagentInnerToolCall } from "renderer/components/Chat/components/SubagentInnerToolCall";
 import {

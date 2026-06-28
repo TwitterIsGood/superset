@@ -1,0 +1,112 @@
+{
+	"$schema": "./scripts/perf-budget.schema.json",
+	"packageSize": {
+		"notes": "Canary regression guard after moving heavy runtimes and the Superset CLI to on-demand resource packs. The active target is 100 MiB for user-facing release artifacts; 150 MiB is the temporary hard guard while the current 114.5 MiB macOS arm64 ZIP is driven below target.",
+		"releaseArtifacts": {
+			"dmg": {
+				"maxBytes": 157286400,
+				"targetBytes": 104857600
+			},
+			"zip": {
+				"maxBytes": 157286400,
+				"targetBytes": 104857600
+			},
+			"AppImage": {
+				"maxBytes": 157286400,
+				"targetBytes": 104857600
+			}
+		}
+	},
+	"build": {
+		"notes": "Canary GitHub Actions budget. Quick branch validation must feel cheap enough for frequent use; published quick canaries keep GitHub Releases as the installer channel and use S3-compatible storage only for on-demand resource packs.",
+		"canary": {
+			"quick": {
+				"maxSeconds": 300,
+				"targetSeconds": 180,
+				"criticalPathMaxSeconds": {
+					"dependencyCache": 60,
+					"install": 90,
+					"compile": 120,
+					"electronBuilderZip": 45,
+					"artifactUpload": 10
+				}
+			},
+			"publishedQuick": {
+				"maxSeconds": 480,
+				"targetSeconds": 300,
+				"criticalPathMaxSeconds": {
+					"resourcePackBuildUploadVerify": 90,
+					"compile": 90,
+					"electronBuilderDmgZip": 150,
+					"releaseUpdate": 30
+				}
+			},
+			"full": {
+				"maxSeconds": 900,
+				"targetSeconds": 600,
+				"criticalPathMaxSeconds": {
+					"macArm64": 300,
+					"macX64": 360,
+					"linuxX64": 360
+				}
+			}
+		}
+	},
+	"startup": {
+		"notes": "Phase 0 regression guard for packaged-app startup marks. Replace perf-baseline.json with measured canary values after the first baseline capture.",
+		"required": true,
+		"maxRegressionPercent": 15,
+		"baselinePath": "./perf-baseline.json",
+		"marks": {
+			"main-window:first-show": {
+				"maxMs": 6500,
+				"targetMs": 2000
+			},
+			"main-window:renderer-did-finish-load": {
+				"maxMs": 6000,
+				"targetMs": 1800
+			}
+		}
+	},
+	"runtime": {
+		"notes": "Dev/canary guard after the desktop-online-lite and resource-pack overhaul. Reports must separate current worktree app+helpers, visible Superset-related services, and whole developer-tooling pressure; optimization claims must not cite only the Electron subtree.",
+		"processTree": {
+			"desktopMemory": {
+				"maxBytes": 4294967296,
+				"targetBytes": 1610612736
+			},
+			"allMemory": {
+				"maxBytes": 6442450944,
+				"targetBytes": 3221225472
+			},
+			"desktopProcessCount": {
+				"max": 24,
+				"target": 16
+			},
+			"allProcessCount": {
+				"max": 36,
+				"target": 28
+			}
+		},
+		"renderer": {
+			"domNodes": {
+				"max": 10000,
+				"target": 5000
+			},
+			"usedJsHeap": {
+				"maxBytes": 1073741824,
+				"targetBytes": 536870912
+			},
+			"consoleErrors": {
+				"max": 0
+			}
+		},
+		"routes": {
+			"requiredRoutes": ["/sign-in"],
+			"openDuration": {
+				"maxMs": 5000,
+				"targetMs": 2000
+			}
+		}
+	}
+}

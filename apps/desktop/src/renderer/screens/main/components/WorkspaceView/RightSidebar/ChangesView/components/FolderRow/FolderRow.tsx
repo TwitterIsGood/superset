@@ -12,16 +12,16 @@ import {
 	ContextMenuTrigger,
 } from "@superset/ui/context-menu";
 import { cn } from "@superset/ui/utils";
-import { type ReactNode, useState } from "react";
 import {
-	VscAdd,
-	VscChevronRight,
-	VscClippy,
-	VscDiscard,
-	VscFolderOpened,
-	VscLinkExternal,
-	VscRemove,
-} from "react-icons/vsc";
+	ChevronRight,
+	Clipboard,
+	ExternalLink,
+	FolderOpen,
+	Minus,
+	Plus,
+	Undo2,
+} from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { toAbsoluteWorkspacePath } from "shared/absolute-paths";
 import { usePathActions } from "../../hooks";
 import { DiscardConfirmDialog } from "../DiscardConfirmDialog";
@@ -75,7 +75,7 @@ function FolderRowHeader({
 	return (
 		<>
 			{!isGrouped && (
-				<VscChevronRight
+				<ChevronRight
 					className={cn(
 						"size-2.5 text-muted-foreground shrink-0 transition-transform duration-150",
 						isExpanded && "rotate-90",
@@ -147,7 +147,7 @@ export function FolderRow({
 					{
 						key: "discard-all",
 						label: "Discard All",
-						icon: <VscDiscard className="size-3" />,
+						icon: <Undo2 className="size-3" />,
 						onClick: openDiscardDialog,
 						isDestructive: true,
 						disabled: isActioning,
@@ -159,7 +159,7 @@ export function FolderRow({
 					{
 						key: "stage-all",
 						label: "Stage All",
-						icon: <VscAdd className="size-3" />,
+						icon: <Plus className="size-3" />,
 						onClick: onStageAll,
 						disabled: isActioning,
 					},
@@ -170,7 +170,7 @@ export function FolderRow({
 					{
 						key: "unstage-all",
 						label: "Unstage All",
-						icon: <VscRemove className="size-3" />,
+						icon: <Minus className="size-3" />,
 						onClick: onUnstageAll,
 						disabled: isActioning,
 					},
@@ -199,22 +199,22 @@ export function FolderRow({
 	const contextMenuContent = (
 		<ContextMenuContent className="w-48">
 			<ContextMenuItem onClick={copyPath}>
-				<VscClippy className="mr-2 size-4" />
+				<Clipboard className="mr-2 size-4" />
 				Copy Path
 			</ContextMenuItem>
 			{!isRoot && (
 				<ContextMenuItem onClick={copyRelativePath}>
-					<VscClippy className="mr-2 size-4" />
+					<Clipboard className="mr-2 size-4" />
 					Copy Relative Path
 				</ContextMenuItem>
 			)}
 			<ContextMenuSeparator />
 			<ContextMenuItem onClick={revealInFinder}>
-				<VscFolderOpened className="mr-2 size-4" />
+				<FolderOpen className="mr-2 size-4" />
 				Reveal in Finder
 			</ContextMenuItem>
 			<ContextMenuItem onClick={openInEditor}>
-				<VscLinkExternal className="mr-2 size-4" />
+				<ExternalLink className="mr-2 size-4" />
 				Open in Editor
 			</ContextMenuItem>
 
@@ -222,14 +222,14 @@ export function FolderRow({
 
 			{onStageAll && (
 				<ContextMenuItem onClick={onStageAll} disabled={isActioning}>
-					<VscAdd className="mr-2 size-4" />
+					<Plus className="mr-2 size-4" />
 					Stage All
 				</ContextMenuItem>
 			)}
 
 			{onUnstageAll && (
 				<ContextMenuItem onClick={onUnstageAll} disabled={isActioning}>
-					<VscRemove className="mr-2 size-4" />
+					<Minus className="mr-2 size-4" />
 					Unstage All
 				</ContextMenuItem>
 			)}
@@ -240,7 +240,7 @@ export function FolderRow({
 					disabled={isActioning}
 					className="text-destructive focus:text-destructive"
 				>
-					<VscDiscard className="mr-2 size-4" />
+					<Undo2 className="mr-2 size-4" />
 					Discard All
 				</ContextMenuItem>
 			)}

@@ -5,18 +5,18 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@superset/ui/collapsible";
-import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { workspaceTrpc } from "@superset/workspace-client";
-import { useEffect, useState } from "react";
 import {
-	LuCheck,
-	LuChevronRight,
-	LuCopy,
-	LuExternalLink,
-	LuLoaderCircle,
-} from "react-icons/lu";
+	Check,
+	ChevronRight,
+	Copy,
+	ExternalLink,
+	LoaderCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { CommentMarkdown } from "renderer/components/CommentMarkdown";
+import { toast } from "renderer/lib/toast";
 import "./comment-thread.css";
 
 interface Comment {
@@ -106,7 +106,7 @@ export function CommentThread({
 					className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none"
 					aria-label={open ? "Collapse thread" : "Expand thread"}
 				>
-					<LuChevronRight
+					<ChevronRight
 						className={cn(
 							"size-3 shrink-0 transition-transform",
 							open && "rotate-90",
@@ -141,9 +141,9 @@ export function CommentThread({
 					}
 				>
 					{isCopied ? (
-						<LuCheck className="size-3 text-green-500" />
+						<Check className="size-3 text-green-500" />
 					) : (
-						<LuCopy className="size-3" />
+						<Copy className="size-3" />
 					)}
 				</button>
 				{url && (
@@ -155,7 +155,7 @@ export function CommentThread({
 						className="shrink-0 text-muted-foreground hover:text-foreground"
 						aria-label="Open on GitHub"
 					>
-						<LuExternalLink className="size-3" />
+						<ExternalLink className="size-3" />
 					</a>
 				)}
 			</div>
@@ -180,7 +180,7 @@ export function CommentThread({
 						}
 					>
 						{setResolution.isPending && (
-							<LuLoaderCircle className="size-3 animate-spin" />
+							<LoaderCircle className="size-3 animate-spin" />
 						)}
 						{isResolved ? "Unresolve" : "Resolve conversation"}
 					</Button>

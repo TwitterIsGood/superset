@@ -6,11 +6,8 @@ import {
 	ConversationScrollButton,
 } from "@superset/ui/ai-elements/conversation";
 import { FileDiffTool } from "@superset/ui/ai-elements/file-diff-tool";
-import {
-	Message,
-	MessageContent,
-	MessageResponse,
-} from "@superset/ui/ai-elements/message";
+import { Message, MessageContent } from "@superset/ui/ai-elements/message";
+import { MessageResponse } from "@superset/ui/ai-elements/message-response";
 import type { MockDiffFile, MockMessage } from "../../../../../mock-data";
 
 type SessionChatProps = {

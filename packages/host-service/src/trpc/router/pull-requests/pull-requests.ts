@@ -10,6 +10,9 @@ export const pullRequestsRouter = router({
 			}),
 		)
 		.query(async ({ ctx, input }) => {
+			if (input.workspaceIds.length > 0) {
+				ctx.runtime.ensurePullRequestRuntimeStarted();
+			}
 			const workspaces =
 				await ctx.runtime.pullRequests.getPullRequestsByWorkspaces(
 					input.workspaceIds,
@@ -23,6 +26,9 @@ export const pullRequestsRouter = router({
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
+			if (input.workspaceIds.length > 0) {
+				ctx.runtime.ensurePullRequestRuntimeStarted();
+			}
 			await ctx.runtime.pullRequests.refreshPullRequestsByWorkspaces(
 				input.workspaceIds,
 			);

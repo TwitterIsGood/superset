@@ -8,13 +8,12 @@ import {
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { dirname, join, parse } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-	type Options as ClaudeOptions,
-	type PermissionResult,
-	type PermissionUpdate,
-	query as queryClaude,
-	type SDKMessage,
+import { fileURLToPath, pathToFileURL } from "node:url";
+import type {
+	Options as ClaudeOptions,
+	PermissionResult,
+	PermissionUpdate,
+	SDKMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AppRouter } from "@superset/trpc";
 import type { createTRPCClient } from "@trpc/client";
@@ -273,6 +272,15 @@ export interface StandaloneChatRuntimeLogger {
 	error?: (message: string, meta?: StandaloneRuntimeLogMeta) => void;
 }
 
+export interface ClaudeAgentRuntimePaths {
+	executablePath?: string;
+	sdkImportPath?: string;
+}
+
+export type ResolveClaudeAgentRuntime = () => Promise<
+	ClaudeAgentRuntimePaths | null | undefined
+>;
+
 export interface StandaloneChatProvider {
 	sendTurn(args: {
 		messages: ProviderMessage[];
@@ -306,11 +314,43 @@ const WEB_CONTEXT_MAX_TOTAL_CHARS = 24_000;
 const STANDALONE_CHAT_DIR_MODE = 0o700;
 const STANDALONE_CHAT_SETTINGS_FILE_MODE = 0o600;
 const STANDALONE_CHAT_HOME_DIR_ENV = "SUPERSET_STANDALONE_CHAT_HOME_DIR";
+const CLAUDE_AGENT_SDK_SPECIFIER = "@anthropic-ai/claude-agent-sdk";
+const CLAUDE_AGENT_SDK_IMPORT_PATH_ENV =
+	"SUPERSET_CLAUDE_AGENT_SDK_IMPORT_PATH";
 const defaultStandaloneRuntimeLogger: StandaloneChatRuntimeLogger = {
 	info: (message, meta) => console.info(message, meta),
 	warn: (message, meta) => console.warn(message, meta),
 	error: (message, meta) => console.error(message, meta),
 };
+
+type ClaudeAgentSdkModule = typeof import("@anthropic-ai/claude-agent-sdk");
+
+const claudeAgentSdkImportPromises = new Map<
+	string,
+	Promise<ClaudeAgentSdkModule>
+>();
+
+function resolveClaudeAgentSdkImportSpecifier(overridePath?: string): string {
+	const override =
+		overridePath?.trim() ??
+		process.env[CLAUDE_AGENT_SDK_IMPORT_PATH_ENV]?.trim();
+	if (!override) return CLAUDE_AGENT_SDK_SPECIFIER;
+	if (/^(node:|file:|data:|https?:)/.test(override)) {
+		return override;
+	}
+	return pathToFileURL(toSpawnableAsarUnpackedPath(override)).href;
+}
+
+async function loadClaudeAgentSdk(
+	importPath?: string,
+): Promise<ClaudeAgentSdkModule> {
+	const specifier = resolveClaudeAgentSdkImportSpecifier(importPath);
+	const existing = claudeAgentSdkImportPromises.get(specifier);
+	if (existing) return existing;
+	const promise = import(specifier);
+	claudeAgentSdkImportPromises.set(specifier, promise);
+	return promise;
+}
 
 type ClaudeProviderRuntimeConfig = {
 	provider: {
@@ -482,8 +522,11 @@ function bunStorePackageCandidates(
 		);
 }
 
-export function resolveClaudeCodeExecutablePath(): string | undefined {
-	const override = process.env.SUPERSET_CLAUDE_CODE_BIN_PATH?.trim();
+export function resolveClaudeCodeExecutablePath(
+	overridePath?: string,
+): string | undefined {
+	const override =
+		overridePath?.trim() ?? process.env.SUPERSET_CLAUDE_CODE_BIN_PATH?.trim();
 	if (override) return toSpawnableAsarUnpackedPath(override);
 
 	const packageName = claudeAgentPlatformPackageName();
@@ -1683,7 +1726,15 @@ function extractAssistantContentFromClaudeMessage(message: SDKMessage): {
 	};
 }
 
+export interface ClaudeStandaloneChatProviderOptions {
+	resolveRuntimePaths?: ResolveClaudeAgentRuntime;
+}
+
 export class ClaudeStandaloneChatProvider implements StandaloneChatProvider {
+	constructor(
+		private readonly options: ClaudeStandaloneChatProviderOptions = {},
+	) {}
+
 	async sendTurn(args: {
 		messages: ProviderMessage[];
 		modelId?: string;
@@ -1727,7 +1778,13 @@ export class ClaudeStandaloneChatProvider implements StandaloneChatProvider {
 		};
 
 		try {
-			const claudeCodeExecutablePath = resolveClaudeCodeExecutablePath();
+			const runtimePaths = await this.options.resolveRuntimePaths?.();
+			const { query: queryClaude } = await loadClaudeAgentSdk(
+				runtimePaths?.sdkImportPath,
+			);
+			const claudeCodeExecutablePath = resolveClaudeCodeExecutablePath(
+				runtimePaths?.executablePath,
+			);
 			const modelId = normalizeClaudeCodeModelId(args.modelId);
 			const claudeQuery = queryClaude({
 				prompt: buildClaudePrompt({

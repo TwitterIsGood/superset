@@ -1,7 +1,7 @@
-import { toast } from "@superset/ui/sonner";
 import { useCallback } from "react";
 import { useV2UserPreferences } from "renderer/hooks/useV2UserPreferences";
 import type { LinkTierMap } from "renderer/lib/clickPolicy";
+import { toast } from "renderer/lib/toast";
 import {
 	isItemVisible,
 	SETTING_ITEM_ID,

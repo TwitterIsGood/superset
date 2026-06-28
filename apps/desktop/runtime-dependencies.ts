@@ -30,42 +30,6 @@ function copyModuleSubtree(
 	};
 }
 
-function copyNestedModule(
-	parentModuleName: string,
-	moduleName: string,
-): PackagedNodeModuleCopy {
-	return {
-		from: `node_modules/${parentModuleName}/node_modules/${moduleName}`,
-		to: `node_modules/${parentModuleName}/node_modules/${moduleName}`,
-		filter: ["**/*"],
-	};
-}
-
-function getClaudeAgentSdkPlatformPackageName(): string {
-	const targetArch = process.env.TARGET_ARCH || process.arch;
-	const targetPlatform = process.env.TARGET_PLATFORM || process.platform;
-
-	if (targetPlatform === "darwin") {
-		return targetArch === "arm64"
-			? "@anthropic-ai/claude-agent-sdk-darwin-arm64"
-			: "@anthropic-ai/claude-agent-sdk-darwin-x64";
-	}
-	if (targetPlatform === "win32") {
-		return targetArch === "arm64"
-			? "@anthropic-ai/claude-agent-sdk-win32-arm64"
-			: "@anthropic-ai/claude-agent-sdk-win32-x64";
-	}
-	if (targetPlatform === "linux") {
-		return targetArch === "arm64"
-			? "@anthropic-ai/claude-agent-sdk-linux-arm64"
-			: "@anthropic-ai/claude-agent-sdk-linux-x64";
-	}
-	return `@anthropic-ai/claude-agent-sdk-${targetPlatform}-${targetArch}`;
-}
-
-export const claudeAgentSdkPlatformPackageName =
-	getClaudeAgentSdkPlatformPackageName();
-
 const externalizedRuntimeModules: ExternalizedRuntimeModule[] = [
 	{
 		specifier: "better-sqlite3",
@@ -92,12 +56,6 @@ const externalizedRuntimeModules: ExternalizedRuntimeModule[] = [
 		asarUnpackGlobs: ["**/node_modules/@superset/macos-process-metrics/**/*"],
 	},
 	{
-		specifier: "@ast-grep/napi",
-		materialize: ["@ast-grep/napi"],
-		packagedCopies: [copyWholeModule("@ast-grep")],
-		asarUnpackGlobs: ["**/node_modules/@ast-grep/napi*/**/*"],
-	},
-	{
 		specifier: "@parcel/watcher",
 		materialize: ["@parcel/watcher"],
 		packagedCopies: [
@@ -105,109 +63,6 @@ const externalizedRuntimeModules: ExternalizedRuntimeModule[] = [
 		],
 		asarUnpackGlobs: ["**/node_modules/@parcel/watcher*/**/*"],
 	},
-	{
-		specifier: "libsql",
-		materialize: ["libsql"],
-		packagedCopies: [
-			copyWholeModule("libsql"),
-			copyWholeModule("@libsql"),
-			copyWholeModule("@neon-rs"),
-		],
-		asarUnpackGlobs: ["**/node_modules/@libsql/**/*"],
-	},
-	{
-		specifier: "@mastra/duckdb",
-		materialize: [
-			"@mastra/duckdb",
-			"@duckdb/node-api",
-			"@duckdb/node-bindings",
-		],
-		packagedCopies: [
-			copyWholeModule("@mastra/duckdb"),
-			copyWholeModule("@duckdb"),
-		],
-		asarUnpackGlobs: ["**/node_modules/@duckdb/**/*"],
-	},
-	{
-		specifier: "@anthropic-ai/claude-agent-sdk",
-		materialize: [
-			"@anthropic-ai/claude-agent-sdk",
-			"@anthropic-ai/sdk",
-			"json-schema-to-ts",
-			"@babel/runtime",
-			"ts-algebra",
-			"@modelcontextprotocol/sdk",
-			claudeAgentSdkPlatformPackageName,
-		],
-		packagedCopies: [
-			copyWholeModule("@anthropic-ai/claude-agent-sdk"),
-			copyWholeModule("@anthropic-ai/sdk"),
-			copyWholeModule("json-schema-to-ts"),
-			copyWholeModule("@babel/runtime"),
-			copyWholeModule("ts-algebra"),
-			copyWholeModule("@modelcontextprotocol/sdk"),
-			copyWholeModule(claudeAgentSdkPlatformPackageName),
-		],
-		asarUnpackGlobs: [
-			"**/node_modules/@anthropic-ai/claude-agent-sdk/**/*",
-			"**/node_modules/@anthropic-ai/claude-agent-sdk-*/*",
-		],
-	},
-];
-
-const trellisRuntimeModuleNames = [
-	"@mindfoldhq/trellis",
-	"@mindfoldhq/trellis-core",
-	"chalk",
-	"commander",
-	"figlet",
-	"giget",
-	"inquirer",
-	"@inquirer/external-editor",
-	"chardet",
-	"iconv-lite",
-	"safer-buffer",
-	"@inquirer/figures",
-	"ansi-escapes",
-	"environment",
-	"cli-width",
-	"mute-stream",
-	"ora",
-	"cli-cursor",
-	"restore-cursor",
-	"onetime",
-	"signal-exit",
-	"cli-spinners",
-	"is-interactive",
-	"is-unicode-supported",
-	"log-symbols",
-	"yoctocolors",
-	"stdin-discarder",
-	"string-width",
-	"get-east-asian-width",
-	"strip-ansi",
-	"ansi-regex",
-	"run-async",
-	"rxjs",
-	"tslib",
-	"wrap-ansi",
-	"ansi-styles",
-	"color-convert",
-	"color-name",
-	"supports-color",
-	"has-flag",
-	"yoctocolors-cjs",
-	"undici",
-	"zod",
-] as const;
-
-const trellisRuntimeModuleCopies = trellisRuntimeModuleNames.map((moduleName) =>
-	copyWholeModule(moduleName),
-);
-
-const trellisRuntimeNestedModuleCopies = [
-	copyNestedModule("onetime", "mimic-fn"),
-	copyNestedModule("restore-cursor", "signal-exit"),
 ];
 
 const packagedSupportModules = [
@@ -223,11 +78,6 @@ const packagedSupportModules = [
 export const mainExternalizedDependencies = [
 	...externalizedRuntimeModules.map((module) => module.specifier),
 	"pg-native",
-	// mastracode transitively loads @mastra/fastembed → onnxruntime-node, whose
-	// native binding is loaded via a dynamic `require` that @rollup/plugin-commonjs
-	// can't resolve at bundle time. Externalizing lets Node handle the require at
-	// runtime from node_modules. Also keeps the bundle size sane (~20 MB chunk).
-	"mastracode",
 ];
 
 export const packagedNodeModuleCopies = [
@@ -235,21 +85,42 @@ export const packagedNodeModuleCopies = [
 	...packagedSupportModules,
 ];
 
-export const packagedTrellisRuntimeResourceCopies = [
-	...trellisRuntimeModuleCopies,
-	...trellisRuntimeNestedModuleCopies,
-];
-
 export const packagedAsarUnpackGlobs = [
 	...externalizedRuntimeModules.flatMap((module) => module.asarUnpackGlobs),
 	"**/node_modules/bindings/**/*",
 	"**/node_modules/file-uri-to-path/**/*",
-	...trellisRuntimeModuleNames.map(
-		(moduleName) => `**/node_modules/${moduleName}/**/*`,
-	),
-	"**/node_modules/onetime/node_modules/mimic-fn/**/*",
-	"**/node_modules/restore-cursor/node_modules/signal-exit/**/*",
 ];
+
+const packOnlyNodeModuleRoots = [
+	"node_modules/@mindfoldhq/trellis",
+	"node_modules/@mindfoldhq/trellis-core",
+	"node_modules/@anthropic-ai/claude-agent-sdk",
+	"node_modules/@anthropic-ai/claude-agent-sdk-*",
+	"node_modules/@anthropic-ai/sdk",
+	"node_modules/@browserbasehq",
+	"node_modules/@modelcontextprotocol/sdk",
+	"node_modules/json-schema-to-ts",
+	"node_modules/ts-algebra",
+	"node_modules/mastracode",
+	"node_modules/@mastra/agent-browser",
+	"node_modules/@mastra/duckdb",
+	"node_modules/@mastra/memory",
+	"node_modules/@mastra/stagehand",
+	"node_modules/@duckdb",
+	"node_modules/@libsql",
+	"node_modules/@neon-rs",
+	"node_modules/libsql",
+	"node_modules/chromium-bidi",
+	"node_modules/patchright-core",
+	"node_modules/playwright",
+	"node_modules/playwright-core",
+	"node_modules/webdriver",
+	"node_modules/webdriverio",
+];
+
+export const packOnlyNodeModuleFileExcludes = packOnlyNodeModuleRoots.flatMap(
+	(moduleRoot) => [`!${moduleRoot}`, `!${moduleRoot}/**/*`],
+);
 
 export const requiredMaterializedNodeModules = [
 	...externalizedRuntimeModules.flatMap((module) => module.materialize),
@@ -260,5 +131,4 @@ export const requiredMaterializedNodeModules = [
 	"is-extglob",
 	"picomatch",
 	"node-addon-api",
-	...trellisRuntimeModuleNames,
 ];

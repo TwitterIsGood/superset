@@ -4,7 +4,7 @@
 // which use Server.close() — that's the cooperative shutdown path. Real
 // production crashes don't go through Server.close.
 //
-// Runs under Node (`node --experimental-strip-types --test`).
+// Runs under Node's test runner via `tsx --test`.
 
 import { strict as assert } from "node:assert";
 import * as childProcess from "node:child_process";

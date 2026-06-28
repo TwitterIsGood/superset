@@ -4,19 +4,28 @@ import type {
 } from "@dnd-kit/core";
 import { cn } from "@superset/ui/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import type { DashboardSidebarProject } from "../../types";
 import { getProjectChildrenWorkspaces } from "../../utils/projectChildren";
 import { DashboardSidebarCollapsedProjectContent } from "./components/DashboardSidebarCollapsedProjectContent";
-import { DashboardSidebarExpandedProjectContent } from "./components/DashboardSidebarExpandedProjectContent";
 import { DashboardSidebarProjectContextMenu } from "./components/DashboardSidebarProjectContextMenu";
 import { DashboardSidebarProjectRow } from "./components/DashboardSidebarProjectRow";
+import { DashboardSidebarStaticExpandedProjectContent } from "./components/DashboardSidebarStaticExpandedProjectContent";
 import { useDashboardSidebarProjectSectionActions } from "./hooks/useDashboardSidebarProjectSectionActions";
+
+const DashboardSidebarExpandedProjectContent = lazy(() =>
+	import("./components/DashboardSidebarExpandedProjectContent").then(
+		(module) => ({
+			default: module.DashboardSidebarExpandedProjectContent,
+		}),
+	),
+);
 
 interface DashboardSidebarProjectSectionProps {
 	project: DashboardSidebarProject;
 	isSidebarCollapsed?: boolean;
 	isDraggingProject?: boolean;
+	enableDnd?: boolean;
 	workspaceShortcutLabels: Map<string, string>;
 	onWorkspaceHover: (workspaceId: string) => void | Promise<void>;
 	onToggleCollapse: (projectId: string) => void;
@@ -28,6 +37,7 @@ export function DashboardSidebarProjectSection({
 	project,
 	isSidebarCollapsed = false,
 	isDraggingProject = false,
+	enableDnd = true,
 	workspaceShortcutLabels,
 	onWorkspaceHover,
 	onToggleCollapse,
@@ -69,7 +79,10 @@ export function DashboardSidebarProjectSection({
 				onRemoveFromSidebar={confirmRemoveFromSidebar}
 				onRename={startRename}
 			>
-				<div className={cn("border-b border-border last:border-b-0")}>
+				<div
+					data-dashboard-sidebar-project-section={project.id}
+					className={cn("border-b border-border last:border-b-0")}
+				>
 					<DashboardSidebarCollapsedProjectContent
 						projectName={project.name}
 						iconUrl={project.iconUrl}
@@ -86,7 +99,10 @@ export function DashboardSidebarProjectSection({
 	}
 
 	return (
-		<div className={cn("border-b border-border last:border-b-0")}>
+		<div
+			data-dashboard-sidebar-project-section={project.id}
+			className={cn("border-b border-border last:border-b-0")}
+		>
 			<DashboardSidebarProjectContextMenu
 				onCreateSection={handleNewSection}
 				onOpenInFinder={handleOpenInFinder}
@@ -107,6 +123,7 @@ export function DashboardSidebarProjectSection({
 					onStartRename={startRename}
 					onToggleCollapse={() => onToggleCollapse(project.id)}
 					onNewWorkspace={handleNewWorkspace}
+					data-dashboard-sidebar-project-row={project.id}
 					{...(dragHandleAttributes ?? {})}
 					{...(dragHandleListeners ?? {})}
 				/>
@@ -121,16 +138,44 @@ export function DashboardSidebarProjectSection({
 						transition={{ duration: 0.15, ease: "easeOut" }}
 						className="overflow-hidden"
 					>
-						<DashboardSidebarExpandedProjectContent
-							projectId={project.id}
-							isCollapsed={project.isCollapsed}
-							projectChildren={project.children}
-							workspaceShortcutLabels={workspaceShortcutLabels}
-							onWorkspaceHover={onWorkspaceHover}
-							onDeleteSection={deleteSection}
-							onRenameSection={renameSection}
-							onToggleSectionCollapse={toggleSectionCollapsed}
-						/>
+						{enableDnd ? (
+							<Suspense
+								fallback={
+									<DashboardSidebarStaticExpandedProjectContent
+										projectId={project.id}
+										isCollapsed={project.isCollapsed}
+										projectChildren={project.children}
+										workspaceShortcutLabels={workspaceShortcutLabels}
+										onWorkspaceHover={onWorkspaceHover}
+										onDeleteSection={deleteSection}
+										onRenameSection={renameSection}
+										onToggleSectionCollapse={toggleSectionCollapsed}
+									/>
+								}
+							>
+								<DashboardSidebarExpandedProjectContent
+									projectId={project.id}
+									isCollapsed={project.isCollapsed}
+									projectChildren={project.children}
+									workspaceShortcutLabels={workspaceShortcutLabels}
+									onWorkspaceHover={onWorkspaceHover}
+									onDeleteSection={deleteSection}
+									onRenameSection={renameSection}
+									onToggleSectionCollapse={toggleSectionCollapsed}
+								/>
+							</Suspense>
+						) : (
+							<DashboardSidebarStaticExpandedProjectContent
+								projectId={project.id}
+								isCollapsed={project.isCollapsed}
+								projectChildren={project.children}
+								workspaceShortcutLabels={workspaceShortcutLabels}
+								onWorkspaceHover={onWorkspaceHover}
+								onDeleteSection={deleteSection}
+								onRenameSection={renameSection}
+								onToggleSectionCollapse={toggleSectionCollapsed}
+							/>
+						)}
 					</motion.div>
 				)}
 			</AnimatePresence>

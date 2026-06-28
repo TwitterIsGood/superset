@@ -1,4 +1,5 @@
 import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
+import type { spawn as nodeSpawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,8 +27,17 @@ const spawnCalls: Array<{
 	options: SpawnOptions;
 }> = [];
 
+const realChildProcess = await import("node:child_process");
+const realSpawn = realChildProcess.spawn;
 const spawnMock = mock(
 	(command: string, args: string[], options: SpawnOptions) => {
+		if (command !== hostBin) {
+			return realSpawn(
+				command,
+				args,
+				options as Parameters<typeof nodeSpawn>[2],
+			);
+		}
 		spawnCalls.push({ command, args, options });
 		return {
 			pid: 12345,
@@ -38,6 +48,7 @@ const spawnMock = mock(
 );
 
 mock.module("node:child_process", () => ({
+	...realChildProcess,
 	spawn: spawnMock,
 }));
 

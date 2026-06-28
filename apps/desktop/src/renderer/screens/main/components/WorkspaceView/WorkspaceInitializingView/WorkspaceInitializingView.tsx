@@ -7,9 +7,8 @@ import {
 	AlertDialogTitle,
 } from "@superset/ui/alert-dialog";
 import { Button } from "@superset/ui/button";
+import { GitBranch, Loader, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
-import { HiExclamationTriangle } from "react-icons/hi2";
-import { LuGitBranch, LuLoader } from "react-icons/lu";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useDeleteWorkspace } from "renderer/react-query/workspaces";
 import { deleteWithToast } from "renderer/routes/_authenticated/components/TeardownLogsDialog";
@@ -112,7 +111,7 @@ export function WorkspaceInitializingView({
 					<div className="flex flex-col items-center max-w-sm text-center space-y-6">
 						{/* Icon */}
 						<div className="flex items-center justify-center size-16 rounded-full bg-muted">
-							<LuGitBranch className="size-8 text-muted-foreground" />
+							<GitBranch className="size-8 text-muted-foreground" />
 						</div>
 
 						{/* Title and description */}
@@ -148,7 +147,7 @@ export function WorkspaceInitializingView({
 							>
 								{retryMutation.isPending ? (
 									<>
-										<LuLoader className="mr-2 size-4 animate-spin" />
+										<Loader className="mr-2 size-4 animate-spin" />
 										Retrying...
 									</>
 								) : (
@@ -208,7 +207,7 @@ export function WorkspaceInitializingView({
 					<div className="flex flex-col items-center max-w-sm text-center space-y-6">
 						{/* Error icon */}
 						<div className="flex items-center justify-center size-16 rounded-full bg-destructive/10">
-							<HiExclamationTriangle className="size-8 text-destructive" />
+							<TriangleAlert className="size-8 text-destructive" />
 						</div>
 
 						{/* Title and description */}
@@ -246,7 +245,7 @@ export function WorkspaceInitializingView({
 							>
 								{retryMutation.isPending ? (
 									<>
-										<LuLoader className="mr-2 size-4 animate-spin" />
+										<Loader className="mr-2 size-4 animate-spin" />
 										Retrying...
 									</>
 								) : (

@@ -6,8 +6,7 @@ import {
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
 import { cn } from "@superset/ui/utils";
-import { HiMiniCommandLine } from "react-icons/hi2";
-import { LuCheck, LuChevronDown, LuPlus } from "react-icons/lu";
+import { Check, ChevronDown, Plus, SquareTerminal } from "lucide-react";
 import { getPresetIcon } from "renderer/assets/app-icons/preset-icons";
 
 export interface QuickAddAgentPill {
@@ -43,9 +42,9 @@ export function QuickAddPresets({
 					variant="outline"
 					disabled={isAddDisabled || pills.length === 0}
 				>
-					<LuPlus className="size-4" />
+					<Plus className="size-4" />
 					Import agent
-					<LuChevronDown className="size-4 opacity-60" />
+					<ChevronDown className="size-4 opacity-60" />
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-80">
@@ -75,7 +74,7 @@ export function QuickAddPresets({
 								{icon ? (
 									<img src={icon} alt="" className="size-4 object-contain" />
 								) : (
-									<HiMiniCommandLine className="size-4 text-muted-foreground" />
+									<SquareTerminal className="size-4 text-muted-foreground" />
 								)}
 							</div>
 							<div className="min-w-0 flex-1">
@@ -89,7 +88,7 @@ export function QuickAddPresets({
 								)}
 							</div>
 							{alreadyAdded && (
-								<LuCheck className="size-4 shrink-0 text-muted-foreground mt-0.5" />
+								<Check className="size-4 shrink-0 text-muted-foreground mt-0.5" />
 							)}
 						</DropdownMenuItem>
 					);

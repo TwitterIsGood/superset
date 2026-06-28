@@ -10,12 +10,8 @@ import {
 	ContextMenuTrigger,
 } from "@superset/ui/context-menu";
 import { useLiveQuery } from "@tanstack/react-db";
+import { CircleUserRound, Copy, Trash2 } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
-import {
-	HiOutlineDocumentDuplicate,
-	HiOutlineTrash,
-	HiOutlineUserCircle,
-} from "react-icons/hi2";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import { useOptimisticCollectionActions } from "renderer/routes/_authenticated/hooks/useOptimisticCollectionActions";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
@@ -111,7 +107,7 @@ export function TaskContextMenu({
 				{/* Assignee submenu */}
 				<ContextMenuSub>
 					<ContextMenuSubTrigger>
-						<HiOutlineUserCircle className="mr-2 size-4" />
+						<CircleUserRound className="mr-2 size-4" />
 						<span>Assignee</span>
 					</ContextMenuSubTrigger>
 					<ContextMenuSubContent className="w-56">
@@ -148,7 +144,7 @@ export function TaskContextMenu({
 				{/* Copy submenu */}
 				<ContextMenuSub>
 					<ContextMenuSubTrigger>
-						<HiOutlineDocumentDuplicate className="mr-2 size-4" />
+						<Copy className="mr-2 size-4" />
 						<span>Copy</span>
 					</ContextMenuSubTrigger>
 					<ContextMenuSubContent className="w-48">
@@ -167,7 +163,7 @@ export function TaskContextMenu({
 					onSelect={handleDelete}
 					className="text-destructive focus:text-destructive"
 				>
-					<HiOutlineTrash className="text-destructive size-4" />
+					<Trash2 className="text-destructive size-4" />
 					<span>Delete</span>
 				</ContextMenuItem>
 			</ContextMenuContent>

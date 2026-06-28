@@ -1,4 +1,5 @@
 import type { BrowserWindow } from "electron";
+import { app } from "electron";
 import { env } from "shared/env.shared";
 
 /** Window IDs defined in the router configuration */
@@ -17,7 +18,7 @@ export function registerRoute(props: {
 	htmlFile: string;
 	query?: Record<string, string>;
 }): void {
-	const isDev = env.NODE_ENV === "development";
+	const isDev = !app.isPackaged && env.NODE_ENV === "development";
 
 	if (isDev) {
 		// Development: load from Vite dev server with hash routing

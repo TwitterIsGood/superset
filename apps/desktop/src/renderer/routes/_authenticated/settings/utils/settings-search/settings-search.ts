@@ -27,6 +27,7 @@ export const SETTING_ITEM_ID = {
 	BEHAVIOR_CONFIRM_QUIT: "behavior-confirm-quit",
 	BEHAVIOR_FILE_OPEN_MODE: "behavior-file-open-mode",
 	BEHAVIOR_RESOURCE_MONITOR: "behavior-resource-monitor",
+	BEHAVIOR_TELEMETRY: "behavior-telemetry",
 	BEHAVIOR_OPEN_LINKS_IN_APP: "behavior-open-links-in-app",
 
 	GIT_BRANCH_PREFIX: "git-branch-prefix",
@@ -136,6 +137,7 @@ export const SETTING_ITEM_VARIANT: Record<SettingItemId, SettingVariant> = {
 	[SETTING_ITEM_ID.BEHAVIOR_CONFIRM_QUIT]: "shared",
 	[SETTING_ITEM_ID.BEHAVIOR_FILE_OPEN_MODE]: "v1",
 	[SETTING_ITEM_ID.BEHAVIOR_RESOURCE_MONITOR]: "shared",
+	[SETTING_ITEM_ID.BEHAVIOR_TELEMETRY]: "shared",
 	[SETTING_ITEM_ID.BEHAVIOR_OPEN_LINKS_IN_APP]: "v1",
 
 	// Branch prefix exists in both UIs — v1 `GitSettings`, v2 `V2GitSettings`.
@@ -587,6 +589,26 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
 			"performance",
 			"process",
 			"terminal",
+		],
+	},
+	{
+		id: SETTING_ITEM_ID.BEHAVIOR_TELEMETRY,
+		section: "behavior",
+		title: "Usage and performance analytics",
+		description:
+			"Send aggregate app usage, startup, memory, and process metrics without user content or file paths",
+		keywords: [
+			"analytics",
+			"telemetry",
+			"usage",
+			"performance",
+			"startup",
+			"memory",
+			"process",
+			"metrics",
+			"privacy",
+			"opt out",
+			"posthog",
 		],
 	},
 	{

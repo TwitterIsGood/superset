@@ -8,18 +8,18 @@ import {
 	CommandList,
 } from "@superset/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
-import { toast } from "@superset/ui/sonner";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
-import { ChevronDownIcon } from "lucide-react";
+import { Check, ChevronDownIcon, Play } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { HiCheck, HiMiniPlay } from "react-icons/hi2";
 import { AgentSelect } from "renderer/components/AgentSelect";
 import { env } from "renderer/env.renderer";
 import { useHostUrl } from "renderer/hooks/host-service/useHostTargetUrl";
 import { useV2AgentChoices } from "renderer/hooks/useV2AgentChoices";
 import { authClient } from "renderer/lib/auth-client";
 import { showHostServiceUnavailableToast } from "renderer/lib/host-service-unavailable";
+import { useTrellisRuntimePack } from "renderer/lib/pack-system";
+import { toast } from "renderer/lib/toast";
 import { DevicePicker } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker";
 import { useWorkspaceHostOptions } from "renderer/routes/_authenticated/components/DashboardNewWorkspaceModal/components/DashboardNewWorkspaceForm/components/DevicePicker/hooks/useWorkspaceHostOptions";
 import {
@@ -74,6 +74,7 @@ export function RunIssuesInWorkspacePopover({
 		: (session?.session?.activeOrganizationId ?? null);
 	const { otherHosts } = useWorkspaceHostOptions();
 	const { submit } = useWorkspaceCreates();
+	const trellisRuntimePack = useTrellisRuntimePack();
 
 	const lastHostId = useV2WorkspaceCreateDefaultsStore(
 		(state) => state.lastHostId,
@@ -210,7 +211,7 @@ export function RunIssuesInWorkspacePopover({
 		activeHostUrl,
 	]);
 
-	const handleRun = () => {
+	const handleRun = async () => {
 		if (!selectedProjectId || !hostId) return;
 		if (submitBlocker) {
 			if (hostId === machineId && !activeHostUrl) {
@@ -225,6 +226,10 @@ export function RunIssuesInWorkspacePopover({
 
 		setLastProjectId(selectedProjectId);
 
+		const trellisSetup = await trellisRuntimePack.prepareTrellisSetup({
+			initialize: trellisInitialize,
+			useLocalPack: hostId === machineId,
+		});
 		const handles = issues.map((issue) =>
 			submit({
 				hostId,
@@ -245,7 +250,7 @@ export function RunIssuesInWorkspacePopover({
 										prompt: synthesizeIssuePrompt(issue),
 									},
 								],
-					trellisSetup: trellisInitialize ? { initialize: true } : undefined,
+					trellisSetup,
 				},
 			}),
 		);
@@ -288,7 +293,7 @@ export function RunIssuesInWorkspacePopover({
 					size="sm"
 					className="h-7 text-xs gap-1.5 bg-muted/50"
 				>
-					<HiMiniPlay className="size-3" />
+					<Play className="size-3" />
 					Run in Workspace
 				</Button>
 			</PopoverTrigger>
@@ -357,7 +362,7 @@ export function RunIssuesInWorkspacePopover({
 													</span>
 												)}
 												{project.id === selectedProjectId && (
-													<HiCheck className="size-3.5 shrink-0" />
+													<Check className="size-3.5 shrink-0" />
 												)}
 											</CommandItem>
 										))}
@@ -395,8 +400,8 @@ export function RunIssuesInWorkspacePopover({
 					<Button
 						size="sm"
 						className="w-full h-8"
-						disabled={!!submitBlocker}
-						onClick={handleRun}
+						disabled={!!submitBlocker || trellisRuntimePack.isResolving}
+						onClick={() => void handleRun()}
 					>
 						Run {issues.length} Workspace{issues.length === 1 ? "" : "s"}
 					</Button>

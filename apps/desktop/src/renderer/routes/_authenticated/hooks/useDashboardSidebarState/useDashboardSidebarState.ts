@@ -1,7 +1,5 @@
 import type { Pane, WorkspaceState } from "@superset/panes";
 import { useCallback } from "react";
-import { terminalRuntimeRegistry } from "renderer/lib/terminal/terminal-runtime-registry";
-import { browserRuntimeRegistry } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/hooks/usePaneRegistry/components/BrowserPane/browserRuntimeRegistry";
 import {
 	extractPaneIds,
 	type PaneLifecycleRow,
@@ -178,13 +176,36 @@ function getBrowserRuntimeId(pane: Pane<unknown>): string | null {
 	return pane.kind === "browser" ? pane.id : null;
 }
 
-function cleanupWorkspacePaneRuntimes(rows: PaneLifecycleRow[]): void {
-	for (const terminalId of extractPaneIds(rows, getTerminalRuntimeId)) {
-		terminalRuntimeRegistry.release(terminalId);
+async function cleanupWorkspacePaneRuntimes(
+	rows: PaneLifecycleRow[],
+): Promise<void> {
+	const terminalIds = extractPaneIds(rows, getTerminalRuntimeId);
+	const browserIds = extractPaneIds(rows, getBrowserRuntimeId);
+	if (terminalIds.size === 0 && browserIds.size === 0) return;
+
+	const [terminalRuntime, browserRuntime] = await Promise.all([
+		terminalIds.size > 0
+			? import("renderer/lib/terminal/terminal-runtime-registry")
+			: Promise.resolve(null),
+		browserIds.size > 0
+			? import(
+					"renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/hooks/usePaneRegistry/components/BrowserPane/browserRuntimeRegistry"
+				)
+			: Promise.resolve(null),
+	]);
+
+	for (const terminalId of terminalIds) {
+		terminalRuntime?.terminalRuntimeRegistry.release(terminalId);
 	}
-	for (const browserId of extractPaneIds(rows, getBrowserRuntimeId)) {
-		browserRuntimeRegistry.destroy(browserId);
+	for (const browserId of browserIds) {
+		browserRuntime?.browserRuntimeRegistry.destroy(browserId);
 	}
+}
+
+function scheduleWorkspacePaneRuntimeCleanup(rows: PaneLifecycleRow[]): void {
+	void cleanupWorkspacePaneRuntimes(rows).catch((error) => {
+		console.warn("[dashboard-sidebar] Failed to clean pane runtimes", error);
+	});
 }
 
 export function useDashboardSidebarState() {
@@ -447,7 +468,7 @@ export function useDashboardSidebarState() {
 		(workspaceId: string) => {
 			const workspace = collections.v2WorkspaceLocalState.get(workspaceId);
 			if (!workspace) return;
-			cleanupWorkspacePaneRuntimes([workspace]);
+			scheduleWorkspacePaneRuntimeCleanup([workspace]);
 			collections.v2WorkspaceLocalState.delete(workspaceId);
 		},
 		[collections],
@@ -471,7 +492,7 @@ export function useDashboardSidebarState() {
 				return;
 			}
 
-			cleanupWorkspacePaneRuntimes([workspace]);
+			scheduleWorkspacePaneRuntimeCleanup([workspace]);
 			collections.v2WorkspaceLocalState.update(workspaceId, (draft) => {
 				draft.sidebarState.projectId = projectId;
 				draft.sidebarState.sectionId = null;
@@ -495,7 +516,7 @@ export function useDashboardSidebarState() {
 				.map((item) => item.sectionId);
 
 			if (workspaceIds.length > 0) {
-				cleanupWorkspacePaneRuntimes(workspaceRows);
+				scheduleWorkspacePaneRuntimeCleanup(workspaceRows);
 				collections.v2WorkspaceLocalState.delete(workspaceIds);
 			}
 			if (sectionIds.length > 0) {

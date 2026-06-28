@@ -127,6 +127,15 @@
   Use `--route=<hash-route>` to measure SPA route transitions through the
   in-app TanStack Router; do not use reload-based navigation as a route-open
   performance proxy unless the task explicitly measures cold route loads.
+- Runtime budget gates must declare required route coverage in
+  `apps/desktop/perf-budget.json` and the reporter invocation must pass the
+  matching `--route=<hash-route>` values. A runtime report with no route
+  measurements is not enough evidence for Canary performance, even when startup
+  and process memory are under budget.
+- Runtime memory hard limits must reject the development regressions this task
+  was created to prevent: desktop process-tree memory above 4 GiB or all tracked
+  process memory above 6 GiB is a failure, not a warning. Targets should stay
+  lower and track the desired VSCode-class steady state.
 - Run repo quality gates before commit:
   `bun run lint`, `bun run --cwd apps/desktop typecheck`, and
   `bun run typecheck` when package/workflow scripts or shared types changed.
@@ -214,3 +223,173 @@ run: |
 - Source-level regression when changing host-service composition: assert
   `packages/host-service/src/app.ts` has no static value imports for
   `ChatService`, `ChatRuntimeManager`, or model gateway handlers.
+
+## Desktop Worktree Dev Memory
+
+### 1. Scope / Trigger
+
+- Trigger: changing `.superset/worktree-dev.sh`, `dev:worktree:*` scripts, or
+  desktop dev server flags.
+- Goal: keep normal Desktop development close to the packaged runtime shape
+  instead of paying for every local backend and Docker data service.
+
+### 2. Signatures
+
+- Default profile: `WORKTREE_DEV_PROFILE=desktop-online-lite`.
+- Full local profile: `WORKTREE_DEV_PROFILE=full`.
+- Desktop main/preload watch escape hatch:
+  `SUPERSET_DESKTOP_DEV_MAIN_WATCH=1`.
+- Desktop dev runner heap escape hatch:
+  `SUPERSET_DESKTOP_DEV_NODE_OPTIONS=<node options>`.
+
+### 3. Contracts
+
+- `bun run dev:worktree:start` must start the low-memory Desktop-only profile
+  by default, connect to the online-like API/Electric/Relay services, and stop
+  any stale worktree-local Docker data services from a previous full run.
+- Full local API/Electric/Docker startup must be explicit through
+  `bun run dev:worktree:start:full` or `WORKTREE_DEV_PROFILE=full`.
+- The default Desktop dev command should not use `electron-vite dev --watch`.
+  Renderer HMR remains available; main/preload watch is opt-in because it keeps
+  the Vite/Rollup dev graph resident and can push the app into multi-GB memory.
+- Runtime reports must write local artifacts under `.tmp/` by default, not
+  `apps/desktop/performance-reports/`, so lint does not scan transient JSON.
+
+### 4. Validation & Error Matrix
+
+- Default profile starts local Docker -> fail; this regresses the low-memory
+  development path.
+- `SUPERSET_DESKTOP_DEV_MAIN_WATCH=1` missing for main/preload hot-reload work
+  -> developer must restart Desktop after main/preload edits.
+- `--max-old-space-size=1024` for electron-vite cold start -> expected OOM in
+  the current app; keep the default at `1536` unless the renderer graph is
+  reduced enough to prove a lower cap.
+
+### 5. Good/Base/Bad Cases
+
+- Good: `dev:worktree:start` reports `profile: desktop-online-lite`, no local
+  compose project, Desktop app processes around 1GB, and external online-like
+  probes pass.
+- Base: `dev:worktree:start:full` intentionally starts local API, relay,
+  Electric proxy, and Docker services for backend integration work.
+- Bad: a normal Desktop UI task starts API Next dev, Wrangler/workerd, local
+  Postgres/Electric/MinIO, and `electron-vite --watch`, causing macOS Force
+  Quit to attribute roughly 10GB to the app.
+
+### 6. Tests Required
+
+- `scripts/worktree-local-shell.test.ts` must assert the default profile,
+  explicit full scripts, Docker cleanup when local data is skipped, heap cap,
+  and main/preload watch escape hatch.
+- Run `bun run dev:worktree:start` and confirm status shows
+  `profile: desktop-online-lite`.
+- Run `bun run --cwd apps/desktop report:runtime -- --duration=10000
+  --interval=1000 --top=12` and confirm process totals are under the current
+  Desktop dev budget.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+bun run dev:worktree:start
+# Starts full local API/Electric/Docker and electron-vite --watch by default.
+```
+
+#### Correct
+
+```bash
+bun run dev:worktree:start
+# Starts Desktop-only online-lite by default.
+
+bun run dev:worktree:start:full
+# Explicitly starts the full local backend stack.
+```
+
+## Desktop Resource Pack Public MinIO Smoke
+
+### 1. Scope / Trigger
+
+- Trigger: validating Desktop resource-pack upload/download behavior before a
+  durable production S3/CDN endpoint is available.
+- Goal: allow a short online-like smoke using local Docker MinIO through a
+  public router mapping without changing GitHub Release installer delivery.
+
+### 2. Signatures
+
+- Docker compose env:
+  - `LOCAL_S3_BIND_HOST`: host bind address for MinIO API, default
+    `127.0.0.1`.
+  - `LOCAL_S3_CONSOLE_BIND_HOST`: host bind address for MinIO console, default
+    `127.0.0.1`.
+- Online stack env:
+  - `SUPERSET_ONLINE_EXPOSE_RESOURCE_PACKS_PUBLIC=1`: sets
+    `LOCAL_S3_BIND_HOST=0.0.0.0` unless explicitly overridden.
+- Resource-pack release env:
+  - `SUPERSET_OBJECT_STORAGE_ENDPOINT=http://localhost:43018`
+  - `SUPERSET_RESOURCE_PACK_BASE_URL=http://<public-domain>:<public-port>/superset-artifacts/packs`
+
+### 3. Contracts
+
+- GitHub Releases remain the installer distribution channel. S3-compatible
+  object storage is only for hidden/on-demand runtime packs.
+- Local MinIO validates S3-compatible uploads with signed credentials and
+  unsigned public downloads from the `packs/` prefix.
+- Direct MinIO public URLs must include bucket plus prefix:
+  `/superset-artifacts/packs`.
+- Multiple runtime-pack build scripts may run sequentially in one release job.
+  Each script must merge its pack into the existing `pack-manifest-index.json`
+  instead of overwriting the app index; otherwise the packaged app can only
+  discover the last built pack.
+- The MinIO console port must remain bound to localhost unless a task
+  explicitly changes admin access policy.
+
+### 4. Validation & Error Matrix
+
+- `SUPERSET_RESOURCE_PACK_BASE_URL` host is `localhost`, `127.0.0.1`, or `::1`
+  without `--allow-local-base-url` -> release readiness fails.
+- Router maps to a port that is still bound to `127.0.0.1` -> public download
+  verification fails before release.
+- Public URL omits `/superset-artifacts/packs` when exposing MinIO directly ->
+  remote manifest fetch returns `404`.
+- Console port is public -> reject the setup; only the API/download port should
+  be exposed for this smoke.
+
+### 5. Good/Base/Bad Cases
+
+- Good: `SUPERSET_ONLINE_EXPOSE_RESOURCE_PACKS_PUBLIC=1` makes MinIO API listen
+  on `0.0.0.0:43018`, router maps a public 6XXXX port to `43018`, and
+  `verify:resource-pack-downloads` succeeds against the public base URL.
+- Base: default online stack keeps MinIO on `127.0.0.1:43018`, suitable for
+  local upload/download tests only.
+- Bad: treating local MinIO as production storage without a durable public URL,
+  repository secrets, and release workflow verification.
+
+### 6. Tests Required
+
+- Source regression: `scripts/superset-online.test.ts` must assert MinIO stays
+  local by default and only the API port is public with the explicit online
+  flag.
+- Source regression: `apps/desktop/scripts/resource-pack-index.test.ts` must
+  prove new pack manifests are merged into the default and embedded app indexes
+  without dropping existing packs.
+- Compose regression: `docker compose config` should show `host_ip:
+  127.0.0.1` by default and `host_ip: 0.0.0.0` for the MinIO API when
+  `LOCAL_S3_BIND_HOST=0.0.0.0`.
+- Release smoke: run `check:resource-pack-release-readiness`,
+  `upload:resource-packs`, and `verify:resource-pack-downloads` with the public
+  base URL.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```bash
+export SUPERSET_RESOURCE_PACK_BASE_URL=http://bj1.v.lhb.ink:6XXXX/packs
+```
+
+#### Correct
+
+```bash
+export SUPERSET_RESOURCE_PACK_BASE_URL=http://bj1.v.lhb.ink:6XXXX/superset-artifacts/packs
+```

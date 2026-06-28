@@ -1,8 +1,8 @@
 import type { AppRouter } from "@superset/host-service";
 import { workspaceTrpc } from "@superset/workspace-client";
 import type { inferRouterOutputs } from "@trpc/server";
+import { MessageSquare } from "lucide-react";
 import { useMemo } from "react";
-import { LuMessageSquare } from "react-icons/lu";
 import type { CommentPaneData, DiffFocusSide } from "../../../../types";
 import {
 	coerceCheckStatus,
@@ -99,7 +99,7 @@ export function useReviewTab({
 	return {
 		id: "review",
 		label: "Review",
-		icon: LuMessageSquare,
+		icon: MessageSquare,
 		badge: openReviewCount > 0 ? openReviewCount : undefined,
 		content,
 	};

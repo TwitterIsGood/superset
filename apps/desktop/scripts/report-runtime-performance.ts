@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { promisify } from "node:util";
+import { config } from "dotenv";
 import { DesktopAutomation } from "../../../packages/desktop-mcp/src/automation/index.ts";
 import {
 	STARTUP_PERFORMANCE_GET_CHANNEL,
@@ -187,15 +188,17 @@ interface RuntimeReport {
 
 const desktopDir = resolve(import.meta.dirname, "..");
 const rootDir = resolve(desktopDir, "../..");
-const taskArtifactsDir = resolve(
+const defaultReportDir = resolve(
 	rootDir,
-	".trellis/tasks/06-09-desktop-performance-packaging-optimization/artifacts",
+	".tmp",
+	"desktop-performance-reports",
 );
 const defaultDurationMs = 10_000;
 const defaultIntervalMs = 1_000;
 const execTimeoutMs = 15_000;
 const maxBuffer = 20 * 1024 * 1024;
 
+config({ path: resolve(rootDir, ".env"), quiet: true });
 process.env.DESKTOP_AUTOMATION_PORT ??= "9322";
 
 let getPhysFootprints: ((pids: number[]) => Record<number, number>) | undefined;
@@ -217,7 +220,7 @@ function parseCliOptions(argv: string[]): CliOptions {
 		durationMs: defaultDurationMs,
 		intervalMs: defaultIntervalMs,
 		topLimit: 12,
-		reportDir: taskArtifactsDir,
+		reportDir: defaultReportDir,
 		routes: [],
 		routeSettleMs: 750,
 		restoreRoute: true,
@@ -1270,6 +1273,8 @@ async function main(): Promise<void> {
 	const markdown = renderMarkdown(report);
 
 	mkdirSync(reportDir, { recursive: true });
+	mkdirSync(dirname(markdownPath), { recursive: true });
+	mkdirSync(dirname(jsonPath), { recursive: true });
 	writeFileSync(markdownPath, markdown);
 	writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
 

@@ -1,16 +1,18 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	realpathSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
+
+let workRoot: string;
+
+beforeEach(() => {
+	workRoot = mkdtempSync(join(tmpdir(), "superset-worktree-shell-"));
+});
+
+afterEach(() => {
+	rmSync(workRoot, { recursive: true, force: true });
+});
 
 function runBash(script: string) {
 	return spawnSync("bash", ["-lc", script], {
@@ -24,191 +26,457 @@ function shellString(value: string): string {
 	return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
-function expectShellSuccess(result: ReturnType<typeof spawnSync>): void {
-	if (result.status !== 0) {
-		throw new Error(
-			`Shell command failed with status ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
-		);
-	}
-}
-
-function withWorkRoot(run: (workRoot: string) => void): void {
-	const workRoot = mkdtempSync(join(tmpdir(), "superset-worktree-shell-"));
-	try {
-		run(workRoot);
-	} finally {
-		rmSync(workRoot, { recursive: true, force: true });
-	}
-}
-
-function worktreePathHash(root: string): string {
-	return createHash("sha1")
-		.update(realpathSync(root))
-		.digest("hex")
-		.slice(0, 10);
-}
-
-function sanitizeName(value: string): string {
-	return (
-		value
-			.toLowerCase()
-			.replaceAll(/[^a-z0-9._-]/g, "-")
-			.replaceAll(/--+/g, "-")
-			.replaceAll(/^-|-$/g, "")
-			.slice(0, 48) || "workspace"
-	);
-}
-
-function defaultWorkspaceName(root: string): string {
-	const physical = realpathSync(root);
-	const base = sanitizeName(basename(physical)).slice(0, 36);
-	return `${base}-${worktreePathHash(root)}`;
-}
-
-function defaultDbProject(root: string): string {
-	return `superset-${defaultWorkspaceName(root)}`;
-}
-
-function expectedHomeDir(root: string): string {
-	return `${realpathSync(root)}/superset-dev-data`;
-}
-
-function writeManagedEnv(envPath: string, root: string): void {
-	writeFileSync(
-		envPath,
-		[
-			"# ===== Local workspace overrides (setup.local.sh) =====",
-			`SUPERSET_WORKTREE_ID="${worktreePathHash(root)}"`,
-			`SUPERSET_WORKTREE_ROOT="${realpathSync(root)}"`,
-			`SUPERSET_HOME_DIR="${expectedHomeDir(root)}"`,
-			'SUPERSET_PORT_BASE="3000"',
-			`LOCAL_DB_PROJECT="${defaultDbProject(root)}"`,
-			'LOCAL_PG_PORT="3014"',
-			'LOCAL_ELECTRIC_PORT="3009"',
-			'LOCAL_REDIS_PORT="3016"',
-			'LOCAL_KV_REST_PORT="3017"',
-			'LOCAL_S3_PORT="3019"',
-			'LOCAL_S3_CONSOLE_PORT="3020"',
-			'API_PORT="3001"',
-			'DESKTOP_VITE_PORT="3005"',
-			'CADDY_ELECTRIC_PORT="3010"',
-			'WRANGLER_PORT="3012"',
-			'RELAY_PORT="3013"',
-			'DATABASE_URL="postgres://postgres:postgres@localhost:3014/main"',
-			'DATABASE_URL_UNPOOLED="postgres://postgres:postgres@localhost:3014/main"',
-			'KV_REST_API_URL="http://localhost:3017"',
-			'KV_URL="redis://localhost:3016"',
-			'ELECTRIC_URL="http://localhost:3009/v1/shape"',
-			'NEXT_PUBLIC_ELECTRIC_URL="http://localhost:3012"',
-			'NEXT_PUBLIC_ELECTRIC_PROXY_URL="http://localhost:3012"',
-			'NEXT_PUBLIC_API_URL="http://localhost:3001"',
-			'NEXT_PUBLIC_DESKTOP_URL="http://localhost:3005"',
-			'RELAY_URL="http://localhost:3013"',
-			'NEXT_PUBLIC_RELAY_URL="http://localhost:3013"',
-			"",
-		].join("\n"),
-	);
+function shellExpansion(value: string): string {
+	return `$${"{"}${value}}`;
 }
 
 describe("worktree local shell helpers", () => {
-	test("derives different default compose projects for same-named worktree paths", () => {
-		withWorkRoot((workRoot) => {
-			const first = join(workRoot, "first", "superset");
-			const second = join(workRoot, "second", "superset");
-			mkdirSync(first, { recursive: true });
-			mkdirSync(second, { recursive: true });
+	test("does not force an 8GB V8 heap for desktop worktree dev", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
 
-			const result = runBash(`
-					set -euo pipefail
-					source .superset/lib/worktree-local.sh
-					first_project="$(worktree_default_db_project ${shellString(first)})"
+		expect(script).not.toContain("NODE_OPTIONS=--max-old-space-size=8192");
+	});
+
+	test("caps only the desktop dev runner heap with an override escape hatch", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+
+		expect(script).toContain("SUPERSET_DESKTOP_DEV_NODE_OPTIONS");
+		expect(script).toContain('export NODE_OPTIONS="--max-old-space-size=1536"');
+		expect(script).toContain(
+			`export NODE_OPTIONS="${shellExpansion("SUPERSET_DESKTOP_DEV_NODE_OPTIONS")}${shellExpansion("NODE_OPTIONS:+ $NODE_OPTIONS")}"`,
+		);
+		expect(script).toContain("SUPERSET_DESKTOP_DEV_MAIN_WATCH");
+		expect(script).toContain("exec ./node_modules/.bin/electron-vite dev");
+	});
+
+	test("caps only the local API dev runner heap with an override escape hatch", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+
+		expect(script).toContain("SUPERSET_API_DEV_NODE_OPTIONS");
+		expect(script).toContain('export NODE_OPTIONS="--max-old-space-size=768"');
+		expect(script).toContain(
+			`export NODE_OPTIONS="${shellExpansion("SUPERSET_API_DEV_NODE_OPTIONS")}${shellExpansion("NODE_OPTIONS:+ $NODE_OPTIONS")}"`,
+		);
+		expect(script).toContain(
+			'exec ./node_modules/.bin/next dev --port "$API_PORT"',
+		);
+	});
+
+	test("defines a desktop-lite profile that skips only the local API app session", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+
+		expect(script).toContain("WORKTREE_DEV_PROFILE");
+		expect(script).toContain(
+			'WORKTREE_DEV_PROFILE="$' +
+				'{WORKTREE_DEV_PROFILE:-desktop-online-lite}"',
+		);
+		expect(script).toContain(
+			'full)\n      SESSIONS=("api" "relay" "electric-proxy" "desktop")',
+		);
+		expect(script).toContain(
+			'desktop-lite)\n      SESSIONS=("relay" "electric-proxy" "desktop")',
+		);
+		expect(script).toContain("WORKTREE_DEV_REQUIRES_LOCAL_API=0");
+		expect(script).toContain("WORKTREE_DEV_REQUIRES_LOCAL_DATA=1");
+	});
+
+	test("defines a desktop online-lite profile that uses external loaded app services", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+		const setupScript = readFileSync(".superset/setup.local.sh", "utf8");
+		const packageJson = readFileSync("package.json", "utf8");
+
+		expect(script).toContain(
+			'desktop-online-lite)\n      SESSIONS=("desktop")',
+		);
+		expect(script).toContain("WORKTREE_DEV_REQUIRES_LOCAL_DATA=0");
+		expect(script).toContain("WORKTREE_DEV_USES_EXTERNAL_APP_SERVICES=1");
+		expect(script).toContain(
+			`WORKTREE_DEV_EXTERNAL_API_URL="${shellExpansion("WORKTREE_DEV_EXTERNAL_API_URL:-http://localhost:43001")}"`,
+		);
+		expect(script).toContain(
+			`WORKTREE_DEV_EXTERNAL_ELECTRIC_URL="${shellExpansion("WORKTREE_DEV_EXTERNAL_ELECTRIC_URL:-http://localhost:43012")}"`,
+		);
+		expect(script).toContain(
+			`WORKTREE_DEV_EXTERNAL_RELAY_URL="${shellExpansion("WORKTREE_DEV_EXTERNAL_RELAY_URL:-http://localhost:43013")}"`,
+		);
+		expect(script).toContain(
+			`SUPERSET_DESKTOP_PROXY_API_TARGET="${shellExpansion("SUPERSET_DESKTOP_PROXY_API_TARGET:-$WORKTREE_DEV_EXTERNAL_API_URL")}"`,
+		);
+		expect(script).toContain(
+			`WORKTREE_DEV_EXTERNAL_TRUSTED_ORIGIN="${shellExpansion("WORKTREE_DEV_EXTERNAL_TRUSTED_ORIGIN:-http://bj1.v.lhb.ink:63000")}"`,
+		);
+		expect(script).toContain(
+			`SUPERSET_DESKTOP_PROXY_ORIGIN="${shellExpansion("SUPERSET_DESKTOP_PROXY_ORIGIN:-$WORKTREE_DEV_EXTERNAL_TRUSTED_ORIGIN")}"`,
+		);
+		expect(script).toContain(
+			`SUPERSET_DESKTOP_TARGET_API_URL="${shellExpansion(`SUPERSET_DESKTOP_TARGET_API_URL:-http://localhost:${shellExpansion("DESKTOP_VITE_PORT")}`)}"`,
+		);
+		expect(script).toContain(
+			'NEXT_PUBLIC_API_URL="$SUPERSET_DESKTOP_TARGET_API_URL"',
+		);
+		expect(script).toContain(
+			"expected external loaded source: bun run online:start:desktop:loaded",
+		);
+		expect(script).toContain(
+			"local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:desktop:loaded",
+		);
+		expect(script).toContain(
+			'warn "local Docker data services skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE); expected external loaded source: bun run online:start:desktop:loaded"\n    stop_data_services',
+		);
+		expect(setupScript).toContain(
+			'WORKTREE_DEV_PROFILE="$' +
+				'{WORKTREE_DEV_PROFILE:-desktop-online-lite}"',
+		);
+		expect(setupScript).toContain("local_requires_local_data");
+		expect(setupScript).toContain(
+			"WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE uses external online-like services",
+		);
+		expect(setupScript).toContain('step_skipped "Start local DB stack"');
+		expect(script).toContain(
+			`wait_for_probe "external api session" "${shellExpansion("WORKTREE_DEV_EXTERNAL_API_URL")}/api/auth/get-session" "200"`,
+		);
+		expect(script).toContain(
+			`probe_url "external electric" "${shellExpansion("WORKTREE_DEV_EXTERNAL_ELECTRIC_URL")}/v1/shape" "401"`,
+		);
+		expect(packageJson).toContain(
+			'dev:worktree:start:online-lite": "WORKTREE_DEV_PROFILE=desktop-online-lite',
+		);
+		expect(packageJson).toContain(
+			'dev:worktree:start:full": "WORKTREE_DEV_PROFILE=full',
+		);
+		expect(packageJson).toContain(
+			'dev:worktree:start:online-lite:loaded": "WORKTREE_DEV_PROFILE=desktop-online-lite WORKTREE_DEV_LOAD_FIXTURE=1',
+		);
+		expect(packageJson).toContain(
+			'dev:worktree:start:full:loaded": "WORKTREE_DEV_PROFILE=full WORKTREE_DEV_LOAD_FIXTURE=1',
+		);
+		expect(packageJson).toContain(
+			'dev:worktree:status:online-lite": "WORKTREE_DEV_PROFILE=desktop-online-lite',
+		);
+		expect(packageJson).toContain(
+			'dev:worktree:status:full": "WORKTREE_DEV_PROFILE=full',
+		);
+	});
+
+	test("desktop-lite status and readiness skip the local API probe", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+		const packageJson = readFileSync("package.json", "utf8");
+
+		expect(script).toContain(
+			"api session skipped (WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE",
+		);
+		expect(script).toContain(
+			'printf \'  - %-24s skipped %s\\n\' "api session" "$NEXT_PUBLIC_API_URL"',
+		);
+		expect(packageJson).toContain(
+			'dev:worktree:start:lite": "WORKTREE_DEV_PROFILE=desktop-lite',
+		);
+		expect(script).toContain("desktop_lite_uses_skipped_local_api");
+		expect(script).toContain(
+			"login and API mutations need an already running API or a different .env API URL",
+		);
+	});
+
+	test("loaded worktree profile ensures and reports dense desktop data", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+		const packageJson = readFileSync("package.json", "utf8");
+
+		expect(script).toContain("WORKTREE_DEV_LOAD_FIXTURE");
+		expect(script).toContain("ensure_desktop_perf_fixture_if_requested");
+		expect(script).toContain("desktop:perf-fixture -- ensure");
+		expect(script).toContain("desktop:perf-fixture -- stats");
+		expect(script).toContain("dense desktop fixture:");
+		expect(script).toContain("run: bun run dev:worktree:start:loaded");
+		expect(packageJson).toContain(
+			'dev:worktree:start:loaded": "WORKTREE_DEV_LOAD_FIXTURE=1',
+		);
+		expect(packageJson).toContain(
+			'dev:worktree:start:lite:loaded": "WORKTREE_DEV_PROFILE=desktop-lite WORKTREE_DEV_LOAD_FIXTURE=1',
+		);
+		expect(packageJson).toContain(
+			'dev:worktree:start:online-lite:loaded": "WORKTREE_DEV_PROFILE=desktop-online-lite WORKTREE_DEV_LOAD_FIXTURE=1',
+		);
+		expect(packageJson).toContain(
+			'desktop:perf-fixture:loaded": "bun run desktop:perf-fixture -- ensure --slug desktop-perf-loaded',
+		);
+	});
+
+	test("status reports worktree memory attribution", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+
+		expect(script).toContain("print_memory_status");
+		expect(script).toContain("worktree_app_memory_kib");
+		expect(script).toContain("worktree_docker_memory_kib");
+		expect(script).toContain("other_superset_app_memory_kib");
+		expect(script).toContain("other_superset_docker_memory_kib");
+		expect(script).toContain("docker stats --no-stream");
+		expect(script).toContain("scripts/dev-memory-report.ts");
+		expect(script).toContain("--local-db-project");
+		expect(script).toContain("SUPERSET_WORKTREE_MEMORY_BUDGET_MIB:-2048");
+		expect(script).toContain('echo "memory:"');
+		expect(script).toContain('"tracked total"');
+		expect(script).toContain('"other Superset apps"');
+		expect(script).toContain('"visible Superset total"');
+		expect(script).toContain('"memory attribution"');
+		expect(script).toContain("visible total includes other Superset worktrees");
+		expect(script).toContain("top app processes:");
+		expect(script).toContain("top other Superset processes:");
+		expect(script).toContain('print_memory_status\n  echo\n  echo "probes:"');
+	});
+
+	test("adds a macOS footprint worktree memory report command", () => {
+		const packageJson = readFileSync("package.json", "utf8");
+		const reportScript = readFileSync("scripts/dev-memory-report.ts", "utf8");
+
+		expect(packageJson).toContain(
+			'dev:worktree:memory": "bun run scripts/dev-memory-report.ts"',
+		);
+		expect(reportScript).toContain("getPhysFootprints");
+		expect(reportScript).toContain("current worktree app");
+		expect(reportScript).toContain("current worktree loose helpers");
+		expect(reportScript).toContain("other Superset apps");
+		expect(reportScript).toContain("isOnlineLikeServiceProcess");
+		expect(reportScript).toContain("scripts/superset-online.sh");
+		expect(reportScript).toContain("Codex app");
+		expect(reportScript).toContain("container runtime");
+		expect(reportScript).toContain("developer tooling incl. Codex");
+		expect(reportScript).toContain("Force Quit style memory metric");
+		expect(reportScript).toContain("--max-current-mib");
+		expect(reportScript).toContain("--baseline-report");
+		expect(reportScript).toContain("baseline comparison");
+		expect(reportScript).toContain("current worktree delta");
+		expect(reportScript).toContain("visible Superset-related delta");
+		expect(reportScript).toContain("developer tooling delta");
+		expect(reportScript).toContain(
+			"current worktree app + loose helpers exceeds budget",
+		);
+	});
+
+	test("cleans stale orphaned node-pty helpers from the current worktree", () => {
+		const packageJson = readFileSync("package.json", "utf8");
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+		const cleanupScript = readFileSync(
+			"scripts/clean-stale-worktree-pty-helpers.ts",
+			"utf8",
+		);
+
+		expect(packageJson).toContain(
+			'dev:worktree:cleanup-pty-helpers": "bun run scripts/clean-stale-worktree-pty-helpers.ts"',
+		);
+		expect(script).toContain("cleanup_stale_worktree_pty_helpers");
+		expect(script).toContain("scripts/clean-stale-worktree-pty-helpers.ts");
+		expect(script).toContain("SUPERSET_STALE_PTY_HELPER_MIN_AGE_MINUTES:-30");
+		expect(script).toContain("cleanup_stale_worktree_pty_helpers\n  if");
+		expect(script).toContain(
+			"stop_data_services\n    cleanup_stale_worktree_pty_helpers",
+		);
+		expect(cleanupScript).toContain("ppid !== 1");
+		expect(cleanupScript).toContain("node-pty@");
+		expect(cleanupScript).toContain("spawn-helper");
+		expect(cleanupScript).toContain('process.kill(-row.pgid, "SIGTERM")');
+	});
+
+	test("profile switches stop app sessions that are no longer managed", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+
+		expect(script).toContain(
+			'ALL_APP_SESSIONS=("api" "relay" "electric-proxy" "desktop")',
+		);
+		expect(script).toContain(
+			"Stopping $session (not part of WORKTREE_DEV_PROFILE=$WORKTREE_DEV_PROFILE)",
+		);
+		expect(script).toContain(
+			'for session in "$' + '{ALL_APP_SESSIONS[@]}"; do',
+		);
+	});
+
+	test("profile switches restart desktop so Vite-injected service URLs refresh", () => {
+		const script = readFileSync(".superset/worktree-dev.sh", "utf8");
+
+		expect(script).toContain('PROFILE_MARKER_PATH="$RUN_DIR/active-profile"');
+		expect(script).toContain("restart_desktop_if_profile_changed");
+		expect(script).toContain('session_in_active_profile "desktop" || return 0');
+		expect(script).toContain('tmux_session_exists "desktop" || return 0');
+		expect(script).toContain(
+			"Restarting desktop for WORKTREE_DEV_PROFILE change",
+		);
+		expect(script).toContain(
+			'tmux -S "$TMUX_SOCKET_PATH" kill-session -t "desktop"',
+		);
+		expect(script).toContain(
+			'printf \'%s\\n\' "$WORKTREE_DEV_PROFILE" > "$PROFILE_MARKER_PATH"',
+		);
+	});
+
+	test("data service startup reuses cached images unless rebuild is requested", () => {
+		const worktreeScript = readFileSync(".superset/worktree-dev.sh", "utf8");
+		const onlineScript = readFileSync("scripts/superset-online.sh", "utf8");
+
+		expect(worktreeScript).not.toContain("compose up -d --build --wait");
+		expect(worktreeScript).not.toContain("compose up -d --build postgres");
+		expect(worktreeScript).toContain("WORKTREE_DEV_REBUILD_DATA");
+		expect(worktreeScript).toContain(
+			"docker image inspect superset-local-kv-rest:latest",
+		);
+		expect(worktreeScript).toContain(
+			'local services=("postgres" "electric" "redis" "kv-rest" "minio")',
+		);
+
+		expect(onlineScript).not.toContain("compose up -d --build postgres");
+		expect(onlineScript).toContain(
+			"compose up -d --remove-orphans --no-build postgres electric redis minio",
+		);
+		expect(onlineScript).toContain(
+			'log "kv-rest image missing; building it once"',
+		);
+	});
+
+	test("minio bucket initialization is bounded instead of an infinite startup blocker", () => {
+		const worktreeScript = readFileSync(".superset/worktree-dev.sh", "utf8");
+		const onlineScript = readFileSync("scripts/superset-online.sh", "utf8");
+
+		expect(worktreeScript).not.toContain("compose run --rm minio-init");
+		expect(worktreeScript).toContain("WORKTREE_DEV_MINIO_INIT_ATTEMPTS");
+		expect(worktreeScript).toContain(
+			'while [ "$attempt" -le "$' + '{MINIO_INIT_ATTEMPTS:-30}" ]; do',
+		);
+		expect(worktreeScript).toContain("S3-dependent flows may need retry");
+		expect(worktreeScript).toContain("compose rm -sf minio-init");
+		expect(worktreeScript).toContain("cleanup_stale_minio_init_containers");
+		expect(worktreeScript).toContain(
+			`docker ps -aq --filter "name=^/${shellExpansion("LOCAL_DB_PROJECT")}-minio-init-run-"`,
+		);
+
+		expect(onlineScript).not.toContain("compose run --rm minio-init");
+		expect(onlineScript).toContain("SUPERSET_ONLINE_MINIO_INIT_ATTEMPTS");
+		expect(onlineScript).toContain(
+			'while [ "$attempt" -le "$' + '{MINIO_INIT_ATTEMPTS:-30}" ]; do',
+		);
+		expect(onlineScript).toContain("compose rm -sf minio-init");
+		expect(onlineScript).toContain("cleanup_stale_minio_init_containers");
+		expect(onlineScript).toContain(
+			`docker ps -aq --filter "name=^/${shellExpansion("COMPOSE_PROJECT_NAME")}-minio-init-run-"`,
+		);
+	});
+
+	test("minio init bypasses host proxy for the compose service hostname", () => {
+		const worktreeScript = readFileSync(".superset/worktree-dev.sh", "utf8");
+		const onlineScript = readFileSync("scripts/superset-online.sh", "utf8");
+		const composeFile = readFileSync("docker-compose.yml", "utf8");
+
+		expect(worktreeScript).toContain('NO_PROXY="localhost,127.0.0.1,minio"');
+		expect(worktreeScript).toContain('no_proxy="localhost,127.0.0.1,minio"');
+		expect(onlineScript).toContain('NO_PROXY="localhost,127.0.0.1,minio"');
+		expect(onlineScript).toContain('no_proxy="localhost,127.0.0.1,minio"');
+		expect(composeFile).toContain("NO_PROXY: localhost,127.0.0.1,minio");
+		expect(composeFile).toContain("no_proxy: localhost,127.0.0.1,minio");
+	});
+
+	test("minio keeps artifacts private while allowing resource pack downloads", () => {
+		const worktreeScript = readFileSync(".superset/worktree-dev.sh", "utf8");
+		const onlineScript = readFileSync("scripts/superset-online.sh", "utf8");
+		const composeFile = readFileSync("docker-compose.yml", "utf8");
+
+		for (const source of [worktreeScript, onlineScript, composeFile]) {
+			expect(source).toContain(
+				'mc anonymous set none "superset/$' +
+					'{SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}"',
+			);
+			expect(source).toContain(
+				'mc anonymous set download "superset/$' +
+					'{SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts}/packs"',
+			);
+		}
+	});
+
+	test("derives different default compose projects for same-named worktree paths", () => {
+		const first = join(workRoot, "first", "superset");
+		const second = join(workRoot, "second", "superset");
+		mkdirSync(first, { recursive: true });
+		mkdirSync(second, { recursive: true });
+
+		const result = runBash(`
+			set -euo pipefail
+			source .superset/lib/worktree-local.sh
+			first_project="$(worktree_default_db_project ${shellString(first)})"
 			second_project="$(worktree_default_db_project ${shellString(second)})"
 			[[ "$first_project" == superset-superset-* ]]
 			[[ "$second_project" == superset-superset-* ]]
-				[[ "$first_project" != "$second_project" ]]
-			`);
+			[[ "$first_project" != "$second_project" ]]
+		`);
 
-			expectShellSuccess(result);
-		});
+		expect(result.status).toBe(0);
 	});
 
 	test("detects missing or stale managed local setup", () => {
-		withWorkRoot((workRoot) => {
-			const root = join(workRoot, "review", "superset");
-			const envPath = join(workRoot, ".env");
-			mkdirSync(root, { recursive: true });
-			writeManagedEnv(envPath, root);
+		const root = join(workRoot, "review", "superset");
+		const envPath = join(workRoot, ".env");
+		mkdirSync(root, { recursive: true });
 
-			const validEnv = runBash(`
-				set -euo pipefail
-				source .superset/lib/worktree-local.sh
-				root=${shellString(root)}
-				env_path=${shellString(envPath)}
-				worktree_env_requires_local_setup "$root" "$env_path"
-			`);
-			if (validEnv.status !== 1) {
-				throw new Error(
-					`Expected valid env status 1, got ${validEnv.status}\nstdout:\n${validEnv.stdout}\nstderr:\n${validEnv.stderr}\nenv:\n${readFileSync(envPath, "utf8")}`,
-				);
-			}
+		const result = runBash(`
+			set -euo pipefail
+			source .superset/lib/worktree-local.sh
+			root=${shellString(root)}
+			env_path=${shellString(envPath)}
+			id="$(worktree_path_hash "$root")"
+			cat > "$env_path" <<ENV
+# ===== Local workspace overrides (setup.local.sh) =====
+SUPERSET_WORKTREE_ID="$id"
+SUPERSET_WORKTREE_ROOT="$(worktree_physical_root "$root")"
+SUPERSET_HOME_DIR="$(worktree_expected_home_dir "$root")"
+SUPERSET_PORT_BASE="3000"
+LOCAL_DB_PROJECT="$(worktree_default_db_project "$root")"
+LOCAL_PG_PORT="3014"
+LOCAL_ELECTRIC_PORT="3009"
+LOCAL_REDIS_PORT="3016"
+LOCAL_KV_REST_PORT="3017"
+LOCAL_S3_PORT="3019"
+LOCAL_S3_CONSOLE_PORT="3020"
+API_PORT="3001"
+DESKTOP_VITE_PORT="3005"
+CADDY_ELECTRIC_PORT="3010"
+WRANGLER_PORT="3012"
+RELAY_PORT="3013"
+DATABASE_URL="postgres://postgres:postgres@localhost:3014/main"
+DATABASE_URL_UNPOOLED="postgres://postgres:postgres@localhost:3014/main"
+KV_REST_API_URL="http://localhost:3017"
+KV_URL="redis://localhost:3016"
+ELECTRIC_URL="http://localhost:3009/v1/shape"
+NEXT_PUBLIC_ELECTRIC_URL="http://localhost:3012"
+NEXT_PUBLIC_ELECTRIC_PROXY_URL="http://localhost:3012"
+NEXT_PUBLIC_API_URL="http://localhost:3001"
+NEXT_PUBLIC_DESKTOP_URL="http://localhost:3005"
+RELAY_URL="http://localhost:3013"
+NEXT_PUBLIC_RELAY_URL="http://localhost:3013"
+ENV
+			if worktree_env_requires_local_setup "$root" "$env_path"; then
+				exit 1
+			fi
+			cp "$env_path" "$env_path.local"
+			sed -i.bak 's|^DATABASE_URL=.*|DATABASE_URL="postgres://postgres:postgres@production.example.com:5432/main"|' "$env_path"
+			if ! worktree_env_requires_local_setup "$root" "$env_path"; then
+				exit 1
+			fi
+			cp "$env_path.local" "$env_path"
+			sed -i.bak 's|^NEXT_PUBLIC_ELECTRIC_URL=.*|NEXT_PUBLIC_ELECTRIC_URL="https://localhost:3010"|' "$env_path"
+			if ! worktree_env_requires_local_setup "$root" "$env_path"; then
+				exit 1
+			fi
+			cp "$env_path.local" "$env_path"
+			sed -i.bak 's/^SUPERSET_WORKTREE_ID=.*/SUPERSET_WORKTREE_ID="stale"/' "$env_path"
+			if ! worktree_env_requires_local_setup "$root" "$env_path"; then
+				exit 1
+			fi
+		`);
 
-			const originalEnv = readFileSync(envPath, "utf8");
-			writeFileSync(
-				envPath,
-				originalEnv.replace(
-					/^DATABASE_URL=.*$/m,
-					'DATABASE_URL="postgres://postgres:postgres@production.example.com:5432/main"',
-				),
-			);
-			const remoteDatabaseEnv = runBash(`
-				set -euo pipefail
-				source .superset/lib/worktree-local.sh
-				root=${shellString(root)}
-				env_path=${shellString(envPath)}
-				worktree_env_requires_local_setup "$root" "$env_path"
-			`);
-			expect(remoteDatabaseEnv.status).toBe(0);
-
-			writeFileSync(
-				envPath,
-				originalEnv.replace(
-					/^NEXT_PUBLIC_ELECTRIC_URL=.*$/m,
-					'NEXT_PUBLIC_ELECTRIC_URL="https://localhost:3010"',
-				),
-			);
-			const caddyEnv = runBash(`
-				set -euo pipefail
-				source .superset/lib/worktree-local.sh
-				root=${shellString(root)}
-				env_path=${shellString(envPath)}
-				worktree_env_requires_local_setup "$root" "$env_path"
-			`);
-			expect(caddyEnv.status).toBe(0);
-
-			writeFileSync(
-				envPath,
-				originalEnv.replace(
-					/^SUPERSET_WORKTREE_ID=.*$/m,
-					'SUPERSET_WORKTREE_ID="stale"',
-				),
-			);
-			const staleEnv = runBash(`
-				set -euo pipefail
-				source .superset/lib/worktree-local.sh
-				root=${shellString(root)}
-				env_path=${shellString(envPath)}
-				worktree_env_requires_local_setup "$root" "$env_path"
-			`);
-			expect(staleEnv.status).toBe(0);
-		});
+		expect(result.status).toBe(0);
 	}, 10_000);
 
 	test("rejects non-local service URLs before destructive worktree actions", () => {
-		withWorkRoot((workRoot) => {
-			const root = join(workRoot, "remote-env", "superset");
-			mkdirSync(root, { recursive: true });
+		const root = join(workRoot, "remote-env", "superset");
+		mkdirSync(root, { recursive: true });
 
-			const result = runBash(`
+		const result = runBash(`
 			set -euo pipefail
 			source .superset/lib/common.sh
 			source .superset/lib/worktree-local.sh
@@ -222,8 +490,6 @@ describe("worktree local shell helpers", () => {
 			export LOCAL_ELECTRIC_PORT=3009
 			export LOCAL_REDIS_PORT=3016
 			export LOCAL_KV_REST_PORT=3017
-			export LOCAL_S3_PORT=3019
-			export LOCAL_S3_CONSOLE_PORT=3020
 			export API_PORT=3001
 			export DESKTOP_VITE_PORT=3005
 			export WRANGLER_PORT=3012
@@ -240,24 +506,20 @@ describe("worktree local shell helpers", () => {
 			export NEXT_PUBLIC_DESKTOP_URL="http://localhost:3005"
 			export RELAY_URL="http://localhost:3013"
 			export NEXT_PUBLIC_RELAY_URL="http://localhost:3013"
-			set +e
-			assert_output="$(worktree_assert_current_local_env "$root" 2>&1)"
-			assert_status="$?"
-			set -e
-			printf '%s\n' "$assert_output"
-			[ "$assert_status" -ne 0 ]
+			if worktree_assert_current_local_env "$root"; then
+				exit 1
+			fi
 		`);
 
-			expect(result.status).not.toBe(0);
-		});
+		expect(result.status).toBe(0);
+		expect(result.stderr + result.stdout).toContain("DATABASE_URL");
 	});
 
 	test("rejects caddy Electric URLs because worktree dev only starts Wrangler", () => {
-		withWorkRoot((workRoot) => {
-			const root = join(workRoot, "caddy-env", "superset");
-			mkdirSync(root, { recursive: true });
+		const root = join(workRoot, "caddy-env", "superset");
+		mkdirSync(root, { recursive: true });
 
-			const result = runBash(`
+		const result = runBash(`
 			set -euo pipefail
 			source .superset/lib/common.sh
 			source .superset/lib/worktree-local.sh
@@ -271,8 +533,6 @@ describe("worktree local shell helpers", () => {
 			export LOCAL_ELECTRIC_PORT=3009
 			export LOCAL_REDIS_PORT=3016
 			export LOCAL_KV_REST_PORT=3017
-			export LOCAL_S3_PORT=3019
-			export LOCAL_S3_CONSOLE_PORT=3020
 			export API_PORT=3001
 			export DESKTOP_VITE_PORT=3005
 			export WRANGLER_PORT=3012
@@ -289,15 +549,12 @@ describe("worktree local shell helpers", () => {
 			export NEXT_PUBLIC_DESKTOP_URL="http://localhost:3005"
 			export RELAY_URL="http://localhost:3013"
 			export NEXT_PUBLIC_RELAY_URL="http://localhost:3013"
-			set +e
-			assert_output="$(worktree_assert_current_local_env "$root" 2>&1)"
-			assert_status="$?"
-			set -e
-			printf '%s\n' "$assert_output"
-			[ "$assert_status" -ne 0 ]
+			if worktree_assert_current_local_env "$root"; then
+				exit 1
+			fi
 		`);
 
-			expect(result.status).not.toBe(0);
-		});
+		expect(result.status).toBe(0);
+		expect(result.stderr + result.stdout).toContain("Wrangler Electric proxy");
 	});
 });

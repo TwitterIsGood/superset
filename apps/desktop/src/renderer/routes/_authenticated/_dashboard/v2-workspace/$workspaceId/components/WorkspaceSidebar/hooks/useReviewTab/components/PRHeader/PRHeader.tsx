@@ -1,5 +1,5 @@
 import { cn } from "@superset/ui/utils";
-import { LuArrowUpRight } from "react-icons/lu";
+import { ArrowUpRight } from "lucide-react";
 import { PRIcon } from "renderer/screens/main/components/PRIcon";
 import type { NormalizedPR } from "../../types";
 
@@ -41,7 +41,7 @@ export function PRHeader({ pr }: PRHeaderProps) {
 				>
 					{pr.title}
 				</span>
-				<LuArrowUpRight
+				<ArrowUpRight
 					aria-hidden="true"
 					className="size-3.5 shrink-0 text-muted-foreground/70 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
 				/>

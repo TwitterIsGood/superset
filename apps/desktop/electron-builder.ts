@@ -10,8 +10,14 @@ import pkg from "./package.json";
 import {
 	packagedAsarUnpackGlobs,
 	packagedNodeModuleCopies,
-	packagedTrellisRuntimeResourceCopies,
+	packOnlyNodeModuleFileExcludes,
 } from "./runtime-dependencies";
+import {
+	normalizeBuilderArch,
+	prunePackagedElectronLocales,
+	prunePackagedElectronSoftwareRenderer,
+	prunePackagedNativePayloads,
+} from "./scripts/prune-packaged-native-payloads";
 
 const currentYear = new Date().getFullYear();
 const author = pkg.author?.name ?? pkg.author;
@@ -26,6 +32,25 @@ const dmgBackgroundPath = join(
 const skipMacCodeSigning = process.env.SKIP_MAC_CODE_SIGNING === "true";
 const adHocMacCodeSigning = process.env.AD_HOC_MAC_CODE_SIGNING === "true";
 const skipDeveloperIdMacSigning = skipMacCodeSigning || adHocMacCodeSigning;
+const shouldRebuildNativeModules =
+	process.env.ELECTRON_BUILDER_NPM_REBUILD !== "false";
+const buildDependenciesFromSource =
+	process.env.ELECTRON_BUILDER_BUILD_FROM_SOURCE === "true";
+const targetPlatform = process.env.TARGET_PLATFORM ?? process.platform;
+const bundledCliResourcePath = join(
+	process.cwd(),
+	"dist/resources/bin",
+	targetPlatform === "win32" ? "superset.exe" : "superset",
+);
+const bundledCliExtraResources = existsSync(bundledCliResourcePath)
+	? [
+			{
+				from: "dist/resources/bin",
+				to: "resources/bin",
+				filter: ["**/*"],
+			},
+		]
+	: [];
 
 const config: Configuration = {
 	appId: "com.superset.desktop",
@@ -62,10 +87,6 @@ const config: Configuration = {
 
 	// Extra resources placed outside asar archive (accessible via process.resourcesPath)
 	extraResources: [
-		// Plugin runtimes must be real files, not files hidden inside app.asar.
-		// Trellis is executed by Bun from host-service when a task/workspace asks
-		// for guided workflow initialization.
-		...packagedTrellisRuntimeResourceCopies,
 		// Database migrations - must be outside asar for drizzle-orm to read
 		{
 			from: "dist/resources/migrations",
@@ -77,38 +98,80 @@ const config: Configuration = {
 			to: "resources/host-migrations",
 			filter: ["**/*"],
 		},
+		...bundledCliExtraResources,
 		{
-			from: "dist/resources/bin",
-			to: "resources/bin",
-			filter: ["**/*"],
+			from: "dist/resources/pack-system",
+			to: "resources/pack-system",
+			filter: ["pack-manifest-index.json"],
 		},
 	],
 
 	files: [
 		"dist/**/*",
+		// Built-in sounds are copied from src/resources into app.asar.unpacked/resources/sounds.
+		// Exclude the electron-vite preview copy to avoid packaging the same MP3s twice.
+		"!dist/resources/sounds/**/*",
+		"!dist/resource-packs/**/*",
+		"!dist/resource-packs-test/**/*",
 		"package.json",
+		// Main/preload/renderer are bundled by electron-vite. Keep production
+		// node_modules out of app.asar by default, then re-include only the
+		// native/runtime modules listed below.
+		"!node_modules/**/*",
 		{
 			from: pkg.resources,
 			to: "resources",
-			filter: ["**/*"],
+			filter: [
+				"**/*",
+				"!build/installer/**/*",
+				"!build/icons/*.png",
+				"!build/*.plist",
+				"!build/icons/*.icns",
+				"!build/icons/*.ico",
+			],
 		},
 		// Runtime modules that stay external to the main bundle.
 		// bun creates symlinks for direct deps in workspace node_modules.
 		// The copy:native-modules script replaces symlinks with real files
 		// before building (required for Bun 1.3+ isolated installs).
 		...packagedNodeModuleCopies,
+		// Heavy feature runtimes are delivered as resource packs. Electron-builder's
+		// dependency traversal can still discover them through workspace package deps.
+		...packOnlyNodeModuleFileExcludes,
 		"!**/.DS_Store",
 		"!**/*.map",
 		"!**/*.test.*",
 		"!**/*.spec.*",
 	],
 
-	// Rebuild native modules for Electron's Node.js version
-	npmRebuild: true,
+	// CI runs `install-app-deps` and `copy:native-modules` explicitly. Let that
+	// path skip electron-builder's duplicate native rebuild while preserving the
+	// safer default for local ad-hoc packaging.
+	npmRebuild: shouldRebuildNativeModules,
+	buildDependenciesFromSource,
+
+	afterPack: async (context) => {
+		await prunePackagedNativePayloads({
+			appOutDir: context.appOutDir,
+			targetArch: normalizeBuilderArch(context.arch),
+			targetPlatform: context.electronPlatformName,
+		});
+		if (context.electronPlatformName === "darwin") {
+			await prunePackagedElectronLocales({
+				appOutDir: context.appOutDir,
+			});
+			await prunePackagedElectronSoftwareRenderer({
+				appOutDir: context.appOutDir,
+			});
+		}
+	},
 
 	// macOS DMG installer
 	dmg: {
 		...(existsSync(dmgBackgroundPath) ? { background: dmgBackgroundPath } : {}),
+		// LZFSE-compressed DMGs are materially faster to create than the default
+		// zlib UDZO images while staying compressed for GitHub Release downloads.
+		format: "ULFO",
 		// Explicit size — dmgbuild's auto-calc under-allocates and silently truncates
 		// the last large file above ~1.7GB of contents. `shrink: true` (default) keeps
 		// the final artifact compact.

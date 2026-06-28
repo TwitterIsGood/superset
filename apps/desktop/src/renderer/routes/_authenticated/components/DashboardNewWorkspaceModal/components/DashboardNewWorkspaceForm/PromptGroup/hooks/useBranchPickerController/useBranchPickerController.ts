@@ -1,6 +1,6 @@
-import { toast } from "@superset/ui/sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
+import { toast } from "renderer/lib/toast";
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import { useWorkspaceCreates } from "renderer/stores/workspace-creates";
 import type { BaseBranchSource } from "../../../../../DashboardNewWorkspaceDraftContext";

@@ -9,14 +9,14 @@ import {
 } from "@superset/ui/dialog";
 import { Input } from "@superset/ui/input";
 import { Label } from "@superset/ui/label";
-import { toast } from "@superset/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@superset/ui/tabs";
+import { FolderOpen, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { LuFolderOpen, LuLoaderCircle } from "react-icons/lu";
 import { RemotePathPicker } from "renderer/components/RemotePathPicker";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
-import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";
+import { toast } from "renderer/lib/toast";
+import { useDashboardSidebarCoreState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarCoreState";
 
 type SetupMode = "clone" | "import";
 
@@ -45,7 +45,7 @@ export function SetupProjectModal({
 }: SetupProjectModalProps) {
 	const selectDirectory = electronTrpc.window.selectDirectory.useMutation();
 	const { ensureProjectInSidebar, ensureWorkspaceInSidebar } =
-		useDashboardSidebarState();
+		useDashboardSidebarCoreState();
 
 	const [mode, setMode] = useState<SetupMode>(
 		repoCloneUrl ? "clone" : "import",
@@ -257,7 +257,7 @@ export function SetupProjectModal({
 												className="shrink-0"
 												aria-label="Browse for directory"
 											>
-												<LuFolderOpen className="size-4" />
+												<FolderOpen className="size-4" />
 											</Button>
 										</div>
 									</div>
@@ -301,7 +301,7 @@ export function SetupProjectModal({
 										className="shrink-0"
 										aria-label="Browse for directory"
 									>
-										<LuFolderOpen className="size-4" />
+										<FolderOpen className="size-4" />
 									</Button>
 								</div>
 							</div>
@@ -326,7 +326,7 @@ export function SetupProjectModal({
 						>
 							{working ? (
 								<>
-									<LuLoaderCircle className="size-4 animate-spin" />
+									<LoaderCircle className="size-4 animate-spin" />
 									{submitLabel}…
 								</>
 							) : (

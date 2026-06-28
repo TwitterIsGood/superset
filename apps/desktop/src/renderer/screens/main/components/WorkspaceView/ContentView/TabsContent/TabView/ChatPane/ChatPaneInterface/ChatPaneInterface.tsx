@@ -12,6 +12,7 @@ import {
 } from "@superset/ui/ai-elements/prompt-input";
 import { useQuery } from "@tanstack/react-query";
 import type { ChatStatus } from "ai";
+import { CLAUDE_AGENT_RUNTIME_PACK_ID } from "lib/pack-system/pack-ids";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatInputFooter } from "renderer/components/Chat/ChatInterface/components/ChatInputFooter";
@@ -25,6 +26,11 @@ import { apiTrpcClient } from "renderer/lib/api-trpc-client";
 import { getDesktopChatModelOptions } from "renderer/lib/dev-chat";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { chatModelsQueryKey } from "renderer/lib/model-provider-query-keys";
+import {
+	PackErrorState,
+	PackLoadingState,
+	usePackStatus,
+} from "renderer/lib/pack-system";
 import { posthog } from "renderer/lib/posthog";
 import { syncCloudModelProvidersToHost } from "renderer/lib/sync-cloud-model-providers";
 import { useChatPreferencesStore } from "renderer/stores/chat-preferences";
@@ -63,6 +69,7 @@ function ChatUploadFooter({
 	sessionId,
 	onError,
 	onSend,
+	submitDisabled,
 	...footerProps
 }: {
 	sessionId: string | null;
@@ -124,7 +131,9 @@ function ChatUploadFooter({
 	return (
 		<ChatInputFooter
 			{...footerProps}
-			submitDisabled={sessionId ? isUploading : false}
+			submitDisabled={
+				Boolean(submitDisabled) || (sessionId ? isUploading : false)
+			}
 			renderAttachment={renderAttachment}
 			onSend={handleSend}
 		/>
@@ -310,6 +319,12 @@ export function ChatPaneInterface({
 	const autoLaunchRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
 		null,
 	);
+	const shouldResolveClaudeRuntimePack = workspaceId === null;
+	const canUseLocalClaudeRuntimeFallback =
+		process.env.NODE_ENV === "development";
+	const claudeRuntimePack = usePackStatus(CLAUDE_AGENT_RUNTIME_PACK_ID, {
+		enabled: shouldResolveClaudeRuntimePack,
+	});
 	const chatRuntimeServiceTrpcUtils = chatRuntimeServiceTrpc.useUtils();
 	const authenticateMcpServerMutation =
 		chatRuntimeServiceTrpc.workspace.authenticateMcpServer.useMutation();
@@ -361,6 +376,41 @@ export function ChatPaneInterface({
 	const setRuntimeErrorMessage = useCallback((message: string) => {
 		setRuntimeError(message);
 	}, []);
+
+	const prepareStandaloneClaudeRuntime = useCallback(async () => {
+		if (!shouldResolveClaudeRuntimePack) return;
+
+		const currentStatus = claudeRuntimePack.status;
+		if (
+			currentStatus?.status === "not_configured" &&
+			canUseLocalClaudeRuntimeFallback
+		) {
+			return;
+		}
+		if (currentStatus?.status === "installed" && currentStatus.installedPath) {
+			return;
+		}
+
+		const resolution = await claudeRuntimePack.resolve();
+		if (resolution.ok) return;
+		if (
+			resolution.status.status === "not_configured" &&
+			canUseLocalClaudeRuntimeFallback
+		) {
+			return;
+		}
+
+		throw new Error(
+			resolution.error ||
+				resolution.status.error ||
+				"Could not prepare chat runtime.",
+		);
+	}, [
+		canUseLocalClaudeRuntimeFallback,
+		claudeRuntimePack.resolve,
+		claudeRuntimePack.status,
+		shouldResolveClaudeRuntimePack,
+	]);
 
 	const handleSelectModel = useCallback(
 		(model: React.SetStateAction<ModelOption | null>) => {
@@ -639,6 +689,8 @@ export function ChatPaneInterface({
 			> | null = null;
 			let targetSessionId = effectiveSessionId;
 			try {
+				await prepareStandaloneClaudeRuntime();
+
 				let preparedFiles = payload.files;
 				if (preparedFiles?.some((file) => file.uploaded === false)) {
 					if (!effectiveSessionId) {
@@ -792,6 +844,7 @@ export function ChatPaneInterface({
 			messages?.length,
 			onStartFreshSession,
 			onSessionReady,
+			prepareStandaloneClaudeRuntime,
 			resolveSlashCommandInput,
 			ensureSessionReady,
 			sessionId,
@@ -864,6 +917,8 @@ export function ChatPaneInterface({
 			};
 
 			try {
+				await prepareStandaloneClaudeRuntime();
+
 				const sendResult = await sendMessageForSession({
 					currentSessionId: autoLaunchSessionLockRef.current[launchConfigKey],
 					isSessionReady,
@@ -938,6 +993,7 @@ export function ChatPaneInterface({
 		onConsumeLaunchConfig,
 		onStartFreshSession,
 		onSessionReady,
+		prepareStandaloneClaudeRuntime,
 		sendMessageToSession,
 		sessionId,
 		setRuntimeErrorMessage,
@@ -976,16 +1032,17 @@ export function ChatPaneInterface({
 					permissionMode,
 				},
 			});
-			if (optimisticMessage) {
-				setPendingUserTurn({
-					kind: "restart",
-					sessionId,
-					prefixMessages: request.prefixMessages,
-					message: optimisticMessage,
-				});
-			}
 
 			try {
+				await prepareStandaloneClaudeRuntime();
+				if (optimisticMessage) {
+					setPendingUserTurn({
+						kind: "restart",
+						sessionId,
+						prefixMessages: request.prefixMessages,
+						message: optimisticMessage,
+					});
+				}
 				await chatRuntimeServiceTrpcUtils.client.session.restartFromMessage.mutate(
 					{
 						sessionId,
@@ -1040,6 +1097,7 @@ export function ChatPaneInterface({
 			onUserMessageSubmitted,
 			sessionId,
 			setRuntimeErrorMessage,
+			prepareStandaloneClaudeRuntime,
 			thinkingLevel,
 			clearDraftInStore,
 			permissionMode,
@@ -1131,6 +1189,43 @@ export function ChatPaneInterface({
 	);
 
 	const errorMessage = runtimeError ?? toErrorMessage(error);
+	const claudeRuntimeStatus = shouldResolveClaudeRuntimePack
+		? claudeRuntimePack.status
+		: null;
+	const shouldIgnoreClaudeRuntimeStatus =
+		claudeRuntimeStatus?.status === "not_configured" &&
+		canUseLocalClaudeRuntimeFallback;
+	const isClaudeRuntimePreparing =
+		shouldResolveClaudeRuntimePack &&
+		!shouldIgnoreClaudeRuntimeStatus &&
+		(claudeRuntimePack.isResolving ||
+			claudeRuntimeStatus?.status === "downloading" ||
+			claudeRuntimeStatus?.status === "verifying");
+	const claudeRuntimeProgressPercent =
+		claudeRuntimeStatus?.progress && claudeRuntimeStatus.progress.totalBytes > 0
+			? Math.round(
+					(claudeRuntimeStatus.progress.bytesDownloaded /
+						claudeRuntimeStatus.progress.totalBytes) *
+						100,
+				)
+			: null;
+	const claudeRuntimeError =
+		!shouldResolveClaudeRuntimePack || shouldIgnoreClaudeRuntimeStatus
+			? null
+			: claudeRuntimeStatus?.status === "not_configured"
+				? "Chat runtime pack is not configured for this build."
+				: claudeRuntimeStatus?.status === "error"
+					? (claudeRuntimeStatus.error ?? "Chat runtime download failed.")
+					: (claudeRuntimePack.error?.message ?? null);
+	const isClaudeRuntimeSendBlocked =
+		isClaudeRuntimePreparing || Boolean(claudeRuntimeError);
+	const retryClaudeRuntimePack = useCallback(() => {
+		void prepareStandaloneClaudeRuntime().catch((error) => {
+			setRuntimeErrorMessage(
+				toErrorMessage(error) ?? "Could not prepare chat runtime.",
+			);
+		});
+	}, [prepareStandaloneClaudeRuntime, setRuntimeErrorMessage]);
 
 	return (
 		<PromptInputProvider initialInput={initialLaunchConfig?.draftInput}>
@@ -1174,6 +1269,33 @@ export function ChatPaneInterface({
 					topInset={messageListTopInset}
 				/>
 				<McpControls mcpUi={mcpUi} />
+				{isClaudeRuntimePreparing || claudeRuntimeError ? (
+					<div className="px-4 pb-2">
+						<div
+							className="mx-auto flex w-full max-w-[680px] items-start gap-2 rounded-md border border-border/60 bg-background/85 px-3 py-2 text-left"
+							data-testid="standalone-chat-runtime-pack-status"
+						>
+							{isClaudeRuntimePreparing ? (
+								<PackLoadingState
+									title="Preparing chat runtime"
+									description="Downloading and verifying the on-demand runtime."
+									progressPercent={claudeRuntimeProgressPercent}
+								/>
+							) : (
+								<PackErrorState
+									className="select-text cursor-text"
+									title="Chat runtime unavailable"
+									description={
+										claudeRuntimeError ??
+										"Retry the runtime download before sending."
+									}
+									isRetrying={claudeRuntimePack.isResolving}
+									onRetry={retryClaudeRuntimePack}
+								/>
+							)}
+						</div>
+					</div>
+				) : null}
 				<ChatUploadFooter
 					cwd={cwd}
 					isFocused={isFocused}
@@ -1190,6 +1312,7 @@ export function ChatPaneInterface({
 					thinkingLevel={thinkingLevel}
 					setThinkingLevel={setThinkingLevel}
 					slashCommands={slashCommands}
+					submitDisabled={isClaudeRuntimeSendBlocked}
 					sessionId={sessionId}
 					placeholder={placeholder}
 					onError={setRuntimeErrorMessage}

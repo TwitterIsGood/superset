@@ -1,5 +1,5 @@
-import { toast } from "@superset/ui/sonner";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { PROJECT_COLOR_DEFAULT } from "shared/constants/project-colors";
 
 export function useSectionMutations(sectionId: string) {

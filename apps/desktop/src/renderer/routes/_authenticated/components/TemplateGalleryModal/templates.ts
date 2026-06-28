@@ -1,12 +1,12 @@
-import type { IconType } from "react-icons";
 import {
-	LuBoxes,
-	LuFlame,
-	LuGlobe,
-	LuLayers,
-	LuMessageSquare,
-	LuSmartphone,
-} from "react-icons/lu";
+	Boxes,
+	Flame,
+	Globe,
+	Layers,
+	type LucideIcon,
+	MessageSquare,
+	Smartphone,
+} from "lucide-react";
 import gstackBanner from "./assets/gstack.png";
 import honoBanner from "./assets/hono.png";
 import nextjsBanner from "./assets/nextjs.png";
@@ -18,7 +18,7 @@ export interface ProjectTemplate {
 	id: string;
 	name: string;
 	description: string;
-	icon: IconType;
+	icon: LucideIcon;
 	bannerClassName: string;
 	repo?: string;
 	banner?: string;
@@ -29,7 +29,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
 		id: "gstack",
 		name: "gstack",
 		description: "Garry Tan's role-based Claude Code workflow",
-		icon: LuLayers,
+		icon: Layers,
 		bannerClassName: "bg-zinc-900 text-white",
 		repo: "https://github.com/garrytan/gstack",
 		banner: gstackBanner,
@@ -38,7 +38,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
 		id: "nextjs",
 		name: "Next.js",
 		description: "Vercel's starter with Drizzle, NextAuth, and Postgres",
-		icon: LuGlobe,
+		icon: Globe,
 		bannerClassName: "bg-black text-white",
 		repo: "https://github.com/vercel/nextjs-postgres-auth-starter",
 		banner: nextjsBanner,
@@ -47,7 +47,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
 		id: "nextjs-chatbot",
 		name: "Next.js Chatbot",
 		description: "AI chatbot built with Next.js and the AI SDK",
-		icon: LuMessageSquare,
+		icon: MessageSquare,
 		bannerClassName: "bg-black text-white",
 		repo: "https://github.com/vercel/ai-chatbot",
 		banner: nextjsChatbotBanner,
@@ -56,7 +56,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
 		id: "react-native",
 		name: "React Native",
 		description: "Cross-platform mobile app with Expo",
-		icon: LuSmartphone,
+		icon: Smartphone,
 		bannerClassName: "bg-blue-500 text-white",
 		repo: "https://github.com/expo/expo-template-default",
 		banner: reactNativeBanner,
@@ -65,7 +65,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
 		id: "t3-turbo",
 		name: "T3 Turbo",
 		description: "Full-stack Turborepo with Next.js, Expo, and tRPC",
-		icon: LuBoxes,
+		icon: Boxes,
 		bannerClassName: "bg-purple-700 text-white",
 		repo: "https://github.com/t3-oss/create-t3-turbo",
 		banner: t3TurboBanner,
@@ -74,7 +74,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
 		id: "hono",
 		name: "React Router + Hono",
 		description: "Fullstack template on Cloudflare Workers",
-		icon: LuFlame,
+		icon: Flame,
 		bannerClassName: "bg-orange-600 text-white",
 		repo: "https://github.com/cloudflare/react-router-hono-fullstack-template",
 		banner: honoBanner,

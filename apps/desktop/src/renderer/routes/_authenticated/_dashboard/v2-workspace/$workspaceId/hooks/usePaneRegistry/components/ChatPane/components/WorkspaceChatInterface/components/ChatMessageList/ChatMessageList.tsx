@@ -6,8 +6,8 @@ import {
 	ConversationScrollButton,
 	useConversationContext,
 } from "@superset/ui/ai-elements/conversation";
+import { MessagesSquare } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
-import { HiMiniChatBubbleLeftRight } from "react-icons/hi2";
 import type {
 	ChatMessage,
 	ChatMessageListProps,
@@ -186,7 +186,7 @@ export function ChatMessageList({
 						<ConversationEmptyState
 							title="Start a conversation"
 							description="Ask anything to get started"
-							icon={<HiMiniChatBubbleLeftRight className="size-8" />}
+							icon={<MessagesSquare className="size-8" />}
 						/>
 					) : (
 						renderedMessages.map((message, messageIndex) => {

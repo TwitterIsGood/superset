@@ -1,8 +1,8 @@
 import type { TaskPriority, V2UsersHostRole } from "@superset/db/enums";
 import type { SelectChatSession } from "@superset/db/schema";
-import { toast } from "@superset/ui/sonner";
 import { useCallback, useMemo } from "react";
 import { isDesktopChatDevMode } from "renderer/lib/dev-chat";
+import { toast } from "renderer/lib/toast";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import {
 	type TrackableWorkspaceTransactionState,

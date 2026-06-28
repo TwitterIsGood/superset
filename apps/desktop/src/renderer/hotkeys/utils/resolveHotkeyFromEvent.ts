@@ -7,6 +7,20 @@ import {
 } from "../stores/keyboardPreferencesStore";
 import type { ShortcutBinding } from "../types";
 import { bindingToDispatchChord } from "./binding";
+import {
+	canonicalizeChord,
+	isIgnorableKey,
+	normalizeToken,
+	TERMINAL_RESERVED_CHORDS,
+} from "./hotkey-chord";
+
+export {
+	canonicalizeChord,
+	isIgnorableKey,
+	MODIFIERS,
+	normalizeToken,
+	TERMINAL_RESERVED_CHORDS,
+} from "./hotkey-chord";
 
 /**
  * KeyboardEvent → registered {@link HotkeyId}, or `null` if unbound. Uses the
@@ -18,60 +32,7 @@ export function resolveHotkeyFromEvent(event: KeyboardEvent): HotkeyId | null {
 	if (event.type !== "keydown") return null;
 	const chord = eventToChord(event);
 	if (!chord) return null;
-	return registeredAppChords.get(chord) ?? null;
-}
-
-// Mirrors react-hotkeys-hook's alias table (react-hotkeys-hook/dist/index.js:3-19)
-const CODE_ALIASES: Record<string, string> = {
-	esc: "escape",
-	return: "enter",
-	left: "arrowleft",
-	right: "arrowright",
-	up: "arrowup",
-	down: "arrowdown",
-	MetaLeft: "meta",
-	MetaRight: "meta",
-	ShiftLeft: "shift",
-	ShiftRight: "shift",
-	AltLeft: "alt",
-	AltRight: "alt",
-	OSLeft: "meta",
-	OSRight: "meta",
-	ControlLeft: "ctrl",
-	ControlRight: "ctrl",
-};
-
-export const MODIFIERS = new Set(["meta", "ctrl", "control", "alt", "shift"]);
-
-// Lock keys must never commit a binding on their own.
-const LOCK_KEYS = new Set(["capslock", "numlock", "scrolllock"]);
-
-export function normalizeToken(token: string): string {
-	const aliased = CODE_ALIASES[token.trim()] ?? token.trim();
-	return aliased.toLowerCase().replace(/key|digit|numpad/, "");
-}
-
-export function isIgnorableKey(normalized: string): boolean {
-	return !normalized || MODIFIERS.has(normalized) || LOCK_KEYS.has(normalized);
-}
-
-/**
- * Stable form for comparing chord strings. Tolerates modifier order and
- * aliases: `meta+alt+up` ≡ `alt+meta+arrowup` ≡ `control+alt+arrowup`.
- */
-export function canonicalizeChord(chord: string): string {
-	const parts = chord.toLowerCase().split("+").map(normalizeToken);
-	const mods: string[] = [];
-	const keys: string[] = [];
-	for (const part of parts) {
-		if (MODIFIERS.has(part)) {
-			mods.push(part === "control" ? "ctrl" : part);
-		} else {
-			keys.push(part);
-		}
-	}
-	mods.sort();
-	return [...mods, ...keys].join("+");
+	return getRegisteredAppChords().get(chord) ?? null;
 }
 
 /** KeyboardEvent → canonical chord (comparable to {@link canonicalizeChord} output), or null for pure modifier / synthetic presses. */
@@ -104,13 +65,6 @@ export function matchesChord(event: KeyboardEvent, chord: string): boolean {
 	return eventChord === canonicalizeChord(chord);
 }
 
-/** Sent straight to the PTY. Canonicalized at build time so lookups via `eventToChord` / `canonicalizeChord` match directly. */
-export const TERMINAL_RESERVED_CHORDS = new Set(
-	["ctrl+c", "ctrl+d", "ctrl+z", "ctrl+s", "ctrl+q", "ctrl+backslash"].map(
-		canonicalizeChord,
-	),
-);
-
 /** True if the event matches a chord the terminal must always receive. */
 export function isTerminalReservedEvent(event: KeyboardEvent): boolean {
 	const chord = eventToChord(event);
@@ -138,14 +92,20 @@ function buildRegisteredAppChords(
 	return map;
 }
 
-// Reassigned on each override, layout, OR adaptive-layout-toggle change;
-// `let` is required so the subscribe callbacks can replace the reference
-// the resolver reads. Read the layout map through `getEffectiveLayoutMap`
-// so the toggle state is honored on every rebuild.
-let registeredAppChords = buildRegisteredAppChords(
-	useHotkeyOverridesStore.getState().overrides,
-	getEffectiveLayoutMap(),
-);
+// Reassigned on each override, layout, OR adaptive-layout-toggle change.
+// Keep the first build lazy so module import does not execute binding logic
+// while binding.ts is still initializing its exported constants.
+let registeredAppChords: Map<string, HotkeyId> | null = null;
+function getRegisteredAppChords(): Map<string, HotkeyId> {
+	if (!registeredAppChords) {
+		registeredAppChords = buildRegisteredAppChords(
+			useHotkeyOverridesStore.getState().overrides,
+			getEffectiveLayoutMap(),
+		);
+	}
+	return registeredAppChords;
+}
+
 function rebuild() {
 	registeredAppChords = buildRegisteredAppChords(
 		useHotkeyOverridesStore.getState().overrides,

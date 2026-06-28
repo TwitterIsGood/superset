@@ -1,7 +1,7 @@
 import { Badge } from "@superset/ui/badge";
 import { Input } from "@superset/ui/input";
+import { X } from "lucide-react";
 import { useState } from "react";
-import { HiXMark } from "react-icons/hi2";
 
 interface CreateTaskLabelsInputProps {
 	value: string[];
@@ -51,7 +51,7 @@ export function CreateTaskLabelsInput({
 						className="rounded-full text-muted-foreground hover:text-foreground"
 						onClick={() => removeLabel(label)}
 					>
-						<HiXMark className="size-3" />
+						<X className="size-3" />
 					</button>
 				</Badge>
 			))}

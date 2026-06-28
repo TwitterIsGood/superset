@@ -34,6 +34,10 @@ export function SortableWorkspaceItem({
 	return (
 		<div
 			ref={setNodeRef}
+			data-dashboard-sidebar-workspace-item={workspace.id}
+			data-dashboard-sidebar-workspace-in-section={
+				isInSection ? "true" : undefined
+			}
 			style={{
 				transform: CSS.Translate.toString(transform),
 				transition,

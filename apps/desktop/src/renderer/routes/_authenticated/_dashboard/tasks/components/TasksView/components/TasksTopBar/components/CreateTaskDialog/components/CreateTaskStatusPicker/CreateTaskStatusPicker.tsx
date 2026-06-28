@@ -5,8 +5,8 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
-import { HiChevronDown } from "react-icons/hi2";
 import {
 	StatusIcon,
 	type StatusType,
@@ -57,7 +57,7 @@ export function CreateTaskStatusPicker({
 					) : (
 						<span className="text-muted-foreground">Status</span>
 					)}
-					<HiChevronDown className="size-3.5 text-muted-foreground" />
+					<ChevronDown className="size-3.5 text-muted-foreground" />
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="w-52 p-1">

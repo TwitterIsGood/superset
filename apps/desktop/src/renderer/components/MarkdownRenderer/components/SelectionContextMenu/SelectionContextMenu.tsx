@@ -6,13 +6,13 @@ import {
 	ContextMenuShortcut,
 	ContextMenuTrigger,
 } from "@superset/ui/context-menu";
+import { Copy } from "lucide-react";
 import type {
 	MouseEvent as ReactMouseEvent,
 	ReactNode,
 	RefObject,
 } from "react";
 import { useState } from "react";
-import { LuCopy } from "react-icons/lu";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 
 function getModifierKeyLabel() {
@@ -92,7 +92,7 @@ export function SelectionContextMenu<T extends HTMLElement>({
 			</ContextMenuTrigger>
 			<ContextMenuContent>
 				<ContextMenuItem disabled={!canCopy} onSelect={handleCopy}>
-					<LuCopy className="size-4" />
+					<Copy className="size-4" />
 					Copy
 					<ContextMenuShortcut>{`${modifierKeyLabel}C`}</ContextMenuShortcut>
 				</ContextMenuItem>

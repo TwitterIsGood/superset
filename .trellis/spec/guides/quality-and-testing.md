@@ -59,6 +59,17 @@ When changing dev, worktree, online, Electric, Redis/KV, or relay startup script
 - Redis/KV URL matches the Docker-published host port.
 - Desktop renderer reaches the sign-in or authenticated route without repeated renderer errors.
 
+## CI Performance Budget Semantics
+
+Canary duration checks must keep the user-facing path as the hard gate:
+
+- Hard-fail the lane when artifact-ready or published-release critical path exceeds its lane hard limit.
+- Hard-fail product-controlled phases such as compile, Electron ZIP packaging, install, release update, and resource-pack build/upload/verify when those phase limits are exceeded.
+- Treat external cache-maintenance phases such as dependency cache restore/save and post-cache cleanup as diagnostics. If they exceed their phase limit while the artifact-ready/critical path still meets the lane hard limit, emit a warning, not a failure.
+- Preserve phase timings in logs even when a phase is diagnostic; otherwise future regressions cannot be attributed.
+
+For artifact-only quick Canary validation, a green run with artifact-ready under the 3-minute target is stronger evidence than a red run caused only by dependency-cache variance.
+
 ## Final Pass
 
 Before finishing spec or doc work, search `.trellis/spec` for generated scaffold language and stale status markers. The docs should describe this repository with concrete paths, not generic framework advice.

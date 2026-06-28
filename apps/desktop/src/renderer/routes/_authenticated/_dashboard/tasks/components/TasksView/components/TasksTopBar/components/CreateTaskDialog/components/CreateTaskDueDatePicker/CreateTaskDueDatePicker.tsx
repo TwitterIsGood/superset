@@ -1,8 +1,8 @@
 import { Button } from "@superset/ui/button";
 import { Calendar } from "@superset/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@superset/ui/popover";
+import { CalendarDays, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
-import { HiChevronDown, HiOutlineCalendarDays } from "react-icons/hi2";
 
 interface CreateTaskDueDatePickerProps {
 	value: string;
@@ -58,11 +58,11 @@ export function CreateTaskDueDatePicker({
 					disabled={disabled}
 					className="flex h-9 items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-3 text-sm transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
 				>
-					<HiOutlineCalendarDays className="size-4 text-muted-foreground" />
+					<CalendarDays className="size-4 text-muted-foreground" />
 					<span className={selectedDate ? "" : "text-muted-foreground"}>
 						{label}
 					</span>
-					<HiChevronDown className="size-3.5 text-muted-foreground" />
+					<ChevronDown className="size-3.5 text-muted-foreground" />
 				</button>
 			</PopoverTrigger>
 			<PopoverContent align="start" className="w-auto p-0" side="top">

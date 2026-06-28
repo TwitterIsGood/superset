@@ -1,12 +1,12 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
+import { Minus, X } from "lucide-react";
 import {
 	type ComponentPropsWithoutRef,
 	forwardRef,
 	useEffect,
 	useRef,
 } from "react";
-import { HiMiniMinus, HiMiniXMark } from "react-icons/hi2";
 import type { DiffStats } from "renderer/hooks/host-service/useDiffStats";
 import { HotkeyLabel } from "renderer/hotkeys";
 import { electronTrpc } from "renderer/lib/electron-trpc";
@@ -302,7 +302,7 @@ export const DashboardSidebarExpandedWorkspaceRow = forwardRef<
 												className="flex items-center justify-center text-muted-foreground hover:text-foreground"
 												aria-label="Remove from sidebar"
 											>
-												<HiMiniMinus className="size-3.5" />
+												<Minus className="size-3.5" />
 											</button>
 										</TooltipTrigger>
 										<TooltipContent side="top" sideOffset={4}>
@@ -330,7 +330,7 @@ export const DashboardSidebarExpandedWorkspaceRow = forwardRef<
 												className="flex items-center justify-center text-muted-foreground hover:text-foreground"
 												aria-label="Close workspace"
 											>
-												<HiMiniXMark className="size-3.5" />
+												<X className="size-3.5" />
 											</button>
 										</TooltipTrigger>
 										<TooltipContent side="top" sideOffset={4}>

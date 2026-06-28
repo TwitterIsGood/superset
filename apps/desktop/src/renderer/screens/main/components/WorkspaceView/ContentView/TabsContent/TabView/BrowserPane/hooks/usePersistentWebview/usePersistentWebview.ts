@@ -7,14 +7,34 @@ import { useTabsStore } from "renderer/stores/tabs/store";
 // Module-level singletons
 // ---------------------------------------------------------------------------
 
-const webviewRegistry = new Map<string, Electron.WebviewTag>();
+interface PersistentWebviewModuleState {
+	webviewRegistry: Map<string, Electron.WebviewTag>;
+	registeredWebContentsIds: Map<string, number>;
+	hiddenContainer: HTMLDivElement | null;
+	dragPassthroughListenersInstalled: boolean;
+}
+
+const persistentWebviewState = (import.meta.hot?.data?.persistentWebviewState as
+	| PersistentWebviewModuleState
+	| undefined) ?? {
+	webviewRegistry: new Map<string, Electron.WebviewTag>(),
+	registeredWebContentsIds: new Map<string, number>(),
+	hiddenContainer: null,
+	dragPassthroughListenersInstalled: false,
+};
+
+if (import.meta.hot) {
+	import.meta.hot.data.persistentWebviewState = persistentWebviewState;
+}
+
+const webviewRegistry = persistentWebviewState.webviewRegistry;
 /** Tracks paneId → last-registered webContentsId so we can re-register if it changes. */
-const registeredWebContentsIds = new Map<string, number>();
-let hiddenContainer: HTMLDivElement | null = null;
+const registeredWebContentsIds =
+	persistentWebviewState.registeredWebContentsIds;
 
 function getHiddenContainer(): HTMLDivElement {
-	if (!hiddenContainer) {
-		hiddenContainer = document.createElement("div");
+	if (!persistentWebviewState.hiddenContainer?.isConnected) {
+		const hiddenContainer = document.createElement("div");
 		hiddenContainer.style.position = "fixed";
 		hiddenContainer.style.left = "-9999px";
 		hiddenContainer.style.top = "-9999px";
@@ -23,8 +43,9 @@ function getHiddenContainer(): HTMLDivElement {
 		hiddenContainer.style.overflow = "hidden";
 		hiddenContainer.style.pointerEvents = "none";
 		document.body.appendChild(hiddenContainer);
+		persistentWebviewState.hiddenContainer = hiddenContainer;
 	}
-	return hiddenContainer;
+	return persistentWebviewState.hiddenContainer;
 }
 
 // ---------------------------------------------------------------------------
@@ -45,17 +66,24 @@ function setWebviewsDragPassthrough(passthrough: boolean) {
 	}
 }
 
-window.addEventListener(
-	"dragstart",
-	() => setWebviewsDragPassthrough(true),
-	true,
-);
-window.addEventListener(
-	"dragend",
-	() => setWebviewsDragPassthrough(false),
-	true,
-);
-window.addEventListener("drop", () => setWebviewsDragPassthrough(false), true);
+if (!persistentWebviewState.dragPassthroughListenersInstalled) {
+	persistentWebviewState.dragPassthroughListenersInstalled = true;
+	window.addEventListener(
+		"dragstart",
+		() => setWebviewsDragPassthrough(true),
+		true,
+	);
+	window.addEventListener(
+		"dragend",
+		() => setWebviewsDragPassthrough(false),
+		true,
+	);
+	window.addEventListener(
+		"drop",
+		() => setWebviewsDragPassthrough(false),
+		true,
+	);
+}
 
 /** Call from useBrowserLifecycle when a pane is removed. */
 export function destroyPersistentWebview(paneId: string): void {

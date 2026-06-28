@@ -1,5 +1,5 @@
+import { X } from "lucide-react";
 import type * as React from "react";
-import { LuX } from "react-icons/lu";
 
 import { cn } from "../../lib/utils";
 import { Badge } from "./badge";
@@ -43,7 +43,7 @@ function SidebarCard({
 					aria-label="Dismiss"
 					className="absolute top-2.5 right-2.5 text-muted-foreground hover:text-foreground transition-colors"
 				>
-					<LuX className="size-3.5" />
+					<X className="size-3.5" />
 				</button>
 			)}
 

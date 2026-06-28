@@ -120,10 +120,16 @@ export function getUnattachedTerminalIds(
 		.sort();
 }
 
-export function getBackgroundTerminalCountRefetchInterval(
-	isOpen: boolean,
-): number | false {
-	return isOpen ? false : BACKGROUND_TERMINAL_COUNT_REFETCH_INTERVAL_MS;
+export function getBackgroundTerminalCountRefetchInterval({
+	isMenuOpen,
+	sidebarOpen,
+}: {
+	isMenuOpen: boolean;
+	sidebarOpen: boolean;
+}): number | false {
+	return !isMenuOpen && sidebarOpen
+		? BACKGROUND_TERMINAL_COUNT_REFETCH_INTERVAL_MS
+		: false;
 }
 
 export function getBackgroundTerminalListRefetchInterval(

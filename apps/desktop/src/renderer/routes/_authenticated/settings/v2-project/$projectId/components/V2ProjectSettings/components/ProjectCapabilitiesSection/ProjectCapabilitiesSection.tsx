@@ -1,8 +1,8 @@
 import { Badge } from "@superset/ui/badge";
-import { toast } from "@superset/ui/sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { apiTrpcClient } from "renderer/lib/api-trpc-client";
+import { toast } from "renderer/lib/toast";
 import {
 	AutomationCapabilitiesPicker,
 	type AutomationCapabilityBindingValue,

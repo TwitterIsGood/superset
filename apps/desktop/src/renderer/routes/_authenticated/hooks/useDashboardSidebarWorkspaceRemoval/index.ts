@@ -1,0 +1,1 @@
+export { useDashboardSidebarWorkspaceRemoval } from "./useDashboardSidebarWorkspaceRemoval";

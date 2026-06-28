@@ -7,13 +7,10 @@ import {
 	useMatchRoute,
 	useNavigate,
 } from "@tanstack/react-router";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { CommandPaletteHost } from "renderer/commandPalette";
 import { useHotkey } from "renderer/hotkeys";
-import { DashboardSidebar } from "renderer/routes/_authenticated/_dashboard/components/DashboardSidebar";
-import { DashboardSidebarDeleteDialog } from "renderer/routes/_authenticated/_dashboard/components/DashboardSidebar/components/DashboardSidebarDeleteDialog";
-import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";
-import { useDevSeedV2Sidebar } from "renderer/routes/_authenticated/hooks/useDevSeedV2Sidebar";
+import { useDashboardSidebarWorkspaceRemoval } from "renderer/routes/_authenticated/hooks/useDashboardSidebarWorkspaceRemoval";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { ResizablePanel } from "renderer/screens/main/components/ResizablePanel";
 import { useOpenNewWorkspaceModal } from "renderer/stores/new-workspace-modal";
@@ -30,6 +27,28 @@ export const Route = createFileRoute("/_authenticated/_dashboard")({
 	component: DashboardLayout,
 });
 
+const DashboardSidebar = lazy(() =>
+	import("./components/DashboardSidebar").then((module) => ({
+		default: module.DashboardSidebar,
+	})),
+);
+
+const DashboardSidebarDeleteDialog = lazy(() =>
+	import(
+		"./components/DashboardSidebar/components/DashboardSidebarDeleteDialog"
+	).then((module) => ({
+		default: module.DashboardSidebarDeleteDialog,
+	})),
+);
+
+const DevSeedV2Sidebar = lazy(() =>
+	import(
+		"renderer/routes/_authenticated/hooks/useDevSeedV2Sidebar/DevSeedV2Sidebar"
+	).then((module) => ({
+		default: module.DevSeedV2Sidebar,
+	})),
+);
+
 interface DeleteTarget {
 	workspaceId: string;
 	workspaceName: string;
@@ -41,8 +60,7 @@ function DashboardLayout() {
 	const location = useLocation();
 	const openNewWorkspaceModal = useOpenNewWorkspaceModal();
 	const collections = useCollections();
-	const { removeWorkspaceFromSidebar } = useDashboardSidebarState();
-	useDevSeedV2Sidebar();
+	const removeWorkspaceFromSidebar = useDashboardSidebarWorkspaceRemoval();
 
 	const matchRoute = useMatchRoute();
 	const v2WorkspaceMatch = matchRoute({
@@ -127,7 +145,9 @@ function DashboardLayout() {
 				setWorkspaceSidebarWidth(DEFAULT_WORKSPACE_SIDEBAR_WIDTH)
 			}
 		>
-			<DashboardSidebar isCollapsed={isWorkspaceSidebarCollapsed()} />
+			<Suspense fallback={null}>
+				<DashboardSidebar isCollapsed={isWorkspaceSidebarCollapsed()} />
+			</Suspense>
 		</ResizablePanel>
 	);
 
@@ -138,6 +158,11 @@ function DashboardLayout() {
 	return (
 		<div className="flex h-full w-full overflow-hidden">
 			<CommandPaletteHost />
+			{isWorkspaceSidebarOpen && (
+				<Suspense fallback={null}>
+					<DevSeedV2Sidebar />
+				</Suspense>
+			)}
 			{sidebarOutsideColumn && sidebarPanel}
 			<div className="flex flex-1 flex-col min-w-0 min-h-0">
 				{!isStandaloneChatRoute && <TopBar />}
@@ -151,20 +176,22 @@ function DashboardLayout() {
 			<div id="workspace-right-sidebar-slot" className="flex h-full shrink-0" />
 			<AddRepositoryModals />
 			{deleteTarget && (
-				<DashboardSidebarDeleteDialog
-					workspaceId={deleteTarget.workspaceId}
-					workspaceName={deleteTarget.workspaceName}
-					open={deleteTarget.open}
-					onOpenChange={(open) => {
-						setDeleteTarget((target) =>
-							target ? { ...target, open } : target,
-						);
-					}}
-					onDeleted={() => {
-						removeWorkspaceFromSidebar(deleteTarget.workspaceId);
-						setDeleteTarget(null);
-					}}
-				/>
+				<Suspense fallback={null}>
+					<DashboardSidebarDeleteDialog
+						workspaceId={deleteTarget.workspaceId}
+						workspaceName={deleteTarget.workspaceName}
+						open={deleteTarget.open}
+						onOpenChange={(open) => {
+							setDeleteTarget((target) =>
+								target ? { ...target, open } : target,
+							);
+						}}
+						onDeleted={() => {
+							removeWorkspaceFromSidebar(deleteTarget.workspaceId);
+							setDeleteTarget(null);
+						}}
+					/>
+				</Suspense>
 			)}
 		</div>
 	);

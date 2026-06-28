@@ -4,7 +4,7 @@ import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useRelayUrl } from "renderer/hooks/useRelayUrl";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
-import { useDashboardSidebarState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarState";
+import { useDashboardSidebarCoreState } from "renderer/routes/_authenticated/hooks/useDashboardSidebarCoreState";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import {
 	getAutomationRunWorkspaceIds,
@@ -135,7 +135,7 @@ export function useDashboardSidebarData() {
 	const collections = useCollections();
 	const { machineId, activeHostUrl } = useLocalHostService();
 	const relayUrl = useRelayUrl();
-	const { toggleProjectCollapsed } = useDashboardSidebarState();
+	const { toggleProjectCollapsed } = useDashboardSidebarCoreState();
 	const queryClient = useQueryClient();
 	const workspaceTransactionsById = useWorkspaceTransactionsStore(
 		(state) => state.byWorkspaceId,

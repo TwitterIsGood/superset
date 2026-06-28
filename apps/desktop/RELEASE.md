@@ -39,6 +39,8 @@ gh release edit desktop-v0.0.50 --draft=false
 
 - GitHub CLI (`gh`) installed and authenticated
 - Clean git working directory
+- Resource-pack object storage configured for published builds; see
+  [Desktop Resource Pack Release Runbook](docs/RESOURCE_PACK_RELEASE.md)
 
 ## Manual Release
 

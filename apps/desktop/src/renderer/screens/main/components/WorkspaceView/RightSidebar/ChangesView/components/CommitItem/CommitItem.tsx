@@ -5,7 +5,7 @@ import {
 	ContextMenuTrigger,
 } from "@superset/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
-import { VscClippy } from "react-icons/vsc";
+import { Clipboard } from "lucide-react";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import type { ChangedFile, CommitInfo } from "shared/changes-types";
 import type { ChangesViewMode } from "../../types";
@@ -62,7 +62,7 @@ function CommitHeader({
 			</Tooltip>
 			<ContextMenuContent className="w-52">
 				<ContextMenuItem onClick={handleCopyCommitHash}>
-					<VscClippy className="mr-2 size-4" />
+					<Clipboard className="mr-2 size-4" />
 					Copy Commit Hash
 				</ContextMenuItem>
 			</ContextMenuContent>

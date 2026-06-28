@@ -1,8 +1,7 @@
 import type { RendererContext } from "@superset/panes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
+import { Check, Copy, Github } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FaGithub } from "react-icons/fa";
-import { LuCheck, LuCopy } from "react-icons/lu";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import type { CommentPaneData, PaneViewerData } from "../../../../../../types";
 
@@ -55,7 +54,7 @@ export function CommentPaneHeaderExtras({
 							aria-label="Open on GitHub"
 							className="rounded p-1 text-muted-foreground/60 transition-colors hover:text-muted-foreground"
 						>
-							<FaGithub className="size-3.5" />
+							<Github className="size-3.5" />
 						</a>
 					</TooltipTrigger>
 					<TooltipContent side="bottom" showArrow={false}>
@@ -72,9 +71,9 @@ export function CommentPaneHeaderExtras({
 						className="rounded p-1 text-muted-foreground/60 transition-colors hover:text-muted-foreground"
 					>
 						{copied ? (
-							<LuCheck className="size-3.5" />
+							<Check className="size-3.5" />
 						) : (
-							<LuCopy className="size-3.5" />
+							<Copy className="size-3.5" />
 						)}
 					</button>
 				</TooltipTrigger>

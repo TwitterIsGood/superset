@@ -55,20 +55,25 @@ import {
 } from "renderer/lib/auth-client";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import superjson from "superjson";
-import { z } from "zod";
 import {
+	type DashboardSidebarProjectInput,
 	type DashboardSidebarProjectRow,
+	type DashboardSidebarSectionInput,
 	type DashboardSidebarSectionRow,
 	dashboardSidebarProjectSchema,
 	dashboardSidebarSectionSchema,
+	type FailedWorkspaceCreateInput,
 	type FailedWorkspaceCreateRow,
 	failedWorkspaceCreateSchema,
 	healV2UserPreferences,
 	healWorkspaceLocalState,
+	type V2TerminalPresetInput,
 	type V2TerminalPresetRow,
+	type V2UserPreferencesInput,
 	type V2UserPreferencesRow,
 	v2TerminalPresetSchema,
 	v2UserPreferencesSchema,
+	type WorkspaceLocalStateInput,
 	type WorkspaceLocalStateRow,
 	type WorkspacesCreateInput,
 	workspaceLocalStateSchema,
@@ -133,6 +138,104 @@ type SyncedRowCollection<T extends object> = Collection<
 	SyncedRowUpsertUtils<T>
 >;
 
+type SyncableCollection = Collection<object> & {
+	startSyncImmediate?: () => void;
+};
+
+type CollectionStatusSnapshot = {
+	id: string;
+	rowCount: number;
+	status: string;
+};
+type PreloadableCollectionKey = keyof OrgCollections | "organizations";
+
+export type CollectionPreloadProfile = {
+	pathname?: string | null;
+	keys?: readonly PreloadableCollectionKey[];
+};
+
+export interface CollectionsStatusReport {
+	organizationId: string;
+	collections: Record<string, CollectionStatusSnapshot>;
+}
+
+const PERSISTED_ELECTRIC_SCHEMA_VERSION = 1;
+const V2_WORKSPACE_GRAPH_KEYS = [
+	"v2Workspaces",
+	"v2Projects",
+	"v2Hosts",
+	"v2UsersHosts",
+] as const satisfies readonly (keyof OrgCollections)[];
+const V2_WORKSPACE_GRAPH_DEPENDENCY_KEYS = [
+	"v2Projects",
+	"v2Hosts",
+	"v2UsersHosts",
+] as const satisfies readonly (keyof OrgCollections)[];
+
+const AUTHENTICATED_SHELL_COLLECTION_KEYS = [
+	"organizations",
+	"v2Hosts",
+	"v2Clients",
+	"v2UsersHosts",
+	"v2Projects",
+	"v2Workspaces",
+	"v2SidebarProjects",
+	"v2WorkspaceLocalState",
+	"v2SidebarSections",
+	"v2TerminalPresets",
+	"v2UserPreferences",
+] as const satisfies readonly PreloadableCollectionKey[];
+
+const TASKS_COLLECTION_KEYS = [
+	"tasks",
+	"taskStatuses",
+	"users",
+	"v2Projects",
+	"v2Workspaces",
+] as const satisfies readonly PreloadableCollectionKey[];
+
+const WORKSPACE_COLLECTION_KEYS = [
+	"chatSessions",
+	"githubRepositories",
+	"githubPullRequests",
+] as const satisfies readonly PreloadableCollectionKey[];
+
+const AUTOMATIONS_COLLECTION_KEYS = [
+	"automations",
+	"automationRuns",
+	"v2Projects",
+] as const satisfies readonly PreloadableCollectionKey[];
+
+const SETTINGS_COLLECTION_KEYS = [
+	"members",
+	"users",
+	"invitations",
+	"teams",
+	"teamMembers",
+	"integrationConnections",
+	"subscriptions",
+	"apiKeys",
+] as const satisfies readonly PreloadableCollectionKey[];
+
+type V2WorkspaceGraphKey = (typeof V2_WORKSPACE_GRAPH_KEYS)[number];
+type V2WorkspaceGraphDependencyKey =
+	(typeof V2_WORKSPACE_GRAPH_DEPENDENCY_KEYS)[number];
+
+export interface V2WorkspaceGraphHealthReport {
+	organizationId: string;
+	collections: Record<V2WorkspaceGraphKey, CollectionStatusSnapshot>;
+	isPartial: boolean;
+	resetKeys: V2WorkspaceGraphDependencyKey[];
+	reason?: string;
+}
+
+export interface V2WorkspaceGraphRecoveryReport
+	extends V2WorkspaceGraphHealthReport {
+	recovered: boolean;
+	before: V2WorkspaceGraphHealthReport;
+	after?: V2WorkspaceGraphHealthReport;
+}
+
 function withSyncedRowUpsertFor<T extends object>() {
 	return <
 		TConfig extends {
@@ -196,15 +299,13 @@ const createPersistedElectricCollection = ((config: ElectricSyncConfig) => {
 	} as any);
 }) as unknown as typeof createCollection;
 
-const apiKeyDisplaySchema = z.object({
-	id: z.string(),
-	name: z.string().nullable(),
-	start: z.string().nullable(),
-	createdAt: z.coerce.date(),
-	lastRequest: z.coerce.date().nullable(),
-});
-
-type ApiKeyDisplay = z.infer<typeof apiKeyDisplaySchema>;
+interface ApiKeyDisplay extends Record<string, unknown> {
+	id: string;
+	name: string | null;
+	start: string | null;
+	createdAt: Date;
+	lastRequest: Date | null;
+}
 
 type IntegrationConnectionDisplay = Omit<
 	SelectIntegrationConnection,
@@ -240,42 +341,42 @@ export interface OrgCollections {
 		string,
 		LocalStorageCollectionUtils,
 		typeof dashboardSidebarProjectSchema,
-		z.input<typeof dashboardSidebarProjectSchema>
+		DashboardSidebarProjectInput
 	>;
 	v2WorkspaceLocalState: Collection<
 		WorkspaceLocalStateRow,
 		string,
 		LocalStorageCollectionUtils,
 		typeof workspaceLocalStateSchema,
-		z.input<typeof workspaceLocalStateSchema>
+		WorkspaceLocalStateInput
 	>;
 	v2SidebarSections: Collection<
 		DashboardSidebarSectionRow,
 		string,
 		LocalStorageCollectionUtils,
 		typeof dashboardSidebarSectionSchema,
-		z.input<typeof dashboardSidebarSectionSchema>
+		DashboardSidebarSectionInput
 	>;
 	v2TerminalPresets: Collection<
 		V2TerminalPresetRow,
 		string,
 		LocalStorageCollectionUtils,
 		typeof v2TerminalPresetSchema,
-		z.input<typeof v2TerminalPresetSchema>
+		V2TerminalPresetInput
 	>;
 	v2UserPreferences: Collection<
 		V2UserPreferencesRow,
 		string,
 		LocalStorageCollectionUtils,
 		typeof v2UserPreferencesSchema,
-		z.input<typeof v2UserPreferencesSchema>
+		V2UserPreferencesInput
 	>;
 	failedWorkspaceCreates: Collection<
 		FailedWorkspaceCreateRow,
 		string,
 		LocalStorageCollectionUtils,
 		typeof failedWorkspaceCreateSchema,
-		z.input<typeof failedWorkspaceCreateSchema>
+		FailedWorkspaceCreateInput
 	>;
 }
 
@@ -1010,22 +1111,237 @@ function createOrgCollections(organizationId: string): OrgCollections {
 	};
 }
 
+function getCollectionStatusSnapshot(
+	collection: Collection<object>,
+): CollectionStatusSnapshot {
+	return {
+		id: collection.id,
+		rowCount: collection.size,
+		status: collection.status,
+	};
+}
+
+function resolvePreloadCollectionKeys({
+	pathname,
+	keys,
+}: CollectionPreloadProfile = {}): PreloadableCollectionKey[] {
+	const resolvedKeys = new Set<PreloadableCollectionKey>([
+		...AUTHENTICATED_SHELL_COLLECTION_KEYS,
+		...(keys ?? []),
+	]);
+	const normalizedPathname = pathname ?? "";
+
+	if (
+		normalizedPathname.startsWith("/tasks") ||
+		normalizedPathname.startsWith("/chat")
+	) {
+		for (const key of TASKS_COLLECTION_KEYS) {
+			resolvedKeys.add(key);
+		}
+	}
+
+	if (normalizedPathname.startsWith("/v2-workspace")) {
+		for (const key of WORKSPACE_COLLECTION_KEYS) {
+			resolvedKeys.add(key);
+		}
+	}
+
+	if (normalizedPathname.startsWith("/automations")) {
+		for (const key of AUTOMATIONS_COLLECTION_KEYS) {
+			resolvedKeys.add(key);
+		}
+	}
+
+	if (normalizedPathname.startsWith("/settings")) {
+		for (const key of SETTINGS_COLLECTION_KEYS) {
+			resolvedKeys.add(key);
+		}
+	}
+
+	return [...resolvedKeys];
+}
+
+function getPreloadableCollection(
+	collections: AppCollections,
+	key: PreloadableCollectionKey,
+): Collection<object> {
+	return collections[key] as Collection<object>;
+}
+
+export function getCollectionsStatusReport(
+	organizationId: string,
+): CollectionsStatusReport {
+	const collections = getCollections(organizationId);
+	const snapshots = Object.fromEntries(
+		Object.entries(collections)
+			.filter(([name]) => name !== "switchOrganization")
+			.map(([name, collection]) => [
+				name,
+				getCollectionStatusSnapshot(collection as Collection<object>),
+			]),
+	);
+
+	return {
+		organizationId,
+		collections: snapshots,
+	};
+}
+
+export function getV2WorkspaceGraphHealth(
+	organizationId: string,
+): V2WorkspaceGraphHealthReport {
+	const collections = getCollections(organizationId);
+	const snapshots = Object.fromEntries(
+		V2_WORKSPACE_GRAPH_KEYS.map((key) => [
+			key,
+			getCollectionStatusSnapshot(collections[key] as Collection<object>),
+		]),
+	) as Record<V2WorkspaceGraphKey, CollectionStatusSnapshot>;
+	const workspaceCount = snapshots.v2Workspaces.rowCount;
+	const resetKeys = V2_WORKSPACE_GRAPH_DEPENDENCY_KEYS.filter((key) => {
+		const snapshot = snapshots[key];
+		return (
+			workspaceCount > 0 &&
+			snapshot.rowCount === 0 &&
+			snapshot.status === "ready"
+		);
+	});
+	const isPartial = resetKeys.length > 0;
+
+	return {
+		organizationId,
+		collections: snapshots,
+		isPartial,
+		resetKeys,
+		...(isPartial
+			? {
+					reason: `v2Workspaces has ${workspaceCount} row(s), but ${resetKeys.join(
+						", ",
+					)} finished with 0 row(s).`,
+				}
+			: {}),
+	};
+}
+
+function createRecoveryTx(collectionId: string) {
+	const now = Date.now();
+	return {
+		txId: `desktop-electric-cache-recovery:${collectionId}:${now}:${Math.random()
+			.toString(36)
+			.slice(2)}`,
+		term: now,
+		seq: Math.floor(Math.random() * 1_000_000_000),
+		rowVersion: 0,
+		truncate: true,
+		mutations: [],
+		collectionMetadataMutations: [
+			{ type: "delete" as const, key: "electric:resume" },
+		],
+	};
+}
+
+async function resetPersistedElectricCollection(
+	collection: Collection<object>,
+): Promise<void> {
+	const resolvedPersistence =
+		persistence.resolvePersistenceForCollection?.({
+			collectionId: collection.id,
+			mode: "sync-present",
+			schemaVersion: PERSISTED_ELECTRIC_SCHEMA_VERSION,
+		}) ??
+		persistence.resolvePersistenceForMode?.("sync-present") ??
+		persistence;
+
+	await collection.cleanup();
+	await resolvedPersistence.adapter.applyCommittedTx(
+		collection.id,
+		createRecoveryTx(collection.id),
+	);
+}
+
+export async function recoverPartialV2WorkspaceGraphCache(
+	organizationId: string,
+): Promise<V2WorkspaceGraphRecoveryReport> {
+	const before = getV2WorkspaceGraphHealth(organizationId);
+	if (!before.isPartial) {
+		return {
+			...before,
+			recovered: false,
+			before,
+		};
+	}
+
+	const collections = getCollections(organizationId);
+	await Promise.all(
+		before.resetKeys.map((key) =>
+			resetPersistedElectricCollection(collections[key] as Collection<object>),
+		),
+	);
+
+	const after = getV2WorkspaceGraphHealth(organizationId);
+	return {
+		...after,
+		recovered: true,
+		before,
+		after,
+	};
+}
+
+function getV2WorkspaceGraphRecoveryReloadKey(organizationId: string) {
+	return `superset:v2-workspace-graph-cache-recovered:${organizationId}`;
+}
+
+async function reloadOnceAfterV2WorkspaceGraphRecovery(
+	organizationId: string,
+): Promise<void> {
+	const report = await recoverPartialV2WorkspaceGraphCache(organizationId);
+	if (!report.recovered) return;
+
+	console.warn(
+		"[collections] Recovered partial v2 workspace collection cache; reloading renderer.",
+		report.before,
+	);
+
+	const reloadKey = getV2WorkspaceGraphRecoveryReloadKey(organizationId);
+	if (globalThis.sessionStorage?.getItem(reloadKey)) return;
+	globalThis.sessionStorage?.setItem(reloadKey, new Date().toISOString());
+	globalThis.location?.reload();
+}
+
+async function preloadCollectionSet(
+	collectionsToPreload: Collection<object>[],
+): Promise<void> {
+	await Promise.allSettled(
+		collectionsToPreload.map((collection) => {
+			const syncableCollection = collection as SyncableCollection;
+			syncableCollection.startSyncImmediate?.();
+			return collection.preload();
+		}),
+	);
+}
+
 /**
  * Preload collections for an organization by starting Electric sync.
  * Collections are lazy — they don't fetch data until subscribed or preloaded.
  * Call this eagerly so data is ready when the user switches orgs.
  */
+export function getPreloadCollectionKeysForPathname(
+	pathname?: string | null,
+): PreloadableCollectionKey[] {
+	return resolvePreloadCollectionKeys({ pathname });
+}
+
 export async function preloadCollections(
 	organizationId: string,
+	profile: CollectionPreloadProfile = {},
 ): Promise<void> {
 	const collections = getCollections(organizationId);
-	const collectionsToPreload = Object.entries(collections)
-		.filter(([name]) => name !== "organizations")
-		.map(([, collection]) => collection as Collection<object>);
-
-	await Promise.allSettled(
-		collectionsToPreload.map((c) => (c as Collection<object>).preload()),
+	const collectionsToPreload = resolvePreloadCollectionKeys(profile).map(
+		(key) => getPreloadableCollection(collections, key),
 	);
+
+	await preloadCollectionSet(collectionsToPreload);
+	await reloadOnceAfterV2WorkspaceGraphRecovery(organizationId);
 }
 
 /**
@@ -1053,3 +1369,67 @@ export function getCollections(organizationId: string) {
 }
 
 export type AppCollections = ReturnType<typeof getCollections>;
+
+declare global {
+	interface Window {
+		__supersetCollectionsDebug?: {
+			getActiveOrganizationId?: () => string | null;
+			switchActiveOrganization?: (organizationId: string) => Promise<{
+				requestedOrganizationId: string;
+				activeOrganizationId: string | null;
+			}>;
+			getCollectionsStatusReport?: (
+				organizationId?: string,
+			) => CollectionsStatusReport | { error: string };
+			getPreloadCollectionKeysForPathname?: (
+				pathname?: string | null,
+			) => PreloadableCollectionKey[];
+			getV2WorkspaceGraphHealth?: (
+				organizationId?: string,
+			) => V2WorkspaceGraphHealthReport | { error: string };
+			recoverPartialV2WorkspaceGraphCache?: (
+				organizationId?: string,
+			) => Promise<V2WorkspaceGraphRecoveryReport | { error: string }>;
+		};
+	}
+}
+
+function getDebugOrganizationId(organizationId?: string): string | null {
+	if (organizationId) return organizationId;
+	return globalThis.localStorage?.getItem("active_organization_id") ?? null;
+}
+
+function getDebugPathname(pathname?: string | null): string | null {
+	if (pathname) return pathname;
+	const hashPath = globalThis.location?.hash?.replace(/^#/, "") ?? "";
+	if (hashPath.startsWith("/")) return hashPath;
+	return globalThis.location?.pathname ?? null;
+}
+
+if (typeof window !== "undefined" && env.NODE_ENV === "development") {
+	window.__supersetCollectionsDebug = {
+		getCollectionsStatusReport: (organizationId?: string) => {
+			const resolvedOrganizationId = getDebugOrganizationId(organizationId);
+			if (!resolvedOrganizationId) {
+				return { error: "No active organization id is available." };
+			}
+			return getCollectionsStatusReport(resolvedOrganizationId);
+		},
+		getPreloadCollectionKeysForPathname: (pathname?: string | null) =>
+			getPreloadCollectionKeysForPathname(getDebugPathname(pathname)),
+		getV2WorkspaceGraphHealth: (organizationId?: string) => {
+			const resolvedOrganizationId = getDebugOrganizationId(organizationId);
+			if (!resolvedOrganizationId) {
+				return { error: "No active organization id is available." };
+			}
+			return getV2WorkspaceGraphHealth(resolvedOrganizationId);
+		},
+		recoverPartialV2WorkspaceGraphCache: async (organizationId?: string) => {
+			const resolvedOrganizationId = getDebugOrganizationId(organizationId);
+			if (!resolvedOrganizationId) {
+				return { error: "No active organization id is available." };
+			}
+			return recoverPartialV2WorkspaceGraphCache(resolvedOrganizationId);
+		},
+	};
+}

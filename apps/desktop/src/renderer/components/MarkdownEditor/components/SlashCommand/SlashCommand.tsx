@@ -5,6 +5,13 @@ import Suggestion, {
 	type SuggestionKeyDownProps,
 	type SuggestionProps,
 } from "@tiptap/suggestion";
+import {
+	CircleCheck,
+	List,
+	ListOrdered,
+	Quote,
+	SquareCode,
+} from "lucide-react";
 
 const slashCommandSuggestionKey = new PluginKey("markdownEditorSlashCommand");
 
@@ -15,13 +22,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import {
-	HiOutlineCheckCircle,
-	HiOutlineCodeBracket,
-	HiOutlineListBullet,
-	HiOutlineNumberedList,
-} from "react-icons/hi2";
-import { RiDoubleQuotesL } from "react-icons/ri";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
 
 interface CommandItem {
@@ -57,32 +57,32 @@ const COMMANDS: CommandItem[] = [
 	// Lists group
 	{
 		title: "Bulleted list",
-		icon: <HiOutlineListBullet className="size-4" />,
+		icon: <List className="size-4" />,
 		command: (editor) => editor.chain().focus().toggleBulletList().run(),
 		group: "lists",
 	},
 	{
 		title: "Numbered list",
-		icon: <HiOutlineNumberedList className="size-4" />,
+		icon: <ListOrdered className="size-4" />,
 		command: (editor) => editor.chain().focus().toggleOrderedList().run(),
 		group: "lists",
 	},
 	{
 		title: "Checklist",
-		icon: <HiOutlineCheckCircle className="size-4" />,
+		icon: <CircleCheck className="size-4" />,
 		command: (editor) => editor.chain().focus().toggleTaskList().run(),
 		group: "lists",
 	},
 	// Blocks group
 	{
 		title: "Code block",
-		icon: <HiOutlineCodeBracket className="size-4" />,
+		icon: <SquareCode className="size-4" />,
 		command: (editor) => editor.chain().focus().toggleCodeBlock().run(),
 		group: "blocks",
 	},
 	{
 		title: "Blockquote",
-		icon: <RiDoubleQuotesL className="size-4" />,
+		icon: <Quote className="size-4" />,
 		command: (editor) => editor.chain().focus().toggleBlockquote().run(),
 		group: "blocks",
 	},

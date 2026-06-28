@@ -10,7 +10,7 @@ import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
-import { createAuthStorage } from "mastracode";
+import { createSupersetAuthStorage } from "../../chat-service/auth-storage";
 import { ANTHROPIC_AUTH_PROVIDER_ID } from "../provider-ids";
 
 export interface ClaudeCredentials {
@@ -170,7 +170,7 @@ export function getCredentialsFromKeychain(): ClaudeCredentials | null {
 
 export async function getCredentialsFromAuthStorage(): Promise<ClaudeCredentials | null> {
 	try {
-		const authStorage = createAuthStorage();
+		const authStorage = createSupersetAuthStorage();
 		authStorage.reload();
 		const credential = authStorage.get(ANTHROPIC_AUTH_PROVIDER_ID);
 		if (!credential) return null;

@@ -6,17 +6,17 @@ import {
 	DropdownMenuTrigger,
 } from "@superset/ui/dropdown-menu";
 import { OverflowFadeText } from "@superset/ui/overflow-fade-text";
-import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
+import { ChevronDown } from "lucide-react";
 import { useCallback, useMemo } from "react";
-import { HiChevronDown } from "react-icons/hi2";
 import {
 	getAppOption,
 	OpenInExternalDropdownItems,
 } from "renderer/components/OpenInExternalDropdown";
 import { HotkeyLabel, useHotkey, useHotkeyDisplay } from "renderer/hotkeys";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { toast } from "renderer/lib/toast";
 import { useV2ProjectDefaultApp } from "renderer/routes/_authenticated/hooks/useV2ProjectDefaultApp";
 import { useThemeStore } from "renderer/stores";
 
@@ -144,7 +144,7 @@ export function V2OpenInMenuButton({
 							isLoading && "opacity-50 pointer-events-none",
 						)}
 					>
-						<HiChevronDown className="size-3.5" />
+						<ChevronDown className="size-3.5" />
 					</button>
 				</DropdownMenuTrigger>
 

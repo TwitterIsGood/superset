@@ -8,9 +8,9 @@ import {
 	ContextMenuTrigger,
 } from "@superset/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
+import { SquareTerminal } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useDrag, useDrop } from "react-dnd";
-import { HiMiniCommandLine } from "react-icons/hi2";
 import type { HotkeyId } from "renderer/hotkeys";
 import { HotkeyLabel } from "renderer/hotkeys";
 import { resolveV2PresetIcon } from "renderer/lib/preset-icon";
@@ -102,7 +102,7 @@ export function V2PresetBarItem({
 										className="size-3.5 shrink-0 object-contain opacity-90"
 									/>
 								) : (
-									<HiMiniCommandLine className="size-3.5 shrink-0" />
+									<SquareTerminal className="size-3.5 shrink-0" />
 								)}
 								<span className="min-w-0 truncate">
 									{preset.name || "default"}

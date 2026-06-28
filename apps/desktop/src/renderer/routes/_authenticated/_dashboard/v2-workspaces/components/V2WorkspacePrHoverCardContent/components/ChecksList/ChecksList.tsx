@@ -1,5 +1,5 @@
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 import type { V2WorkspacePrSummary } from "renderer/routes/_authenticated/_dashboard/v2-workspaces/hooks/useAccessibleV2Workspaces";
 import { CheckRow } from "./components/CheckRow";
 
@@ -23,9 +23,9 @@ export function ChecksList({ checks }: ChecksListProps) {
 				className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
 			>
 				{expanded ? (
-					<LuChevronDown className="size-3" />
+					<ChevronDown className="size-3" />
 				) : (
-					<LuChevronRight className="size-3" />
+					<ChevronRight className="size-3" />
 				)}
 				<span>{expanded ? "Hide checks" : "Show checks"}</span>
 			</button>

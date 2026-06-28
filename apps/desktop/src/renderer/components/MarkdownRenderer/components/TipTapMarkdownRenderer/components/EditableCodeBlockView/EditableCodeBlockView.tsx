@@ -1,4 +1,3 @@
-import { mermaid } from "@streamdown/mermaid";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -7,23 +6,20 @@ import {
 } from "@superset/ui/dropdown-menu";
 import type { NodeViewProps } from "@tiptap/react";
 import { NodeViewContent, NodeViewWrapper } from "@tiptap/react";
-import { useState } from "react";
-import {
-	HiCheck,
-	HiChevronDown,
-	HiOutlineClipboard,
-	HiOutlineCodeBracket,
-	HiOutlineEye,
-} from "react-icons/hi2";
+import { Check, ChevronDown, Clipboard, Eye, SquareCode } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
 import { useCopyToClipboard } from "renderer/hooks/useCopyToClipboard";
 import {
 	FILE_VIEW_CODE_BLOCK_LANGUAGES,
 	getCodeBlockLanguageLabel,
 } from "renderer/lib/tiptap/code-block-languages";
 import { useTheme } from "renderer/stores";
-import { Streamdown } from "streamdown";
 
-const mermaidPlugins = { mermaid };
+const LazyMermaidCodeBlock = lazy(() =>
+	import("renderer/components/MermaidCodeBlock").then((module) => ({
+		default: module.MermaidCodeBlock,
+	})),
+);
 
 export function EditableCodeBlockView({
 	node,
@@ -90,9 +86,9 @@ export function EditableCodeBlockView({
 						className="flex items-center justify-center rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 					>
 						{mermaidMode === "preview" ? (
-							<HiOutlineCodeBracket className="h-3.5 w-3.5" />
+							<SquareCode className="h-3.5 w-3.5" />
 						) : (
-							<HiOutlineEye className="h-3.5 w-3.5" />
+							<Eye className="h-3.5 w-3.5" />
 						)}
 					</button>
 				)}
@@ -103,7 +99,7 @@ export function EditableCodeBlockView({
 							className="flex items-center gap-1 rounded px-2 py-1 text-muted-foreground text-xs transition-colors hover:bg-muted hover:text-foreground"
 						>
 							{currentLabel}
-							<HiChevronDown className="h-3 w-3" />
+							<ChevronDown className="h-3 w-3" />
 						</button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -133,22 +129,22 @@ export function EditableCodeBlockView({
 					className="flex items-center justify-center rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 				>
 					{copied ? (
-						<HiCheck className="h-3.5 w-3.5 text-green-500" />
+						<Check className="h-3.5 w-3.5 text-green-500" />
 					) : (
-						<HiOutlineClipboard className="h-3.5 w-3.5" />
+						<Clipboard className="h-3.5 w-3.5" />
 					)}
 				</button>
 			</div>
 
 			{showMermaidPreview && (
 				<div contentEditable={false} className="w-full [&_.min-h-28]:min-h-80">
-					<Streamdown
-						mode="static"
-						plugins={mermaidPlugins}
-						mermaid={{ config: { theme: isDark ? "dark" : "default" } }}
-					>
-						{`\`\`\`\`mermaid\n${mermaidSource}\n\`\`\`\``}
-					</Streamdown>
+					<Suspense fallback={<pre>{mermaidSource}</pre>}>
+						<LazyMermaidCodeBlock
+							source={mermaidSource}
+							isDark={isDark}
+							className="[&_.min-h-28]:min-h-80"
+						/>
+					</Suspense>
 				</div>
 			)}
 
