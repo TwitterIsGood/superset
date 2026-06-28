@@ -37,7 +37,7 @@
 				"criticalPathMaxSeconds": {
 					"resourcePackBuildUploadVerify": 90,
 					"compile": 90,
-					"electronBuilderZip": 45,
+					"electronBuilderDmgZip": 150,
 					"releaseUpdate": 30
 				}
 			},

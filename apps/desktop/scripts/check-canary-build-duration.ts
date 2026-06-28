@@ -360,6 +360,7 @@ function phaseForStep(jobName: string, stepName: string): string | undefined {
 		text.includes("build electron app") ||
 		text.includes("electron-builder")
 	) {
+		if (text.includes("dmg+zip")) return "electronBuilderDmgZip";
 		return "electronBuilderZip";
 	}
 	if (text.includes("upload") && text.includes("artifact"))

@@ -104,7 +104,7 @@ jobs:
               if [[ "$PUBLISH_RELEASE" == "false" ]]; then
                 echo "macos_artifact_mode=zip_only" >> $GITHUB_OUTPUT
               else
-                echo "macos_artifact_mode=full" >> $GITHUB_OUTPUT
+                echo "macos_artifact_mode=quick_full" >> $GITHUB_OUTPUT
               fi
               ;;
             full)
@@ -138,7 +138,7 @@ jobs:
             echo "capture_compile_bundle_stats=false" >> $GITHUB_OUTPUT
             echo "capture_runtime_performance=false" >> $GITHUB_OUTPUT
           elif [[ "$BUILD_SCOPE" == "quick" ]]; then
-            echo "Published quick canary requested: uploading resource packs and building macOS ZIP+DMG without runtime telemetry."
+            echo "Published quick canary requested: uploading resource packs and building macOS ZIP+DMG from precompiled dist without runtime telemetry."
             echo "upload_resource_pack_artifacts=true" >> $GITHUB_OUTPUT
             echo "bundle_cli=false" >> $GITHUB_OUTPUT
             echo "upload_sourcemaps=false" >> $GITHUB_OUTPUT

@@ -169,6 +169,9 @@ const config: Configuration = {
 	// macOS DMG installer
 	dmg: {
 		...(existsSync(dmgBackgroundPath) ? { background: dmgBackgroundPath } : {}),
+		// LZFSE-compressed DMGs are materially faster to create than the default
+		// zlib UDZO images while staying compressed for GitHub Release downloads.
+		format: "ULFO",
 		// Explicit size — dmgbuild's auto-calc under-allocates and silently truncates
 		// the last large file above ~1.7GB of contents. `shrink: true` (default) keeps
 		// the final artifact compact.

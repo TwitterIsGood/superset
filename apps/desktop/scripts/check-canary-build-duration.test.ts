@@ -154,6 +154,7 @@ describe("evaluateCanaryBuildDuration", () => {
 				maxSeconds: 480,
 				targetSeconds: 300,
 				criticalPathMaxSeconds: {
+					electronBuilderDmgZip: 150,
 					releaseUpdate: 60,
 					resourcePackBuildUploadVerify: 150,
 				},
@@ -165,6 +166,7 @@ describe("evaluateCanaryBuildDuration", () => {
 					name: "Build - macOS (arm64)",
 					started_at: "2026-06-27T00:00:00Z",
 					steps: [
+						step("Build Electron app (DMG+ZIP)", 0, 75),
 						step("Build desktop resource packs", 20, 100),
 						step("Upload desktop resource packs to object storage", 100, 150),
 					],
@@ -187,6 +189,10 @@ describe("evaluateCanaryBuildDuration", () => {
 				(phase) => phase.name === "resourcePackBuildUploadVerify",
 			)?.durationSeconds,
 		).toBe(130);
+		expect(
+			result.phases.find((phase) => phase.name === "electronBuilderDmgZip")
+				?.durationSeconds,
+		).toBe(75);
 	});
 
 	test("accepts gh run view camelCase timestamp fields", () => {

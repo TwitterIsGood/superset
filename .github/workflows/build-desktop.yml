@@ -53,7 +53,7 @@ on:
         type: string
         default: "auto"
       macos_artifact_mode:
-        description: "macOS artifact mode: full builds DMG+ZIP, zip_only builds the updater ZIP only."
+        description: "macOS artifact mode: full compiles on macOS and builds DMG+ZIP, quick_full reuses precompiled dist and builds DMG+ZIP, zip_only builds the updater ZIP only."
         required: false
         type: string
         default: "full"
@@ -111,8 +111,8 @@ env:
 
 jobs:
   compile-macos-zip-dist:
-    name: Compile - macOS ZIP dist (arm64)
-    if: ${{ inputs.build_macos && inputs.macos_artifact_mode == 'zip_only' && inputs.macos_arches_json == '["arm64"]' }}
+    name: Compile - macOS fast dist (arm64)
+    if: ${{ inputs.build_macos && inputs.macos_artifact_mode != 'full' && inputs.macos_arches_json == '["arm64"]' }}
     runs-on: ubuntu-latest
     environment: production
 
@@ -220,7 +220,7 @@ jobs:
           bun-version-file: .bun-version
 
       - name: Restore dependencies cache
-        if: inputs.macos_artifact_mode == 'zip_only'
+        if: inputs.macos_artifact_mode != 'full'
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
@@ -230,7 +230,7 @@ jobs:
             ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-revision }}-
 
       - name: Cache dependencies
-        if: inputs.macos_artifact_mode != 'zip_only'
+        if: inputs.macos_artifact_mode == 'full'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
@@ -256,8 +256,8 @@ jobs:
           MACOS_ARTIFACT_MODE: ${{ inputs.macos_artifact_mode }}
           TARGET_ARCH: ${{ matrix.arch }}
         run: |
-          if [[ "$MACOS_ARTIFACT_MODE" == "zip_only" && "$TARGET_ARCH" == "arm64" ]]; then
-            echo "::notice::Installing only the desktop workspace dependency graph for macOS arm64 ZIP-only packaging."
+          if [[ "$MACOS_ARTIFACT_MODE" != "full" && "$TARGET_ARCH" == "arm64" ]]; then
+            echo "::notice::Installing only the desktop workspace dependency graph for macOS arm64 fast packaging."
             bun install --frozen --ignore-scripts --minimum-release-age=0 --filter @superset/desktop
             exit 0
           fi
@@ -304,7 +304,7 @@ jobs:
         run: bun run ensure:icons
 
       - name: Download precompiled dist
-        if: inputs.macos_artifact_mode == 'zip_only' && matrix.arch == 'arm64'
+        if: inputs.macos_artifact_mode != 'full' && matrix.arch == 'arm64'
         working-directory: apps/desktop
         env:
           GH_TOKEN: ${{ github.token }}
@@ -336,7 +336,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.arch }}-desktop-resource-packs-
 
       - name: Compile app with electron-vite
-        if: ${{ inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64' }}
+        if: ${{ inputs.macos_artifact_mode == 'full' || matrix.arch != 'arm64' }}
         working-directory: apps/desktop
         env:
           NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
@@ -368,7 +368,7 @@ jobs:
         run: bun run report:size --top=15
 
       - name: Upload compile bundle stats
-        if: inputs.capture_compile_bundle_stats && (inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64')
+        if: inputs.capture_compile_bundle_stats && (inputs.macos_artifact_mode == 'full' || matrix.arch != 'arm64')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.artifact_prefix }}-mac-${{ matrix.arch }}-compile-bundle-stats
@@ -377,7 +377,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload compile timing report
-        if: ${{ always() && (inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64') }}
+        if: ${{ always() && (inputs.macos_artifact_mode == 'full' || matrix.arch != 'arm64') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.artifact_prefix }}-mac-${{ matrix.arch }}-compile-timings
@@ -386,13 +386,13 @@ jobs:
           if-no-files-found: warn
 
       - name: Install target platform optional dependencies
-        if: ${{ inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64' }}
+        if: ${{ inputs.macos_artifact_mode == 'full' || matrix.arch != 'arm64' }}
         env:
           MACOS_ARTIFACT_MODE: ${{ inputs.macos_artifact_mode }}
           TARGET_ARCH: ${{ matrix.arch }}
         run: |
-          if [[ "$MACOS_ARTIFACT_MODE" == "zip_only" && "$TARGET_ARCH" == "arm64" ]]; then
-            echo "::notice::Skipping target optional dependency install for macOS arm64 ZIP-only validation."
+          if [[ "$MACOS_ARTIFACT_MODE" != "full" && "$TARGET_ARCH" == "arm64" ]]; then
+            echo "::notice::Skipping target optional dependency install for macOS arm64 fast packaging."
             exit 0
           fi
           bun install --frozen --ignore-scripts --minimum-release-age=0 --cpu="$TARGET_ARCH" --os=darwin
@@ -474,7 +474,7 @@ jobs:
           bun run copy:native-modules
           bun run validate:native-runtime
 
-      - name: Build Electron app
+      - name: Build Electron app (${{ inputs.macos_artifact_mode == 'zip_only' && 'ZIP only' || 'DMG+ZIP' }})
         working-directory: apps/desktop
         env:
           MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
@@ -491,6 +491,10 @@ jobs:
         run: |
           case "$MACOS_ARTIFACT_MODE" in
             full)
+              PACKAGE_TARGET_ARGS=("--${{ matrix.arch }}")
+              ;;
+            quick_full)
+              echo "::notice::macOS artifact mode is quick_full; building DMG+ZIP from precompiled dist."
               PACKAGE_TARGET_ARGS=("--${{ matrix.arch }}")
               ;;
             zip_only)
@@ -709,7 +713,7 @@ jobs:
           fi
 
       - name: Upload DMG artifact
-        if: inputs.macos_artifact_mode == 'full'
+        if: inputs.macos_artifact_mode != 'zip_only'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.artifact_prefix }}-mac-${{ matrix.arch }}-dmg

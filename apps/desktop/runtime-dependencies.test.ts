@@ -1957,6 +1957,10 @@ describe("Trellis runtime pack packaging", () => {
 			),
 			"utf8",
 		);
+		const electronBuilderConfig = readFileSync(
+			join(import.meta.dirname, "electron-builder.ts"),
+			"utf8",
+		);
 		const canaryWorkflow = readFileSync(
 			join(
 				import.meta.dirname,
@@ -1983,9 +1987,10 @@ describe("Trellis runtime pack packaging", () => {
 		expect(buildWorkflow).toContain("macos_artifact_mode");
 		expect(buildWorkflow).toContain("macos_runner");
 		expect(buildWorkflow).toContain("compile-macos-zip-dist");
-		expect(buildWorkflow).toContain("Compile - macOS ZIP dist (arm64)");
+		expect(buildWorkflow).toContain("Compile - macOS fast dist (arm64)");
 		expect(buildWorkflow).toContain("runs-on: ubuntu-latest");
 		expect(buildWorkflow).toContain("TARGET_PLATFORM: darwin");
+		expect(electronBuilderConfig).toContain('format: "ULFO"');
 		expect(buildWorkflow).toContain(
 			"$" + "{{ inputs.artifact_prefix }}-mac-arm64-precompiled-dist",
 		);
@@ -1995,10 +2000,10 @@ describe("Trellis runtime pack packaging", () => {
 			"bun install --frozen --ignore-scripts --minimum-release-age=0 --filter @superset/desktop",
 		);
 		expect(buildWorkflow).toContain(
-			"Installing only the desktop workspace dependency graph for macOS arm64 ZIP-only packaging.",
+			"Installing only the desktop workspace dependency graph for macOS arm64 fast packaging.",
 		);
 		expect(buildWorkflow).toContain(
-			"inputs.macos_artifact_mode == 'zip_only' && matrix.arch == 'arm64'",
+			"inputs.macos_artifact_mode != 'full' && matrix.arch == 'arm64'",
 		);
 		expect(buildWorkflow).toContain('gh run download "$GITHUB_RUN_ID"');
 		expect(buildWorkflow).toContain(
@@ -2006,19 +2011,27 @@ describe("Trellis runtime pack packaging", () => {
 		);
 		expect(buildWorkflow).toContain("runs-on: $" + "{{ inputs.macos_runner }}");
 		expect(buildWorkflow).toContain("zip_only");
+		expect(buildWorkflow).toContain("quick_full");
+		expect(buildWorkflow).toContain(
+			"macOS artifact mode is quick_full; building DMG+ZIP from precompiled dist.",
+		);
+		expect(buildWorkflow).toContain(
+			"Build Electron app ($" +
+				"{{ inputs.macos_artifact_mode == 'zip_only' && 'ZIP only' || 'DMG+ZIP' }})",
+		);
 		expect(buildWorkflow).toContain('PACKAGE_TARGET_ARGS=("--mac" "zip"');
 		expect(buildWorkflow).toContain("Ensure file icons");
 		expect(buildWorkflow).toContain("bun run ensure:icons");
 		expect(buildWorkflow).not.toContain("bun run generate:icons");
 		expect(buildWorkflow).toContain(
 			"if: $" +
-				"{{ inputs.macos_artifact_mode != 'zip_only' || matrix.arch != 'arm64' }}",
+				"{{ inputs.macos_artifact_mode == 'full' || matrix.arch != 'arm64' }}",
 		);
 		expect(buildWorkflow).toContain(
-			'if [[ "$MACOS_ARTIFACT_MODE" == "zip_only" && "$TARGET_ARCH" == "arm64" ]]',
+			'if [[ "$MACOS_ARTIFACT_MODE" != "full" && "$TARGET_ARCH" == "arm64" ]]',
 		);
 		expect(buildWorkflow).toContain(
-			"Skipping target optional dependency install for macOS arm64 ZIP-only validation.",
+			"Skipping target optional dependency install for macOS arm64 fast packaging.",
 		);
 		expect(buildWorkflow).toContain("if: inputs.macos_artifact_mode == 'full'");
 		expect(buildWorkflow).toContain(
@@ -2117,9 +2130,8 @@ describe("Trellis runtime pack packaging", () => {
 		);
 		expect(buildWorkflow).toContain("Restore dependencies cache");
 		expect(buildWorkflow).toContain("actions/cache/restore");
-		expect(buildWorkflow).toContain(
-			"if: inputs.macos_artifact_mode == 'zip_only'",
-		);
+		expect(buildWorkflow).toContain("if: inputs.macos_artifact_mode != 'full'");
+		expect(buildWorkflow).toContain("if: inputs.macos_artifact_mode == 'full'");
 		expect(buildWorkflow).toContain(
 			"if: inputs.macos_artifact_mode != 'zip_only'",
 		);
@@ -2143,9 +2155,9 @@ describe("Trellis runtime pack packaging", () => {
 		expect(canaryWorkflow).toContain(
 			'if [[ "$PUBLISH_RELEASE" == "false" ]]; then',
 		);
-		expect(canaryWorkflow).toContain("macos_artifact_mode=full");
+		expect(canaryWorkflow).toContain("macos_artifact_mode=quick_full");
 		expect(canaryWorkflow).toContain(
-			"Published quick canary requested: uploading resource packs and building macOS ZIP+DMG without runtime telemetry.",
+			"Published quick canary requested: uploading resource packs and building macOS ZIP+DMG from precompiled dist without runtime telemetry.",
 		);
 		expect(canaryWorkflow).toContain(
 			"upload_resource_pack_artifacts: $" +
