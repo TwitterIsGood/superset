@@ -1,4 +1,4 @@
-import treeKill from "tree-kill";
+import { execFile } from "node:child_process";
 
 const DEFAULT_ESCALATION_TIMEOUT_MS = 2000;
 const POLL_INTERVAL_MS = 50;
@@ -39,17 +39,13 @@ export function treeKillWithEscalation({
 			resolve(result);
 		};
 
-		treeKill(pid, signal, (err) => {
+		void signalProcessTree(pid, signal).then((result) => {
 			if (resolved) return;
 
-			if (err) {
-				if (isProcessNotFoundError(err)) {
-					doResolve({ success: true });
-					return;
-				}
+			if (!result.success) {
 				console.error(
 					`[treeKillWithEscalation] Failed to ${signal} pid ${pid}:`,
-					err,
+					result.error,
 				);
 			}
 
@@ -79,25 +75,84 @@ export function treeKillWithEscalation({
 				`[treeKillWithEscalation] Process ${pid} still alive after ${signal}, escalating to SIGKILL`,
 			);
 
-			treeKill(pid, "SIGKILL", (err) => {
+			void signalProcessTree(pid, "SIGKILL").then((result) => {
 				if (resolved) return;
 
-				if (err) {
-					if (isProcessNotFoundError(err)) {
-						doResolve({ success: true });
-						return;
-					}
+				if (!result.success) {
 					console.error(
 						`[treeKillWithEscalation] Failed to SIGKILL pid ${pid}:`,
-						err,
+						result.error,
 					);
-					doResolve({ success: false, error: err.message });
+					doResolve({ success: false, error: result.error });
 				} else {
 					doResolve({ success: true });
 				}
 			});
 		}, escalationTimeoutMs);
 		escalationTimer.unref();
+	});
+}
+
+async function signalProcessTree(
+	pid: number,
+	signal: string,
+): Promise<{ success: boolean; error?: string }> {
+	const pids = await collectProcessTree(pid);
+	let lastError: string | undefined;
+
+	for (const currentPid of pids) {
+		try {
+			process.kill(currentPid, signal as NodeJS.Signals);
+		} catch (error) {
+			if (isProcessNotFoundError(error as Error)) continue;
+			lastError =
+				error instanceof Error
+					? error.message
+					: `Failed to signal ${currentPid}`;
+		}
+	}
+
+	return lastError ? { success: false, error: lastError } : { success: true };
+}
+
+async function collectProcessTree(
+	pid: number,
+	seen = new Set<number>(),
+): Promise<number[]> {
+	if (seen.has(pid)) return [];
+	seen.add(pid);
+
+	const children = await listChildPids(pid);
+	const descendants: number[] = [];
+	for (const child of children) {
+		descendants.push(...(await collectProcessTree(child, seen)));
+	}
+
+	return [...descendants, pid];
+}
+
+function listChildPids(pid: number): Promise<number[]> {
+	if (process.platform === "win32") return Promise.resolve([]);
+
+	return new Promise((resolve) => {
+		execFile(
+			"pgrep",
+			["-P", String(pid)],
+			{ timeout: 1000 },
+			(error, stdout) => {
+				if (error || !stdout.trim()) {
+					resolve([]);
+					return;
+				}
+
+				resolve(
+					stdout
+						.split(/\s+/)
+						.map((entry) => Number.parseInt(entry, 10))
+						.filter((entry) => Number.isInteger(entry) && entry > 0),
+				);
+			},
+		);
 	});
 }
 

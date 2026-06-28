@@ -2,12 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { __setAccountShellForTesting } from "../../../terminal/user-shell.ts";
 import type { ResolvedHostAgentConfig } from "./agents";
 import {
 	automationAgentRunInputSchema,
 	buildAgentLaunchCommand,
 	buildAgentLaunchEnv,
 	resolveAutomationAgentTimeoutMs,
+	resolveAutomationProcessFinalStatus,
 	runAutomationAgent,
 } from "./agents";
 
@@ -102,6 +104,57 @@ describe("resolveAutomationAgentTimeoutMs", () => {
 	});
 });
 
+describe("resolveAutomationProcessFinalStatus", () => {
+	test("fails a cleanly exited agent that produced no output", () => {
+		expect(
+			resolveAutomationProcessFinalStatus({
+				exitCode: 0,
+				signal: null,
+				stdout: "",
+				stderr: "",
+			}),
+		).toEqual({
+			status: "failed",
+			title: "Automation produced no output",
+			failureReason:
+				"Agent exited successfully without writing output or writing back a result.",
+			resultSummary: "Automation produced no output",
+		});
+	});
+
+	test("completes a cleanly exited agent that produced output", () => {
+		expect(
+			resolveAutomationProcessFinalStatus({
+				exitCode: 0,
+				signal: null,
+				stdout: "done",
+				stderr: "",
+			}),
+		).toEqual({
+			status: "completed",
+			title: "Automation completed",
+			resultSummary: "Automation completed",
+		});
+	});
+
+	test("keeps timeout failure reason override", () => {
+		expect(
+			resolveAutomationProcessFinalStatus({
+				exitCode: null,
+				signal: "SIGTERM",
+				stdout: "",
+				stderr: "timed out",
+				failureReasonOverride: "Automation agent timed out after 50ms",
+			}),
+		).toEqual({
+			status: "failed",
+			title: "Automation failed",
+			failureReason: "Automation agent timed out after 50ms",
+			resultSummary: "Automation failed",
+		});
+	});
+});
+
 function createAgentDb(row: ResolvedHostAgentConfig) {
 	return {
 		select: () => ({
@@ -130,19 +183,27 @@ async function waitFor(predicate: () => boolean): Promise<void> {
 	}
 }
 
-describe("runAutomationAgent", () => {
-	test("runs from a Superset automation directory and completes without workspace input", async () => {
+describe.serial("runAutomationAgent", () => {
+	test("fails a cleanly exited automation agent that writes no output", async () => {
 		const root = mkdtempSync(join(tmpdir(), "superset-automation-runs-"));
 		const previousRoot = process.env.SUPERSET_AUTOMATION_RUNS_DIR;
+		const previousHome = process.env.HOME;
 		process.env.SUPERSET_AUTOMATION_RUNS_DIR = root;
-		const completed: Array<{ runId: string; resultMarkdown: string }> = [];
+		process.env.HOME = root;
+		__setAccountShellForTesting("/bin/bash");
+		const failed: Array<{
+			runId: string;
+			failureReason: string;
+			resultMarkdown: string;
+			resultSummary: string;
+		}> = [];
 
 		try {
 			const ctx = {
 				db: createAgentDb(
 					config({
-						command: "/bin/cat",
-						args: [],
+						command: "/bin/sh",
+						args: ["-c", ":"],
 						promptTransport: "stdin",
 						promptArgs: [],
 					}),
@@ -153,30 +214,32 @@ describe("runAutomationAgent", () => {
 							query: async () => ({ status: "running" }),
 						},
 						completeRun: {
-							mutate: async (input: {
-								runId: string;
-								resultMarkdown: string;
-							}) => {
-								completed.push(input);
-								return { status: "completed" };
+							mutate: async () => {
+								throw new Error("unexpected completeRun");
 							},
 						},
 						failRun: {
-							mutate: async () => {
-								throw new Error("unexpected failRun");
+							mutate: async (input: {
+								runId: string;
+								failureReason: string;
+								resultMarkdown: string;
+								resultSummary: string;
+							}) => {
+								failed.push(input);
+								return { status: "failed" };
 							},
 						},
 					},
 				},
 			} as never;
 
-			const runId = "11111111-1111-4111-8111-111111111111";
-			const automationId = "22222222-2222-4222-8222-222222222222";
+			const runId = "55555555-5555-4555-8555-555555555555";
+			const automationId = "66666666-6666-4666-8666-666666666666";
 			const result = await runAutomationAgent(ctx, {
 				runId,
 				automationId,
 				agent: "agent-1",
-				prompt: "write a tiny report",
+				prompt: "this agent exits without output",
 			});
 
 			expect(result.kind).toBe("automation");
@@ -185,14 +248,29 @@ describe("runAutomationAgent", () => {
 				existsSync(join(root, automationId, "runs", `${runId}.prompt.md`)),
 			).toBe(true);
 
-			await waitFor(() => completed.length === 1);
-			expect(completed[0]?.runId).toBe(runId);
-			expect(completed[0]?.resultMarkdown).toContain("write a tiny report");
+			await waitFor(() => failed.length === 1);
+			expect(failed[0]?.runId).toBe(runId);
+			expect(failed[0]?.failureReason).toBe(
+				"Agent exited successfully without writing output or writing back a result.",
+			);
+			expect(failed[0]?.resultSummary).toBe("Automation produced no output");
+			expect(failed[0]?.resultMarkdown).toContain(
+				"# Automation produced no output",
+			);
+			expect(failed[0]?.resultMarkdown).toContain(
+				"The agent process exited without writing output.",
+			);
 		} finally {
 			if (previousRoot === undefined) {
 				delete process.env.SUPERSET_AUTOMATION_RUNS_DIR;
 			} else {
 				process.env.SUPERSET_AUTOMATION_RUNS_DIR = previousRoot;
+			}
+			__setAccountShellForTesting(undefined);
+			if (previousHome === undefined) {
+				delete process.env.HOME;
+			} else {
+				process.env.HOME = previousHome;
 			}
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -202,8 +280,11 @@ describe("runAutomationAgent", () => {
 		const root = mkdtempSync(join(tmpdir(), "superset-automation-runs-"));
 		const previousRoot = process.env.SUPERSET_AUTOMATION_RUNS_DIR;
 		const previousTimeout = process.env.SUPERSET_AUTOMATION_AGENT_TIMEOUT_MS;
+		const previousHome = process.env.HOME;
 		process.env.SUPERSET_AUTOMATION_RUNS_DIR = root;
 		process.env.SUPERSET_AUTOMATION_AGENT_TIMEOUT_MS = "50";
+		process.env.HOME = root;
+		__setAccountShellForTesting("/bin/bash");
 		const failed: Array<{ runId: string; failureReason: string }> = [];
 
 		try {
@@ -262,6 +343,12 @@ describe("runAutomationAgent", () => {
 				delete process.env.SUPERSET_AUTOMATION_AGENT_TIMEOUT_MS;
 			} else {
 				process.env.SUPERSET_AUTOMATION_AGENT_TIMEOUT_MS = previousTimeout;
+			}
+			__setAccountShellForTesting(undefined);
+			if (previousHome === undefined) {
+				delete process.env.HOME;
+			} else {
+				process.env.HOME = previousHome;
 			}
 			rmSync(root, { recursive: true, force: true });
 		}

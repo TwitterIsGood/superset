@@ -3,6 +3,7 @@ import {
 	createWriteStream,
 	mkdirSync,
 	readFileSync,
+	type WriteStream,
 	writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -616,6 +617,37 @@ function readFileTail(path: string, maxChars: number): string {
 	}
 }
 
+function appendOutputTail(
+	current: string,
+	chunk: string | Buffer | Uint8Array,
+	maxChars: number,
+): string {
+	const text =
+		typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf-8");
+	const next = current + text;
+	if (next.length <= maxChars) return next;
+	return next.slice(next.length - maxChars);
+}
+
+function waitForWriteStream(stream: WriteStream): Promise<void> {
+	if (stream.closed || stream.writableFinished) return Promise.resolve();
+
+	return new Promise((resolve) => {
+		let settled = false;
+		const done = () => {
+			if (settled) return;
+			settled = true;
+			stream.off("close", done);
+			stream.off("error", done);
+			stream.off("finish", done);
+			resolve();
+		};
+		stream.once("close", done);
+		stream.once("error", done);
+		stream.once("finish", done);
+	});
+}
+
 function buildFallbackResultMarkdown(args: {
 	title: string;
 	exitCode: number | null;
@@ -645,6 +677,60 @@ function buildFallbackResultMarkdown(args: {
 	return sections.join("\n").slice(0, 190_000);
 }
 
+type AutomationProcessFinalStatus =
+	| {
+			status: "completed";
+			title: "Automation completed";
+			resultSummary: "Automation completed";
+	  }
+	| {
+			status: "failed";
+			title: "Automation failed" | "Automation produced no output";
+			failureReason: string;
+			resultSummary: "Automation failed" | "Automation produced no output";
+	  };
+
+export function resolveAutomationProcessFinalStatus(args: {
+	exitCode: number | null;
+	signal: NodeJS.Signals | null;
+	stdout: string;
+	stderr: string;
+	failureReasonOverride?: string | null;
+}): AutomationProcessFinalStatus {
+	const exitedCleanly = args.exitCode === 0 && !args.signal;
+	const wroteOutput =
+		args.stdout.trim().length > 0 || args.stderr.trim().length > 0;
+
+	if (exitedCleanly && wroteOutput) {
+		return {
+			status: "completed",
+			title: "Automation completed",
+			resultSummary: "Automation completed",
+		};
+	}
+
+	if (exitedCleanly) {
+		return {
+			status: "failed",
+			title: "Automation produced no output",
+			failureReason:
+				"Agent exited successfully without writing output or writing back a result.",
+			resultSummary: "Automation produced no output",
+		};
+	}
+
+	return {
+		status: "failed",
+		title: "Automation failed",
+		failureReason:
+			args.failureReasonOverride ??
+			(args.signal
+				? `Agent exited by signal ${args.signal}`
+				: `Agent exited with code ${args.exitCode ?? "unknown"}`),
+		resultSummary: "Automation failed",
+	};
+}
+
 async function finalizeAutomationProcess(args: {
 	ctx: HostServiceContext;
 	runId: string;
@@ -654,6 +740,8 @@ async function finalizeAutomationProcess(args: {
 	exitCode: number | null;
 	signal: NodeJS.Signals | null;
 	failureReasonOverride?: string | null;
+	stdoutTail?: string;
+	stderrTail?: string;
 }): Promise<void> {
 	automationProcesses.delete(args.runId);
 
@@ -662,42 +750,52 @@ async function finalizeAutomationProcess(args: {
 	});
 	if (TERMINAL_AUTOMATION_RUN_STATUSES.has(run.status)) return;
 
-	const stdout = readFileTail(args.stdoutPath, AUTOMATION_RUN_OUTPUT_MAX);
-	const stderr = readFileTail(args.stderrPath, AUTOMATION_RUN_OUTPUT_MAX);
-	const exitedCleanly = args.exitCode === 0 && !args.signal;
+	const stdoutFromFile = readFileTail(
+		args.stdoutPath,
+		AUTOMATION_RUN_OUTPUT_MAX,
+	);
+	const stderrFromFile = readFileTail(
+		args.stderrPath,
+		AUTOMATION_RUN_OUTPUT_MAX,
+	);
+	const stdout = args.stdoutTail?.trim() ? args.stdoutTail : stdoutFromFile;
+	const stderr = args.stderrTail?.trim() ? args.stderrTail : stderrFromFile;
+	const finalStatus = resolveAutomationProcessFinalStatus({
+		exitCode: args.exitCode,
+		signal: args.signal,
+		stdout,
+		stderr,
+		failureReasonOverride: args.failureReasonOverride,
+	});
 
-	if (exitedCleanly) {
+	if (finalStatus.status === "completed") {
 		await args.ctx.api.automation.completeRun.mutate({
 			runId: args.runId,
 			resultMarkdown: buildFallbackResultMarkdown({
-				title: "Automation completed",
+				title: finalStatus.title,
 				exitCode: args.exitCode,
 				signal: args.signal,
 				stdout,
 				stderr,
 				runDirectory: args.runDirectory,
 			}),
-			resultSummary: "Automation completed",
+			resultSummary: finalStatus.resultSummary,
 		});
 		return;
 	}
 
 	await args.ctx.api.automation.failRun.mutate({
 		runId: args.runId,
-		failureReason:
-			args.failureReasonOverride ??
-			(args.signal
-				? `Agent exited by signal ${args.signal}`
-				: `Agent exited with code ${args.exitCode ?? "unknown"}`),
+		failureReason: finalStatus.failureReason,
 		resultMarkdown: buildFallbackResultMarkdown({
-			title: "Automation failed",
+			title: finalStatus.title,
 			exitCode: args.exitCode,
 			signal: args.signal,
 			stdout,
 			stderr,
 			runDirectory: args.runDirectory,
 		}),
-		resultSummary: "Automation failed",
+		resultSummary: finalStatus.resultSummary,
 	});
 }
 
@@ -823,6 +921,8 @@ export async function runAutomationAgent(
 	});
 	const stdoutPath = artifactPaths.stdoutPath;
 	const stderrPath = artifactPaths.stderrPath;
+	let stdoutTail = "";
+	let stderrTail = "";
 	const stdoutStream = createWriteStream(stdoutPath, {
 		flags: "a",
 		mode: 0o600,
@@ -831,6 +931,8 @@ export async function runAutomationAgent(
 		flags: "a",
 		mode: 0o600,
 	});
+	const stdoutFinished = waitForWriteStream(stdoutStream);
+	const stderrFinished = waitForWriteStream(stderrStream);
 
 	const child = spawn(launch.shell, launch.args, {
 		cwd: runDirectory,
@@ -838,6 +940,12 @@ export async function runAutomationAgent(
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 
+	child.stdout?.on("data", (chunk) => {
+		stdoutTail = appendOutputTail(stdoutTail, chunk, AUTOMATION_RUN_OUTPUT_MAX);
+	});
+	child.stderr?.on("data", (chunk) => {
+		stderrTail = appendOutputTail(stderrTail, chunk, AUTOMATION_RUN_OUTPUT_MAX);
+	});
 	child.stdout?.pipe(stdoutStream);
 	child.stderr?.pipe(stderrStream);
 
@@ -849,37 +957,60 @@ export async function runAutomationAgent(
 
 	let finalized = false;
 	let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+	let timeoutFinalizeTimer: ReturnType<typeof setTimeout> | null = null;
 	let failureReasonOverride: string | null = null;
-	const finalize = (exitCode: number | null, signal: NodeJS.Signals | null) => {
+	const finalize = (
+		exitCode: number | null,
+		signal: NodeJS.Signals | null,
+		options: { endStreams?: boolean } = {},
+	) => {
 		if (finalized) return;
 		finalized = true;
 		if (timeoutTimer) {
 			clearTimeout(timeoutTimer);
 			timeoutTimer = null;
 		}
-		stdoutStream.end();
-		stderrStream.end();
-		void finalizeAutomationProcess({
-			ctx,
-			runId: input.runId,
-			runDirectory,
-			stdoutPath,
-			stderrPath,
-			exitCode,
-			signal,
-			failureReasonOverride,
-		}).catch((error) => {
-			console.error("[automation-runner] failed to finalize run", {
-				runId: input.runId,
-				error: error instanceof Error ? error.message : String(error),
+		if (timeoutFinalizeTimer) {
+			clearTimeout(timeoutFinalizeTimer);
+			timeoutFinalizeTimer = null;
+		}
+		if (options.endStreams) {
+			stdoutStream.end();
+			stderrStream.end();
+		}
+		void Promise.all([stdoutFinished, stderrFinished])
+			.then(() =>
+				finalizeAutomationProcess({
+					ctx,
+					runId: input.runId,
+					runDirectory,
+					stdoutPath,
+					stderrPath,
+					exitCode,
+					signal,
+					failureReasonOverride,
+					stdoutTail,
+					stderrTail,
+				}),
+			)
+			.catch((error) => {
+				console.error("[automation-runner] failed to finalize run", {
+					runId: input.runId,
+					error: error instanceof Error ? error.message : String(error),
+				});
 			});
-		});
 	};
 	const timeoutMs = resolveAutomationAgentTimeoutMs();
 	timeoutTimer = setTimeout(() => {
 		const duration = formatDuration(timeoutMs);
 		failureReasonOverride = `Automation agent timed out after ${duration}`;
-		stderrStream.write(`\n[${failureReasonOverride}]\n`);
+		const timeoutOutput = `\n[${failureReasonOverride}]\n`;
+		stderrTail = appendOutputTail(
+			stderrTail,
+			timeoutOutput,
+			AUTOMATION_RUN_OUTPUT_MAX,
+		);
+		stderrStream.write(timeoutOutput);
 		if (child.pid && child.pid > 0) {
 			void treeKillWithEscalation({
 				pid: child.pid,
@@ -896,13 +1027,22 @@ export async function runAutomationAgent(
 		} else {
 			child.kill("SIGTERM");
 		}
-		finalize(null, "SIGTERM");
+		timeoutFinalizeTimer = setTimeout(() => {
+			finalize(null, "SIGTERM", { endStreams: true });
+		}, 5_000);
+		timeoutFinalizeTimer.unref();
 	}, timeoutMs);
 	timeoutTimer.unref();
 
 	child.on("error", (error) => {
-		stderrStream.write(`${error.message}\n`);
-		finalize(1, null);
+		const errorOutput = `${error.message}\n`;
+		stderrTail = appendOutputTail(
+			stderrTail,
+			errorOutput,
+			AUTOMATION_RUN_OUTPUT_MAX,
+		);
+		stderrStream.write(errorOutput);
+		finalize(1, null, { endStreams: true });
 	});
 	child.on("close", (code, signal) => {
 		finalize(code, signal);
