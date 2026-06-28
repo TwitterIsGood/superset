@@ -1074,3 +1074,37 @@ Completed the desktop performance overhaul: added the low-memory desktop online 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 31: Fix workspace navigation flicker
+
+**Date**: 2026-06-28
+**Task**: Fix workspace navigation flicker
+**Package**: desktop
+**Branch**: `main`
+
+### Summary
+
+Kept the desktop authenticated ReactDndBoundary mounted across route changes so navigating from workspace worktree tabs to Workspaces, Automations, or Tasks & PRs no longer remounts the dashboard shell. Added a focused source regression test and validated with Desktop Automation shell-removal probes and screenshots.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `246215ba1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
