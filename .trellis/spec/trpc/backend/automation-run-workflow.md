@@ -53,6 +53,17 @@
   should point at automation-owned files inside the Automation task directory.
   Run-scoped env remains separate so a process can identify and write back to
   the current run.
+- Claude Automation model selection must materialize gateway configuration in
+  both places: `<automationDir>/.claude/settings.local.json` for local tool
+  compatibility and the launched process env for Claude Code API auth. The env
+  must include `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL`,
+  `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, and
+  `ANTHROPIC_DEFAULT_OPUS_MODEL`. Do not rely on `settings.local.json` alone.
+- Host-service model gateway translation must preserve non-empty assistant
+  content from every supported provider protocol. OpenAI Responses text commonly
+  arrives as `output[].content[].type = "output_text"`; translate it to
+  Anthropic `{ type: "text" }` instead of returning a successful empty
+  `content` array.
 - Run-scoped JWT access may only read/write its own run id. User JWT access must still respect organization membership and automation ownership.
 - Completed/failed/skipped rows are terminal. `completeRun` and `failRun` must be idempotent and return the existing terminal row when called again.
 - `reconcileRun` is conservative and idempotent. It may only move stale active statuses (`queued`, `dispatching`, `running`, or legacy `dispatched`) to `failed` with `resultSource = "system"`; it must return terminal rows unchanged.
@@ -88,6 +99,9 @@
 - Legacy terminal run has an isolated run workspace -> cleanup scheduled; relay/host cleanup failure is logged and does not roll back the run result.
 - Terminal run reused an explicit workspace -> cleanup skipped.
 - Automation cleanup uses `force: true` -> invalid because teardown is skipped and Docker Compose services can remain alive.
+- OpenAI Responses upstream returns HTTP 200 but translates to no assistant text
+  or tool calls -> host-service model gateway returns 502 with a sanitized
+  provider/protocol message, not a successful empty Anthropic response.
 
 ### 5. Good/Base/Bad Cases
 
@@ -105,6 +119,8 @@
 - Bad: every scheduled run creates a worktree plus Postgres/Electric/Neon Docker containers.
 - Bad: every scheduled run copies a full Skill bundle, CLI install, MCP config,
   or model provider secret into a new run directory.
+- Bad: an OpenAI Responses provider returns `output_text`, but the gateway drops
+  it and Claude exits `0` with no stdout.
 
 ### 6. Tests Required
 
@@ -117,6 +133,11 @@
 - Dispatch host selection tests proving project context does not create or require workspaces, and requested/default online hosts are selected without project setup checks.
 - Dispatch agent selection tests proving machine-local source ids map to portable preset ids after host reroute.
 - Host-service tests proving one-off agent env is passed through without leaking token values into visible command strings.
+- Host-service tests proving Claude Automation model injection returns gateway
+  env for the process and writes the same values to `.claude/settings.local.json`.
+- Host-service model-gateway tests proving OpenAI Responses `output_text` blocks
+  survive translation for automation gateway tokens, and unknown successful
+  response shapes fail with sanitized 502 instead of empty success.
 - Host-service tests proving `agents.runAutomation` uses a Superset-home run directory and does not require a workspace id.
 - Host-service tests proving Automation context materialization writes under the
   Automation task directory and per-run snapshots stay lightweight and secret-free.

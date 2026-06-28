@@ -364,6 +364,60 @@ describe("handleModelGatewayRequest", () => {
 		expect(parsed.content?.[0]?.text).toBe("Automation report body");
 	});
 
+	it("rejects translated provider responses with no assistant content", async () => {
+		const db = createTestDb();
+		const provider = upsertModelProvider(asHostDb(db), {
+			name: "Responses provider",
+			protocol: "openai-responses",
+			baseUrl: "http://upstream.test/v1",
+			enabled: true,
+			secret: "secret-key",
+			models: [{ modelId: "gpt-5.5" }],
+		});
+		db.insert(schema.automationAgentModelConfigs)
+			.values({
+				id: "automation-config-1",
+				automationId: "automation-1",
+				agent: "claude",
+				providerId: provider.id,
+				gatewayToken: "automation-token",
+				modelId: "gpt-5.5",
+			})
+			.run();
+
+		const response = await handleModelGatewayRequest({
+			db: asHostDb(db),
+			request: new Request("http://127.0.0.1/model-gateway/v1/messages", {
+				method: "POST",
+				headers: { authorization: "Bearer automation-token" },
+				body: JSON.stringify({
+					model: "gpt-5.5",
+					messages: [{ role: "user", content: "hello" }],
+					max_tokens: 64,
+				}),
+			}),
+			fetchImpl: async (): Promise<Response> =>
+				new Response(
+					JSON.stringify({
+						id: "resp_1",
+						output: [
+							{
+								type: "message",
+								role: "assistant",
+								content: [{ type: "unknown_text", text: "not parsed yet" }],
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+		});
+
+		expect(response.status).toBe(502);
+		const text = await response.text();
+		expect(text).toContain("provider response");
+		expect(text).not.toContain("secret-key");
+	});
+
 	it("returns a sanitized provider failure when upstream fetch fails", async () => {
 		const db = createTestDb();
 		seedWorkspace(db);

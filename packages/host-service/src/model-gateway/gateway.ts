@@ -152,6 +152,17 @@ function responseHeadersForJson(stream: boolean): Record<string, string> {
 	};
 }
 
+function translatedMessageHasContent(message: unknown): boolean {
+	if (!isObjectRecord(message) || !Array.isArray(message.content)) return false;
+	return message.content.some((block) => {
+		if (!isObjectRecord(block)) return false;
+		if (block.type === "text") {
+			return typeof block.text === "string" && block.text.trim().length > 0;
+		}
+		return block.type === "tool_use";
+	});
+}
+
 function matchesGatewayEndpoint(pathname: string, endpoint: string): boolean {
 	const normalizedPathname = pathname.toLowerCase().replace(/\/+$/, "");
 	const normalizedEndpoint = endpoint.toLowerCase().replace(/^\/+/, "");
@@ -269,6 +280,14 @@ async function forwardTranslated(args: {
 		requestModel: args.body.model,
 		upstream: parsed,
 	});
+	if (!translatedMessageHasContent(message)) {
+		return jsonResponse(502, {
+			error: {
+				message:
+					"Model provider response did not include assistant text or tool calls. Check the provider protocol and response shape.",
+			},
+		});
+	}
 	if (args.body.stream === true) {
 		return new Response(buildAnthropicSseFromMessage(message), {
 			status: 200,
