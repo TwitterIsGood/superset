@@ -98,10 +98,14 @@ jobs:
 
           case "$BUILD_SCOPE" in
             quick)
-              echo "Quick canary requested: macOS arm64 updater ZIP only."
+              echo "Quick canary requested: macOS arm64."
               echo 'macos_arches_json=["arm64"]' >> $GITHUB_OUTPUT
               echo "build_linux=false" >> $GITHUB_OUTPUT
-              echo "macos_artifact_mode=zip_only" >> $GITHUB_OUTPUT
+              if [[ "$PUBLISH_RELEASE" == "false" ]]; then
+                echo "macos_artifact_mode=zip_only" >> $GITHUB_OUTPUT
+              else
+                echo "macos_artifact_mode=full" >> $GITHUB_OUTPUT
+              fi
               ;;
             full)
               echo "Full canary requested: macOS arm64/x64 + Linux x64."
@@ -134,7 +138,7 @@ jobs:
             echo "capture_compile_bundle_stats=false" >> $GITHUB_OUTPUT
             echo "capture_runtime_performance=false" >> $GITHUB_OUTPUT
           elif [[ "$BUILD_SCOPE" == "quick" ]]; then
-            echo "Published quick canary requested: uploading resource packs and updater ZIP without DMG/runtime telemetry."
+            echo "Published quick canary requested: uploading resource packs and building macOS ZIP+DMG without runtime telemetry."
             echo "upload_resource_pack_artifacts=true" >> $GITHUB_OUTPUT
             echo "bundle_cli=false" >> $GITHUB_OUTPUT
             echo "upload_sourcemaps=false" >> $GITHUB_OUTPUT
@@ -282,7 +286,7 @@ jobs:
           SUPERSET_RESOURCE_PACK_BASE_URL: ${{ secrets.SUPERSET_RESOURCE_PACK_BASE_URL }}
         run: |
           bun run check:resource-pack-release-readiness
-          bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files=false
+          bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files=false --skip-existing=false
           bun run verify:resource-pack-downloads -- --index dist/resource-packs/pack-manifest-index.json --include-loose-files=false
 
   resource-pack-release-preflight:
@@ -321,8 +325,8 @@ jobs:
 
   release:
     name: Update Canary Release
-    needs: [check-changes, build, resource-pack-release-preflight]
-    if: always() && needs.check-changes.outputs.should_build == 'true' && needs.build.result == 'success' && (needs.resource-pack-release-preflight.result == 'success' || needs.resource-pack-release-preflight.result == 'skipped') && github.event.inputs.publish_release != 'false'
+    needs: [check-changes, build, resource-packs, resource-pack-release-preflight]
+    if: always() && needs.check-changes.outputs.should_build == 'true' && needs.build.result == 'success' && (needs.resource-packs.result == 'success' || needs.resource-packs.result == 'skipped') && (needs.resource-pack-release-preflight.result == 'success' || needs.resource-pack-release-preflight.result == 'skipped') && github.event.inputs.publish_release != 'false'
     runs-on: ubuntu-latest
 
     steps:

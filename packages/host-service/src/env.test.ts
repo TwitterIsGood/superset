@@ -21,6 +21,7 @@ process.env.SUPERSET_API_URL = "https://api.superset.test";
 delete process.env.SUPERSET_AUTH_CONFIG_PATH;
 
 const { env } = await import("./env");
+const envSource = await Bun.file(new URL("./env.ts", import.meta.url)).text();
 
 afterAll(() => {
 	for (const [key, value] of Object.entries(originalEnv)) {
@@ -36,5 +37,9 @@ describe("host-service env", () => {
 	test("SUPERSET_AUTH_CONFIG_PATH is optional", () => {
 		expect(env.SUPERSET_AUTH_CONFIG_PATH).toBeUndefined();
 		expect(env.AUTH_TOKEN).toBe("access-token");
+	});
+
+	test("is always treated as server-side in bundled Node runtimes", () => {
+		expect(envSource).toContain("isServer: true");
 	});
 });

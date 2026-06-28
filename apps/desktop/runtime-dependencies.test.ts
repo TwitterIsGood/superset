@@ -1912,6 +1912,39 @@ describe("Trellis runtime pack packaging", () => {
 		expect(packBuilderSource).not.toContain("Big Mono 12.flf");
 	});
 
+	test("ships terminal serializer runtime with the CLI host-service dist", () => {
+		const buildDistSource = readFileSync(
+			join(
+				import.meta.dirname,
+				"..",
+				"..",
+				"packages",
+				"cli",
+				"scripts",
+				"build-dist.ts",
+			),
+			"utf8",
+		);
+		const terminalScreenTrackerSource = readFileSync(
+			join(
+				import.meta.dirname,
+				"..",
+				"..",
+				"packages",
+				"host-service",
+				"src",
+				"terminal",
+				"terminal-screen-tracker.ts",
+			),
+			"utf8",
+		);
+
+		expect(terminalScreenTrackerSource).toContain(
+			'require("@xterm/addon-serialize")',
+		);
+		expect(buildDistSource).toContain('"@xterm/addon-serialize"');
+	});
+
 	test("keeps artifact-only canary validation on the fast macOS ZIP path", () => {
 		const buildWorkflow = readFileSync(
 			join(
@@ -2106,11 +2139,13 @@ describe("Trellis runtime pack packaging", () => {
 			"fetch-depth: $" +
 				"{{ github.event.inputs.force_build == 'true' && 1 || 0 }}",
 		);
+		expect(canaryWorkflow).toContain("Quick canary requested: macOS arm64.");
 		expect(canaryWorkflow).toContain(
-			"Quick canary requested: macOS arm64 updater ZIP only.",
+			'if [[ "$PUBLISH_RELEASE" == "false" ]]; then',
 		);
+		expect(canaryWorkflow).toContain("macos_artifact_mode=full");
 		expect(canaryWorkflow).toContain(
-			"Published quick canary requested: uploading resource packs and updater ZIP without DMG/runtime telemetry.",
+			"Published quick canary requested: uploading resource packs and building macOS ZIP+DMG without runtime telemetry.",
 		);
 		expect(canaryWorkflow).toContain(
 			"upload_resource_pack_artifacts: $" +
@@ -2162,7 +2197,16 @@ describe("Trellis runtime pack packaging", () => {
 			"bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files=false",
 		);
 		expect(canaryWorkflow).toContain(
-			"needs: [check-changes, build, resource-pack-release-preflight]",
+			"bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files=false --skip-existing=false",
+		);
+		expect(buildWorkflow).toContain(
+			"bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files=false --skip-existing=false",
+		);
+		expect(canaryWorkflow).toContain(
+			"needs: [check-changes, build, resource-packs, resource-pack-release-preflight]",
+		);
+		expect(canaryWorkflow).toContain(
+			"needs.resource-packs.result == 'success' || needs.resource-packs.result == 'skipped'",
 		);
 		expect(canaryWorkflow).toContain(
 			"needs.resource-pack-release-preflight.result == 'success' || needs.resource-pack-release-preflight.result == 'skipped'",

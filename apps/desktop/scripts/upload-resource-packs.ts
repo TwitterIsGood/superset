@@ -24,20 +24,21 @@ function fail(message: string): never {
 	process.exit(1);
 }
 
-function parseArgs(): UploadArgs {
+export function parseResourcePackUploadArgs(
+	argv = process.argv.slice(2),
+): UploadArgs {
 	const parsed: UploadArgs = {
 		includeLooseFiles: false,
 		packDir: defaultResourcePackOutDir,
 		prefix: "packs",
-		skipExisting: true,
+		skipExisting: false,
 	};
-	const args = process.argv.slice(2);
-	for (let index = 0; index < args.length; index += 1) {
-		const arg = args[index];
+	for (let index = 0; index < argv.length; index += 1) {
+		const arg = argv[index];
 		const [flag, inlineValue] = arg.split("=", 2);
 		const readValue = () => {
 			if (inlineValue) return inlineValue;
-			const value = args[index + 1];
+			const value = argv[index + 1];
 			if (!value) fail(`${flag} requires a value`);
 			index += 1;
 			return value;
@@ -126,7 +127,7 @@ export async function collectResourcePackUploadFiles(args: {
 }
 
 async function main() {
-	const args = parseArgs();
+	const args = parseResourcePackUploadArgs();
 	if (!isObjectStorageConfigured()) {
 		fail("Object storage is not configured. Set SUPERSET_OBJECT_STORAGE_*.");
 	}

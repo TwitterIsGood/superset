@@ -2,7 +2,10 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collectResourcePackUploadFiles } from "./upload-resource-packs";
+import {
+	collectResourcePackUploadFiles,
+	parseResourcePackUploadArgs,
+} from "./upload-resource-packs";
 
 const tempDirs: string[] = [];
 
@@ -100,5 +103,20 @@ describe("collectResourcePackUploadFiles", () => {
 			"trellis-runtime/1.0.0/small.txt",
 			"trellis-runtime/manifest.json",
 		]);
+	});
+});
+
+describe("parseResourcePackUploadArgs", () => {
+	test("overwrites existing object keys by default", () => {
+		expect(parseResourcePackUploadArgs([]).skipExisting).toBe(false);
+	});
+
+	test("can opt into skipping existing object keys", () => {
+		expect(
+			parseResourcePackUploadArgs(["--skip-existing", "true"]).skipExisting,
+		).toBe(true);
+		expect(
+			parseResourcePackUploadArgs(["--skip-existing=false"]).skipExisting,
+		).toBe(false);
 	});
 });

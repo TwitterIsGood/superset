@@ -462,7 +462,7 @@ jobs:
             exit 0
           fi
           bun run check:resource-pack-release-readiness
-          bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files=false
+          bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files=false --skip-existing=false
           bun run verify:resource-pack-downloads -- --index dist/resource-packs/pack-manifest-index.json --include-loose-files=false
 
       - name: Prepare native runtime modules
@@ -645,6 +645,7 @@ jobs:
         working-directory: apps/desktop
         env:
           BUNDLE_CLI: ${{ inputs.bundle_cli }}
+          UPLOAD_RESOURCE_PACK_ARTIFACTS: ${{ inputs.upload_resource_pack_artifacts }}
         run: |
           # electron-builder uses mac-arm64/ for arm64 and mac/ for x64 (when host is arm64)
           APP_DIR=$(find release -maxdepth 2 -name "*.app" -type d | head -1)
@@ -666,6 +667,10 @@ jobs:
             }
             "$CLI_BIN" --version
           else
+            if [[ "$UPLOAD_RESOURCE_PACK_ARTIFACTS" != "true" ]]; then
+              echo "::notice::Skipping Superset CLI runtime pack verification because resource-pack artifacts are built by a separate job."
+              exit 0
+            fi
             if [[ -e "$CLI_BIN" ]]; then
               echo "::error::Bundled Superset CLI should not exist when bundle_cli=false: $CLI_BIN"
               exit 1
@@ -933,7 +938,7 @@ jobs:
             exit 0
           fi
           bun run check:resource-pack-release-readiness
-          bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files=false
+          bun run upload:resource-packs -- --pack-dir dist/resource-packs --prefix packs --include-loose-files=false --skip-existing=false
           bun run verify:resource-pack-downloads -- --index dist/resource-packs/pack-manifest-index.json --include-loose-files=false
 
       - name: Prepare native runtime modules
