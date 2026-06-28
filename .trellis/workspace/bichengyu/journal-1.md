@@ -1108,3 +1108,37 @@ Kept the desktop authenticated ReactDndBoundary mounted across route changes so 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 32: Desktop visual stability gate
+
+**Date**: 2026-06-28
+**Task**: Desktop visual stability gate
+**Package**: desktop
+**Branch**: `main`
+
+### Summary
+
+Added the desktop visual-stability automation gate, tests, docs, runtime packaging guard, and real desktop validation artifacts.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `24d066ec0` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
