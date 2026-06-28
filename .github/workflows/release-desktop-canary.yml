@@ -187,7 +187,7 @@ jobs:
       build_linux: ${{ needs.check-changes.outputs.build_linux == 'true' }}
       mac_signing: ${{ needs.check-changes.outputs.mac_signing }}
       macos_artifact_mode: ${{ needs.check-changes.outputs.macos_artifact_mode }}
-      upload_resource_pack_artifacts: ${{ needs.check-changes.outputs.build_scope != 'quick' && needs.check-changes.outputs.upload_resource_pack_artifacts == 'true' }}
+      upload_resource_pack_artifacts: ${{ needs.check-changes.outputs.upload_resource_pack_artifacts == 'true' }}
       upload_resource_pack_object_storage: ${{ needs.check-changes.outputs.build_scope != 'quick' && needs.check-changes.outputs.upload_resource_pack_artifacts == 'true' }}
       require_resource_pack_object_storage: ${{ github.event.inputs.publish_release != 'false' }}
       bundle_cli: ${{ needs.check-changes.outputs.bundle_cli == 'true' }}

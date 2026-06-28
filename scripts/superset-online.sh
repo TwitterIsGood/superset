@@ -84,7 +84,7 @@ load_base_env() {
 apply_host_env() {
 	export NODE_ENV="production"
 	export SUPERSET_ONLINE_SERVICE="1"
-	export SUPERSET_ALLOW_LOCALHOST_CORS="1"
+	export SUPERSET_ALLOW_LOCALHOST_CORS="0"
 	export SUPERSET_HOME_DIR="${SUPERSET_ONLINE_HOME_DIR:-$RUN_DIR/superset-home}"
 	export SUPERSET_NEXT_DIST_DIR=".next-online"
 
@@ -168,7 +168,7 @@ write_online_env_file() {
 		printf '# --- Managed by scripts/superset-online.sh. Do not edit below. ---\n'
 		write_env_var "NODE_ENV" "production"
 		write_env_var "SUPERSET_ONLINE_SERVICE" "1"
-		write_env_var "SUPERSET_ALLOW_LOCALHOST_CORS" "1"
+		write_env_var "SUPERSET_ALLOW_LOCALHOST_CORS" "0"
 		write_env_var "SUPERSET_HOME_DIR" "/var/lib/superset"
 		write_env_var "SUPERSET_NEXT_DIST_DIR" ".next-online"
 		write_env_var "LOCAL_PG_PORT" "$ONLINE_PG_PORT"

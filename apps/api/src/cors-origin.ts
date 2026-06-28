@@ -1,8 +1,7 @@
 const localhostOriginPattern = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
 
 export function isAllowedCorsOrigin({
-	allowLocalhost = process.env.SUPERSET_ALLOW_LOCALHOST_CORS === "1" ||
-		process.env.SUPERSET_ONLINE_SERVICE === "1",
+	allowLocalhost = process.env.SUPERSET_ALLOW_LOCALHOST_CORS === "1",
 	allowedOrigins,
 	nodeEnv = process.env.NODE_ENV,
 	origin,

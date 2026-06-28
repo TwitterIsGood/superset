@@ -386,12 +386,12 @@ jobs:
           if-no-files-found: warn
 
       - name: Install target platform optional dependencies
-        if: ${{ inputs.macos_artifact_mode == 'full' || matrix.arch != 'arm64' }}
+        if: ${{ inputs.macos_artifact_mode == 'full' || matrix.arch != 'arm64' || inputs.upload_resource_pack_artifacts }}
         env:
           MACOS_ARTIFACT_MODE: ${{ inputs.macos_artifact_mode }}
           TARGET_ARCH: ${{ matrix.arch }}
         run: |
-          if [[ "$MACOS_ARTIFACT_MODE" != "full" && "$TARGET_ARCH" == "arm64" ]]; then
+          if [[ "$MACOS_ARTIFACT_MODE" != "full" && "$TARGET_ARCH" == "arm64" && "${{ inputs.upload_resource_pack_artifacts }}" != "true" ]]; then
             echo "::notice::Skipping target optional dependency install for macOS arm64 fast packaging."
             exit 0
           fi

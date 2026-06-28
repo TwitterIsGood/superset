@@ -2161,7 +2161,14 @@ describe("Trellis runtime pack packaging", () => {
 		);
 		expect(canaryWorkflow).toContain(
 			"upload_resource_pack_artifacts: $" +
+				"{{ needs.check-changes.outputs.upload_resource_pack_artifacts == 'true' }}",
+		);
+		expect(canaryWorkflow).toContain(
+			"upload_resource_pack_object_storage: $" +
 				"{{ needs.check-changes.outputs.build_scope != 'quick' && needs.check-changes.outputs.upload_resource_pack_artifacts == 'true' }}",
+		);
+		expect(buildWorkflow).toContain(
+			"inputs.macos_artifact_mode == 'full' || matrix.arch != 'arm64' || inputs.upload_resource_pack_artifacts",
 		);
 		expect(canaryWorkflow).toContain("macos_artifact_mode=zip_only");
 		expect(canaryWorkflow).toContain(

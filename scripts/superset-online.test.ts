@@ -181,4 +181,15 @@ describe("superset online public URL defaults", () => {
 			`mc anonymous set download "superset/${shellExpansion("SUPERSET_OBJECT_STORAGE_BUCKET:-superset-artifacts")}/packs"`,
 		);
 	});
+
+	test("does not enable arbitrary localhost credentialed CORS for online API", () => {
+		expect(SOURCE).toContain('export SUPERSET_ALLOW_LOCALHOST_CORS="0"');
+		expect(SOURCE).toContain(
+			'write_env_var "SUPERSET_ALLOW_LOCALHOST_CORS" "0"',
+		);
+		expect(SOURCE).not.toContain('export SUPERSET_ALLOW_LOCALHOST_CORS="1"');
+		expect(SOURCE).not.toContain(
+			'write_env_var "SUPERSET_ALLOW_LOCALHOST_CORS" "1"',
+		);
+	});
 });
