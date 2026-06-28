@@ -1,4 +1,4 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
@@ -164,6 +164,10 @@ function buildObjectUrl(config: ObjectStorageConfig, key: string): URL {
 	return endpoint;
 }
 
+function objectStorageOrigin(url: URL): string {
+	return `${url.protocol}//${url.host}`;
+}
+
 function signS3Request(args: {
 	config: ObjectStorageConfig;
 	method: string;
@@ -255,11 +259,18 @@ async function s3Request(args: {
 		contentType: args.contentType,
 	});
 
-	return fetch(url, {
-		method: args.method,
-		headers,
-		body: args.body as FetchRequestBody,
-	});
+	try {
+		return await fetch(url, {
+			method: args.method,
+			headers,
+			body: args.body as FetchRequestBody,
+		});
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
+		throw new Error(
+			`Object storage ${args.method} request could not reach ${objectStorageOrigin(url)}. Check SUPERSET_OBJECT_STORAGE_ENDPOINT, port mapping, and runner network access. ${detail}`,
+		);
+	}
 }
 
 export function isObjectStorageConfigured(): boolean {
@@ -282,6 +293,33 @@ export async function putObjectStorageObject(args: {
 			`Object storage upload failed for ${args.key} with HTTP ${response.status}.`,
 		);
 	}
+}
+
+export async function deleteObjectStorageObject(key: string): Promise<void> {
+	const response = await s3Request({
+		method: "DELETE",
+		key: normalizeCapabilityArtifactPathname(key),
+	});
+	if (!response.ok && response.status !== 404) {
+		throw new Error(
+			`Object storage DELETE failed for ${key} with HTTP ${response.status}.`,
+		);
+	}
+}
+
+export async function probeObjectStorageWriteAccess(args?: {
+	prefix?: string;
+}): Promise<void> {
+	const prefix = normalizeCapabilityArtifactPathname(
+		args?.prefix ?? "packs/.release-probe",
+	);
+	const key = `${prefix}/probe-${Date.now()}-${randomUUID()}.txt`;
+	await putObjectStorageObject({
+		key,
+		body: new TextEncoder().encode("superset resource pack release probe\n"),
+		contentType: "text/plain",
+	});
+	await deleteObjectStorageObject(key);
 }
 
 export async function hasObjectStorageObject(key: string): Promise<boolean> {
@@ -317,15 +355,7 @@ async function putObjectArtifact(args: {
 }
 
 async function deleteObjectArtifact(pathname: string): Promise<void> {
-	const response = await s3Request({
-		method: "DELETE",
-		key: normalizeCapabilityArtifactPathname(pathname),
-	});
-	if (!response.ok && response.status !== 404) {
-		throw new Error(
-			`Capability artifact object storage delete failed with HTTP ${response.status}.`,
-		);
-	}
+	await deleteObjectStorageObject(pathname);
 }
 
 async function readObjectArtifact(pathname: string): Promise<Buffer | null> {

@@ -18,6 +18,7 @@ describe("parseResourcePackReadinessArgs", () => {
 	it("parses the local-base-url escape hatch", () => {
 		expect(parseResourcePackReadinessArgs(["--allow-local-base-url"])).toEqual({
 			allowLocalBaseUrl: true,
+			probeObjectStorage: false,
 			requireFastRunnerVariable: false,
 		});
 	});
@@ -32,7 +33,16 @@ describe("parseResourcePackReadinessArgs", () => {
 		).toEqual({
 			allowLocalBaseUrl: false,
 			githubRepo: "TwitterIsGood/superset",
+			probeObjectStorage: false,
 			requireFastRunnerVariable: true,
+		});
+	});
+
+	it("parses the object-storage connectivity probe flag", () => {
+		expect(parseResourcePackReadinessArgs(["--probe-object-storage"])).toEqual({
+			allowLocalBaseUrl: false,
+			probeObjectStorage: true,
+			requireFastRunnerVariable: false,
 		});
 	});
 });

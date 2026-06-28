@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
 	hasObjectStorageObject,
+	probeObjectStorageWriteAccess,
 	putObjectStorageObject,
 	readCapabilityArtifactReference,
 	storeCapabilityArtifact,
@@ -120,6 +121,48 @@ describe("capability artifact storage", () => {
 		await expect(
 			hasObjectStorageObject("packs/trellis-runtime/1.0.0/missing.tgz"),
 		).resolves.toBe(false);
+	});
+
+	test("probes object-storage write access with a small temporary object", async () => {
+		configureObjectStorage();
+		const calls: Array<{ url: string; method: string; body?: unknown }> = [];
+		globalThis.fetch = async (input, init) => {
+			calls.push({
+				url: input.toString(),
+				method: init?.method ?? "GET",
+				body: init?.body,
+			});
+			return new Response(null, { status: 200 });
+		};
+
+		await expect(probeObjectStorageWriteAccess()).resolves.toBeUndefined();
+
+		expect(calls).toHaveLength(2);
+		expect(calls[0]?.method).toBe("PUT");
+		expect(calls[0]?.url).toMatch(
+			/^http:\/\/127\.0\.0\.1:9000\/superset-artifacts\/packs\/\.release-probe\/probe-/,
+		);
+		expect(calls[1]?.method).toBe("DELETE");
+		expect(calls[1]?.url).toBe(calls[0]?.url);
+	});
+
+	test("explains object-storage endpoint connectivity failures", async () => {
+		configureObjectStorage();
+		globalThis.fetch = async () => {
+			throw new Error(
+				"Unable to connect. Is the computer able to access the url?",
+			);
+		};
+
+		await expect(
+			putObjectStorageObject({
+				key: "packs/trellis-runtime/1.0.0/manifest.json",
+				body: new TextEncoder().encode("{}"),
+				contentType: "application/json",
+			}),
+		).rejects.toThrow(
+			"Object storage PUT request could not reach http://127.0.0.1:9000",
+		);
 	});
 
 	test("stores object-storage artifacts behind an internal reference", async () => {

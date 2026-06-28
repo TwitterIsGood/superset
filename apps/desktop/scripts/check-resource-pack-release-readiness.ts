@@ -1,8 +1,10 @@
 import { execFileSync } from "node:child_process";
+import { probeObjectStorageWriteAccess } from "@superset/trpc/capability-artifact-storage";
 
 interface ReadinessArgs {
 	allowLocalBaseUrl: boolean;
 	githubRepo?: string;
+	probeObjectStorage: boolean;
 	requireFastRunnerVariable: boolean;
 }
 
@@ -43,6 +45,7 @@ function fail(message: string): never {
 export function parseResourcePackReadinessArgs(argv: string[]): ReadinessArgs {
 	const parsed: ReadinessArgs = {
 		allowLocalBaseUrl: false,
+		probeObjectStorage: false,
 		requireFastRunnerVariable: false,
 	};
 
@@ -59,6 +62,9 @@ export function parseResourcePackReadinessArgs(argv: string[]): ReadinessArgs {
 				index += 1;
 				break;
 			}
+			case "--probe-object-storage":
+				parsed.probeObjectStorage = true;
+				break;
 			case "--require-fast-runner-variable":
 				parsed.requireFastRunnerVariable = true;
 				break;
@@ -284,6 +290,10 @@ async function main() {
 				`- GitHub fast Canary runner variable: ${result.githubActions.presentVariables.length}/1`,
 			);
 		}
+	}
+	if (args.probeObjectStorage) {
+		await probeObjectStorageWriteAccess();
+		console.log("- Object storage write probe: ok");
 	}
 }
 

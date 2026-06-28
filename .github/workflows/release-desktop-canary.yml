@@ -199,7 +199,7 @@ jobs:
 
   resource-packs:
     name: Build and upload quick resource packs
-    needs: check-changes
+    needs: [check-changes, resource-pack-release-preflight]
     if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.build_scope == 'quick' && needs.check-changes.outputs.upload_resource_pack_artifacts == 'true'
     runs-on: ${{ vars.DESKTOP_CANARY_MACOS_RUNNER || 'macos-latest' }}
     environment: production
@@ -292,36 +292,44 @@ jobs:
   resource-pack-release-preflight:
     name: Check quick resource pack release config
     needs: check-changes
-    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.build_scope == 'quick' && needs.check-changes.outputs.upload_resource_pack_artifacts == 'true' && github.event.inputs.publish_release != 'false'
+    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.build_scope == 'quick' && needs.check-changes.outputs.upload_resource_pack_artifacts == 'true'
     runs-on: ubuntu-latest
     environment: production
 
     steps:
-      - name: Verify object-storage release secrets are present
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        id: setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Cache dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-revision }}-${{ hashFiles('bun.lock', 'package.json', 'apps/desktop/package.json', 'packages/*/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-revision }}-
+
+      - name: Install dependencies
+        run: bun install --frozen --ignore-scripts --minimum-release-age=0
+
+      - name: Verify object-storage release config
+        working-directory: apps/desktop
         env:
           SUPERSET_OBJECT_STORAGE_ENDPOINT: ${{ secrets.SUPERSET_OBJECT_STORAGE_ENDPOINT }}
           SUPERSET_OBJECT_STORAGE_BUCKET: ${{ secrets.SUPERSET_OBJECT_STORAGE_BUCKET }}
           SUPERSET_OBJECT_STORAGE_REGION: ${{ secrets.SUPERSET_OBJECT_STORAGE_REGION }}
           SUPERSET_OBJECT_STORAGE_ACCESS_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_ACCESS_KEY }}
           SUPERSET_OBJECT_STORAGE_SECRET_KEY: ${{ secrets.SUPERSET_OBJECT_STORAGE_SECRET_KEY }}
+          SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE: ${{ secrets.SUPERSET_OBJECT_STORAGE_FORCE_PATH_STYLE }}
           SUPERSET_RESOURCE_PACK_BASE_URL: ${{ secrets.SUPERSET_RESOURCE_PACK_BASE_URL }}
         run: |
-          missing=()
-          for name in \
-            SUPERSET_OBJECT_STORAGE_ENDPOINT \
-            SUPERSET_OBJECT_STORAGE_BUCKET \
-            SUPERSET_OBJECT_STORAGE_REGION \
-            SUPERSET_OBJECT_STORAGE_ACCESS_KEY \
-            SUPERSET_OBJECT_STORAGE_SECRET_KEY \
-            SUPERSET_RESOURCE_PACK_BASE_URL; do
-            if [[ -z "${!name:-}" ]]; then
-              missing+=("$name")
-            fi
-          done
-          if (( ${#missing[@]} > 0 )); then
-            printf '::error::Published quick canary requires object-storage resource-pack secrets before updating the GitHub Release. Missing: %s\n' "${missing[*]}"
-            exit 1
-          fi
+          bun run check:resource-pack-release-readiness -- --probe-object-storage
 
   release:
     name: Update Canary Release
