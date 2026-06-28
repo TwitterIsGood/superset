@@ -211,7 +211,8 @@ function collectBareRequireSpecifiers(filePath: string): string[] {
 		if (
 			ts.isCallExpression(node) &&
 			ts.isIdentifier(node.expression) &&
-			node.expression.text === "require" &&
+			(node.expression.text === "require" ||
+				node.expression.text === "commonjsRequire") &&
 			node.arguments.length === 1
 		) {
 			const [argument] = node.arguments;
@@ -225,7 +226,15 @@ function collectBareRequireSpecifiers(filePath: string): string[] {
 
 	visit(sourceFile);
 
-	return specifiers.filter(
+	const generatedRequireAliasPattern =
+		/\brequire\$\d+\(\s*["']([^"']+)["']\s*\)/g;
+	for (const match of content.matchAll(generatedRequireAliasPattern)) {
+		if (match[1]) {
+			specifiers.push(match[1]);
+		}
+	}
+
+	return [...new Set(specifiers)].filter(
 		(specifier) => !specifier.startsWith(".") && !specifier.startsWith("/"),
 	);
 }

@@ -1,15 +1,16 @@
 /**
- * Validate that the packaged app contains native runtime bindings.
+ * Validate that the packaged app contains unpacked runtime files.
  *
  * Source-tree checks are not enough: CI can cache a materialized node_modules
  * directory whose packages exist but whose Electron ABI `.node` bindings were
- * never rebuilt. This guard runs against app.asar.unpacked after electron-builder
- * has copied and pruned files.
+ * never rebuilt, or can omit a JS-only package required by an externalized
+ * host-service dependency. This guard runs against app.asar.unpacked after
+ * electron-builder has copied and pruned files.
  */
 
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { getRequiredNativeRuntimeFiles } from "../runtime-dependencies";
+import { getRequiredPackagedRuntimeFiles } from "../runtime-dependencies";
 
 type ValidatePackagedNativeRuntimeOptions = {
 	appOutDir: string;
@@ -70,7 +71,7 @@ function formatMissingNativeRuntimeError({
 	nodeModulesDir?: string;
 }): string {
 	return [
-		"[validate:packaged-native-runtime] Packaged native runtime bindings are missing.",
+		"[validate:packaged-native-runtime] Packaged runtime files are missing.",
 		`App output: ${appOutDir}`,
 		nodeModulesDir ? `Packaged node_modules: ${nodeModulesDir}` : null,
 		...missingFiles.map((file) => `Missing: ${file}`),
@@ -95,7 +96,7 @@ export function validatePackagedNativeRuntime({
 		);
 	}
 
-	const requiredFiles = getRequiredNativeRuntimeFiles({
+	const requiredFiles = getRequiredPackagedRuntimeFiles({
 		targetArch,
 		targetPlatform,
 	}).map((file) => file.relativePath);
@@ -114,7 +115,7 @@ export function validatePackagedNativeRuntime({
 	}
 
 	console.log(
-		`[validate:packaged-native-runtime] OK: ${requiredFiles.length} native runtime binding(s) present`,
+		`[validate:packaged-native-runtime] OK: ${requiredFiles.length} packaged runtime file(s) present`,
 	);
 
 	return { missingFiles, nodeModulesDir, requiredFiles };

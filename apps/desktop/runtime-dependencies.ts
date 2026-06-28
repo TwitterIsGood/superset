@@ -16,6 +16,11 @@ export type RequiredNativeRuntimeFile = {
 	relativePath: string;
 };
 
+export type RequiredPackagedRuntimeFile = {
+	description: string;
+	relativePath: string;
+};
+
 function copyWholeModule(moduleName: string): PackagedNodeModuleCopy {
 	return {
 		from: `node_modules/${moduleName}`,
@@ -78,10 +83,16 @@ const packagedSupportModules = [
 	copyWholeModule("is-extglob"),
 	copyWholeModule("picomatch"),
 	copyWholeModule("node-addon-api"),
+	copyWholeModule("ws"),
+	copyWholeModule("@xterm/headless"),
+	copyWholeModule("@xterm/addon-serialize"),
 ];
 
 export const mainExternalizedDependencies = [
 	...externalizedRuntimeModules.map((module) => module.specifier),
+	"ws",
+	"@xterm/headless",
+	"@xterm/addon-serialize",
 	"pg-native",
 ];
 
@@ -94,6 +105,9 @@ export const packagedAsarUnpackGlobs = [
 	...externalizedRuntimeModules.flatMap((module) => module.asarUnpackGlobs),
 	"**/node_modules/bindings/**/*",
 	"**/node_modules/file-uri-to-path/**/*",
+	"**/node_modules/ws/**/*",
+	"**/node_modules/@xterm/headless/**/*",
+	"**/node_modules/@xterm/addon-serialize/**/*",
 ];
 
 const packOnlyNodeModuleRoots = [
@@ -136,6 +150,9 @@ export const requiredMaterializedNodeModules = [
 	"is-extglob",
 	"picomatch",
 	"node-addon-api",
+	"ws",
+	"@xterm/headless",
+	"@xterm/addon-serialize",
 ];
 
 function normalizeRuntimePlatform(platform: string): NodeJS.Platform | string {
@@ -218,4 +235,28 @@ export function getRequiredNativeRuntimeFiles({
 	}
 
 	return requiredFiles;
+}
+
+export function getRequiredPackagedRuntimeFiles({
+	targetArch = process.env.TARGET_ARCH ?? process.arch,
+	targetPlatform = process.env.TARGET_PLATFORM ?? process.platform,
+}: {
+	targetArch?: string;
+	targetPlatform?: string;
+} = {}): RequiredPackagedRuntimeFile[] {
+	return [
+		...getRequiredNativeRuntimeFiles({ targetArch, targetPlatform }),
+		{
+			description: "host-service WebSocket runtime package",
+			relativePath: "ws/package.json",
+		},
+		{
+			description: "host-service headless terminal runtime package",
+			relativePath: "@xterm/headless/package.json",
+		},
+		{
+			description: "host-service terminal serialization runtime package",
+			relativePath: "@xterm/addon-serialize/package.json",
+		},
+	];
 }

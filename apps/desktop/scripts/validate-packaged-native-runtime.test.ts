@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getRequiredNativeRuntimeFiles } from "../runtime-dependencies";
+import { getRequiredPackagedRuntimeFiles } from "../runtime-dependencies";
 import { validatePackagedNativeRuntime } from "./validate-packaged-native-runtime";
 
 const tempDirs: string[] = [];
@@ -42,7 +42,7 @@ describe("validatePackagedNativeRuntime", () => {
 			"node_modules",
 		);
 
-		for (const file of getRequiredNativeRuntimeFiles({
+		for (const file of getRequiredPackagedRuntimeFiles({
 			targetArch: "arm64",
 			targetPlatform: "darwin",
 		})) {
@@ -59,6 +59,11 @@ describe("validatePackagedNativeRuntime", () => {
 		expect(result.nodeModulesDir).toBe(nodeModulesDir);
 		expect(result.requiredFiles).toContain(
 			"better-sqlite3/build/Release/better_sqlite3.node",
+		);
+		expect(result.requiredFiles).toContain("ws/package.json");
+		expect(result.requiredFiles).toContain("@xterm/headless/package.json");
+		expect(result.requiredFiles).toContain(
+			"@xterm/addon-serialize/package.json",
 		);
 	});
 
@@ -96,5 +101,33 @@ describe("validatePackagedNativeRuntime", () => {
 				targetPlatform: "darwin",
 			}),
 		).toThrow("better-sqlite3/build/Release/better_sqlite3.node");
+	});
+
+	test("rejects a packaged app missing the host-service websocket runtime package", () => {
+		const appOutDir = makeTempDir();
+		const nodeModulesDir = join(
+			appOutDir,
+			"Superset Canary.app",
+			"Contents",
+			"Resources",
+			"app.asar.unpacked",
+			"node_modules",
+		);
+
+		for (const file of getRequiredPackagedRuntimeFiles({
+			targetArch: "arm64",
+			targetPlatform: "darwin",
+		})) {
+			if (file.relativePath === "ws/package.json") continue;
+			touch(join(nodeModulesDir, file.relativePath));
+		}
+
+		expect(() =>
+			validatePackagedNativeRuntime({
+				appOutDir,
+				targetArch: "arm64",
+				targetPlatform: "darwin",
+			}),
+		).toThrow("ws/package.json");
 	});
 });

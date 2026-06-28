@@ -5,6 +5,8 @@ import hostServicePackageJson from "../../packages/host-service/package.json";
 import uiPackageJson from "../../packages/ui/package.json";
 import packageJson from "./package.json";
 import {
+	getRequiredPackagedRuntimeFiles,
+	mainExternalizedDependencies,
 	packagedAsarUnpackGlobs,
 	packagedNodeModuleCopies,
 	packOnlyNodeModuleFileExcludes,
@@ -47,6 +49,49 @@ function readSourceFiles(dir: string): Array<{ path: string; source: string }> {
 
 	return files;
 }
+
+describe("packaged base runtime dependencies", () => {
+	test("keeps host-service JS runtime packages available to packaged Electron", () => {
+		const runtimeModules = [
+			{
+				moduleName: "ws",
+				requiredFile: "ws/package.json",
+				unpackGlob: "**/node_modules/ws/**/*",
+			},
+			{
+				moduleName: "@xterm/headless",
+				requiredFile: "@xterm/headless/package.json",
+				unpackGlob: "**/node_modules/@xterm/headless/**/*",
+			},
+			{
+				moduleName: "@xterm/addon-serialize",
+				requiredFile: "@xterm/addon-serialize/package.json",
+				unpackGlob: "**/node_modules/@xterm/addon-serialize/**/*",
+			},
+		];
+		const requiredPackagedFiles = getRequiredPackagedRuntimeFiles({
+			targetArch: "arm64",
+			targetPlatform: "darwin",
+		});
+
+		for (const { moduleName, requiredFile, unpackGlob } of runtimeModules) {
+			expect(mainExternalizedDependencies).toContain(moduleName);
+			expect(requiredMaterializedNodeModules).toContain(moduleName);
+			expect(packagedNodeModuleCopies).toContainEqual(
+				expect.objectContaining({
+					from: `node_modules/${moduleName}`,
+					to: `node_modules/${moduleName}`,
+				}),
+			);
+			expect(packagedAsarUnpackGlobs).toContain(unpackGlob);
+			expect(requiredPackagedFiles).toContainEqual(
+				expect.objectContaining({
+					relativePath: requiredFile,
+				}),
+			);
+		}
+	});
+});
 
 describe("Trellis runtime pack packaging", () => {
 	const trellisRuntimeModules = [
