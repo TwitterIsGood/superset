@@ -44,6 +44,7 @@ import { MOCK_ORG_ID, NOTIFICATION_EVENTS } from "shared/constants";
 import { AgentHooks } from "./components/AgentHooks";
 import { ControlChatHost } from "./components/ControlChatHost";
 import { FileMenuListener } from "./components/FileMenuListener";
+import { ReactDndBoundary } from "./components/ReactDndBoundary";
 import { TeardownLogsDialog } from "./components/TeardownLogsDialog/TeardownLogsDialog";
 import { CollectionsProvider } from "./providers/CollectionsProvider";
 import { DeletingWorkspacesProvider } from "./providers/DeletingWorkspacesProvider";
@@ -61,10 +62,6 @@ const LazyDashboardNewWorkspaceModal = lazy(async () => ({
 		.DashboardNewWorkspaceModal,
 }));
 
-const LazyReactDndBoundary = lazy(async () => ({
-	default: (await import("./components/ReactDndBoundary")).ReactDndBoundary,
-}));
-
 const LazyDaemonAutoUpdateFailureDialog = lazy(async () => ({
 	default: (await import("./components/DaemonAutoUpdateFailureDialog"))
 		.DaemonAutoUpdateFailureDialog,
@@ -79,14 +76,6 @@ const LazyV2NotificationController = lazy(async () => ({
 	default: (await import("./components/V2NotificationController"))
 		.V2NotificationController,
 }));
-
-function routeUsesReactDnd(pathname: string) {
-	return (
-		pathname.startsWith("/v2-workspace") ||
-		pathname.startsWith("/workspace") ||
-		pathname.startsWith("/settings/terminal")
-	);
-}
 
 function routeUsesGlobalBrowserLifecycle(pathname: string) {
 	return pathname.startsWith("/v2-workspace");
@@ -131,7 +120,6 @@ function AuthenticatedLayout() {
 	const isOnline = useOnlineStatus();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const shouldEnableReactDnd = routeUsesReactDnd(location.pathname);
 	const shouldEnableGlobalBrowserLifecycle = routeUsesGlobalBrowserLifecycle(
 		location.pathname,
 	);
@@ -523,11 +511,5 @@ function AuthenticatedLayout() {
 		</CollectionsProvider>
 	);
 
-	return shouldEnableReactDnd ? (
-		<Suspense fallback={null}>
-			<LazyReactDndBoundary>{content}</LazyReactDndBoundary>
-		</Suspense>
-	) : (
-		content
-	);
+	return <ReactDndBoundary>{content}</ReactDndBoundary>;
 }
