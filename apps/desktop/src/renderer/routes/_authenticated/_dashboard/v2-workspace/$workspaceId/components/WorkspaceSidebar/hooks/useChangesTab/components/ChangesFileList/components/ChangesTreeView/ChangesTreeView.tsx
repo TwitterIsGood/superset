@@ -51,6 +51,8 @@ const TREE_STYLE = createPierreTreeStyle({
 	levelIndent: 8,
 });
 
+const LARGE_CHANGESET_TREE_COLLAPSE_THRESHOLD = 500;
+
 type SectionKind = ChangesetFile["source"]["kind"];
 
 interface ChangesTreeViewProps {
@@ -104,6 +106,8 @@ export const ChangesTreeView = memo(function ChangesTreeView({
 	}, [files]);
 
 	const { dirs, dirFileCount } = useMemo(() => buildTreeShape(paths), [paths]);
+	const shouldStartCollapsed =
+		files.length >= LARGE_CHANGESET_TREE_COLLAPSE_THRESHOLD;
 
 	const initialGitStatusEntriesRef = useRef(buildPierreGitStatus(files));
 
@@ -120,7 +124,7 @@ export const ChangesTreeView = memo(function ChangesTreeView({
 
 	const { model } = usePierreFileTree({
 		paths,
-		initialExpansion: "open",
+		initialExpansion: shouldStartCollapsed ? "closed" : "open",
 		search: false,
 		gitStatus: initialGitStatusEntriesRef.current,
 		icons: { set: "complete", colored: true },

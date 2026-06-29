@@ -33,6 +33,12 @@
   load.
 - Large lists must virtualize visible rows; memoizing grouped data is not enough
   if thousands of DOM rows still mount.
+- Do not replace a proven lightweight virtualized tree row implementation with
+  product row components just to satisfy a source-level "uses virtualizer" test.
+  In the Changes sidebar, Pierre rows are intentionally lighter than `FileRow`;
+  `FileRow` carries context menus, tooltip/dropdown wiring, discard dialog
+  plumbing, mutation hooks, and click-policy hooks. Reusing it in Tree mode
+  doubled measured DOM/long-task cost in a large changeset.
 - If a virtualized warm tab must stay mounted, do not hide it with
   `display:none` when return latency depends on retained row measurement. Use a
   bounded hidden layer (`absolute`, `invisible`, `pointer-events-none`,
@@ -46,6 +52,9 @@
   failure.
 - Cached switch has a single long task above the accepted budget -> inspect
   hidden-layer strategy, row component weight, and virtualizer measurement.
+- A source test proves "virtualizer exists" but Desktop Automation shows worse
+  long tasks, DOM nodes, or memory -> reject the implementation. The real
+  measurement wins over the source-level proxy.
 - Hidden warm tab can receive focus/clicks -> accessibility and interaction
   regression.
 
