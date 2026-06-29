@@ -13,11 +13,13 @@ type ExternalizedRuntimeModule = {
 
 export type RequiredNativeRuntimeFile = {
 	description: string;
+	mustBeExecutable?: boolean;
 	relativePath: string;
 };
 
 export type RequiredPackagedRuntimeFile = {
 	description: string;
+	mustBeExecutable?: boolean;
 	relativePath: string;
 };
 
@@ -215,6 +217,11 @@ export function getRequiredNativeRuntimeFiles({
 			{
 				description: "node-pty macOS prebuild",
 				relativePath: `node-pty/prebuilds/darwin-${arch}/pty.node`,
+			},
+			{
+				description: "node-pty macOS spawn helper",
+				mustBeExecutable: true,
+				relativePath: `node-pty/prebuilds/darwin-${arch}/spawn-helper`,
 			},
 			{
 				description: "macOS process metrics native binding",

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getRequiredPackagedRuntimeFiles } from "../runtime-dependencies";
@@ -46,7 +52,11 @@ describe("validatePackagedNativeRuntime", () => {
 			targetArch: "arm64",
 			targetPlatform: "darwin",
 		})) {
-			touch(join(nodeModulesDir, file.relativePath));
+			const path = join(nodeModulesDir, file.relativePath);
+			touch(path);
+			if (file.mustBeExecutable) {
+				chmodSync(path, 0o755);
+			}
 		}
 
 		const result = validatePackagedNativeRuntime({
@@ -56,9 +66,13 @@ describe("validatePackagedNativeRuntime", () => {
 		});
 
 		expect(result.missingFiles).toEqual([]);
+		expect(result.nonExecutableFiles).toEqual([]);
 		expect(result.nodeModulesDir).toBe(nodeModulesDir);
 		expect(result.requiredFiles).toContain(
 			"better-sqlite3/build/Release/better_sqlite3.node",
+		);
+		expect(result.requiredFiles).toContain(
+			"node-pty/prebuilds/darwin-arm64/spawn-helper",
 		);
 		expect(result.requiredFiles).toContain("ws/package.json");
 		expect(result.requiredFiles).toContain("@xterm/headless/package.json");
@@ -118,8 +132,14 @@ describe("validatePackagedNativeRuntime", () => {
 			targetArch: "arm64",
 			targetPlatform: "darwin",
 		})) {
-			if (file.relativePath === "ws/package.json") continue;
-			touch(join(nodeModulesDir, file.relativePath));
+			if (file.relativePath === "ws/package.json") {
+				continue;
+			}
+			const path = join(nodeModulesDir, file.relativePath);
+			touch(path);
+			if (file.mustBeExecutable) {
+				chmodSync(path, 0o755);
+			}
 		}
 
 		expect(() =>
@@ -129,5 +149,36 @@ describe("validatePackagedNativeRuntime", () => {
 				targetPlatform: "darwin",
 			}),
 		).toThrow("ws/package.json");
+	});
+
+	test("rejects a packaged macOS app with a non-executable node-pty spawn helper", () => {
+		const appOutDir = makeTempDir();
+		const nodeModulesDir = join(
+			appOutDir,
+			"Superset Canary.app",
+			"Contents",
+			"Resources",
+			"app.asar.unpacked",
+			"node_modules",
+		);
+
+		for (const file of getRequiredPackagedRuntimeFiles({
+			targetArch: "arm64",
+			targetPlatform: "darwin",
+		})) {
+			touch(join(nodeModulesDir, file.relativePath));
+		}
+		chmodSync(
+			join(nodeModulesDir, "node-pty/prebuilds/darwin-arm64/spawn-helper"),
+			0o644,
+		);
+
+		expect(() =>
+			validatePackagedNativeRuntime({
+				appOutDir,
+				targetArch: "arm64",
+				targetPlatform: "darwin",
+			}),
+		).toThrow("Not executable: node-pty/prebuilds/darwin-arm64/spawn-helper");
 	});
 });

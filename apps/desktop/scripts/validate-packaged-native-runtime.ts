@@ -8,7 +8,7 @@
  * electron-builder has copied and pruned files.
  */
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { getRequiredPackagedRuntimeFiles } from "../runtime-dependencies";
 
@@ -19,6 +19,7 @@ type ValidatePackagedNativeRuntimeOptions = {
 };
 
 type ValidatePackagedNativeRuntimeResult = {
+	nonExecutableFiles: string[];
 	missingFiles: string[];
 	nodeModulesDir: string;
 	requiredFiles: string[];
@@ -65,16 +66,19 @@ function formatMissingNativeRuntimeError({
 	appOutDir,
 	missingFiles,
 	nodeModulesDir,
+	nonExecutableFiles = [],
 }: {
 	appOutDir: string;
 	missingFiles: string[];
 	nodeModulesDir?: string;
+	nonExecutableFiles?: string[];
 }): string {
 	return [
 		"[validate:packaged-native-runtime] Packaged runtime files are missing.",
 		`App output: ${appOutDir}`,
 		nodeModulesDir ? `Packaged node_modules: ${nodeModulesDir}` : null,
 		...missingFiles.map((file) => `Missing: ${file}`),
+		...nonExecutableFiles.map((file) => `Not executable: ${file}`),
 		"Run `bun run --cwd apps/desktop install:deps`, then rebuild the package.",
 	]
 		.filter(Boolean)
@@ -99,17 +103,26 @@ export function validatePackagedNativeRuntime({
 	const requiredFiles = getRequiredPackagedRuntimeFiles({
 		targetArch,
 		targetPlatform,
-	}).map((file) => file.relativePath);
+	});
+	const requiredFilePaths = requiredFiles.map((file) => file.relativePath);
 	const missingFiles = requiredFiles.filter(
-		(relativePath) => !existsSync(join(nodeModulesDir, relativePath)),
+		(file) => !existsSync(join(nodeModulesDir, file.relativePath)),
 	);
+	const nonExecutableFiles = requiredFiles.filter((file) => {
+		if (!file.mustBeExecutable) return false;
+		const absolutePath = join(nodeModulesDir, file.relativePath);
+		return (
+			existsSync(absolutePath) && (statSync(absolutePath).mode & 0o111) === 0
+		);
+	});
 
-	if (missingFiles.length > 0) {
+	if (missingFiles.length > 0 || nonExecutableFiles.length > 0) {
 		throw new Error(
 			formatMissingNativeRuntimeError({
 				appOutDir,
-				missingFiles,
+				missingFiles: missingFiles.map((file) => file.relativePath),
 				nodeModulesDir,
+				nonExecutableFiles: nonExecutableFiles.map((file) => file.relativePath),
 			}),
 		);
 	}
@@ -118,7 +131,12 @@ export function validatePackagedNativeRuntime({
 		`[validate:packaged-native-runtime] OK: ${requiredFiles.length} packaged runtime file(s) present`,
 	);
 
-	return { missingFiles, nodeModulesDir, requiredFiles };
+	return {
+		missingFiles: [],
+		nodeModulesDir,
+		nonExecutableFiles: [],
+		requiredFiles: requiredFilePaths,
+	};
 }
 
 if (import.meta.main) {

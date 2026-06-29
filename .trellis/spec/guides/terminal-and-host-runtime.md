@@ -145,6 +145,13 @@ terminalInputQueueRef.current = terminalInputQueueRef.current
   text/log schema with the new code path. If the installed app still emits an
   old diagnostic shape after a canary update, assume a stale host-service or
   stale pty-daemon process is being adopted until logs prove otherwise.
+- macOS `node-pty` packaged runtime uses a `spawn-helper` executable next to the
+  loaded native binding. If desktop packaging prunes `node-pty/build` and keeps
+  only `prebuilds/darwin-${arch}`, the target prebuild's `spawn-helper` must be
+  present and executable (`0755`). A packaged runtime validation that only checks
+  `pty.node` exists is insufficient: `node-pty` can load the native binding and
+  still fail every terminal open with `posix_spawnp failed` when the helper lacks
+  execute permission.
 
 ### Scenario: Packaged Daemon Code Change And Version Handoff
 

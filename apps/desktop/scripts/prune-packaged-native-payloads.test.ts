@@ -5,6 +5,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -96,7 +97,9 @@ describe("prunePackagedNativePayloads", () => {
 		);
 
 		touch(join(nodeModulesDir, "node-pty/prebuilds/darwin-arm64/pty.node"));
+		touch(join(nodeModulesDir, "node-pty/prebuilds/darwin-arm64/spawn-helper"));
 		touch(join(nodeModulesDir, "node-pty/prebuilds/darwin-x64/pty.node"));
+		touch(join(nodeModulesDir, "node-pty/prebuilds/darwin-x64/spawn-helper"));
 		touch(join(nodeModulesDir, "node-pty/prebuilds/win32-x64/pty.node"));
 		touch(join(nodeModulesDir, "node-pty/prebuilds/win32-x64/pty.pdb"));
 		touch(join(nodeModulesDir, "node-pty/build/Release/pty.node"));
@@ -174,6 +177,11 @@ describe("prunePackagedNativePayloads", () => {
 		expect(
 			existsSync(join(nodeModulesDir, "node-pty/prebuilds/darwin-arm64")),
 		).toBe(true);
+		expect(
+			statSync(
+				join(nodeModulesDir, "node-pty/prebuilds/darwin-arm64/spawn-helper"),
+			).mode & 0o111,
+		).toBeGreaterThan(0);
 		expect(
 			existsSync(join(nodeModulesDir, "node-pty/prebuilds/darwin-x64")),
 		).toBe(false);

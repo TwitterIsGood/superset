@@ -1,4 +1,10 @@
-import { existsSync, readdirSync, rmSync, unlinkSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	readdirSync,
+	rmSync,
+	unlinkSync,
+} from "node:fs";
 import { join, relative } from "node:path";
 
 type PruneTarget = {
@@ -290,6 +296,15 @@ function pruneNodePty(
 	}
 
 	removeFilesByExtension(nodeModulesDir, nodePtyRoot, ".pdb", removedPaths);
+
+	if (targetPlatform === "darwin") {
+		for (const prebuildDir of targetPrebuilds) {
+			const helperPath = join(prebuildsRoot, prebuildDir, "spawn-helper");
+			if (existsSync(helperPath)) {
+				chmodSync(helperPath, 0o755);
+			}
+		}
+	}
 }
 
 function getAstGrepTargetPackages(
