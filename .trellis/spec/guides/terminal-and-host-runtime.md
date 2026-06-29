@@ -335,6 +335,92 @@ const daemonSessions = await getSupervisor().listSessions(ctx.organizationId);
   create or attach a terminal/agent session, then verify host-service logs show
   the expected `pty-daemon.js` path and socket bootstrap.
 
+## Scenario: Terminal Auto-Attach And Explicit Close
+
+### 1. Scope / Trigger
+
+- Applies when editing desktop terminal panes, `useAutoAttachBackgroundTerminal`,
+  background terminal indicators, pane close behavior, hotkeys that close panes
+  or tabs, or remote/cross-device terminal session surfacing.
+
+### 2. Signatures
+
+- Explicit close marker:
+  `suppressTerminalAutoAttachAfterExplicitClose(workspaceId, terminalId, ttlMs?)`.
+- Auto-attach decision:
+  `getAutoAttachBackgroundTerminalId({ sessions, attachedTerminalIds, suppressedTerminalIds })`.
+- Close entry points:
+  pane `definition.onBeforeClose`, workspace `onBeforeCloseTab`, and
+  `CLOSE_TAB` hotkey.
+
+### 3. Contracts
+
+- Remote/background terminal auto-attach is product behavior. Do not disable it
+  globally to fix a local close race.
+- A user-initiated terminal pane or tab close must mark that terminal id as
+  suppressed before the pane disappears from the local layout.
+- Suppression is scoped by `workspaceId + terminalId`; it must clear when the
+  session exits/disappears and must have a TTL to avoid hiding a future session
+  forever.
+- Intentional backgrounding remains separate from explicit close. Background
+  markers prevent immediate local reattach while preserving the terminal
+  runtime; explicit close suppression prevents a just-closed live session from
+  being re-added during cleanup.
+- Hotkey close paths must run the same close guard/suppression logic as tab-bar
+  and pane UI close paths.
+
+### 4. Validation & Error Matrix
+
+- Close removes the pane, auto-attach re-adds it before host marks it exited ->
+  blank terminal tab race.
+- Suppression is global by terminal id only -> another workspace can hide a
+  valid remote terminal.
+- Suppression never clears -> remote terminals may stop surfacing after a stale
+  close.
+- Hotkey bypasses `onBeforeCloseTab` -> keyboard close can still reproduce the
+  blank tab bug.
+
+### 5. Good/Base/Bad Cases
+
+- Good: close one terminal tab, wait longer than the auto-attach polling
+  interval, and the tab count stays reduced with no blank terminal pane.
+- Base: a remote-created terminal that was not explicitly closed still
+  auto-attaches when no live local terminal pane exists.
+- Bad: removing `useAutoAttachBackgroundTerminal`, or treating every workspace
+  unmount as an explicit close.
+
+### 6. Tests Required
+
+- Unit/source tests for marker/suppression separation and sorted suppression
+  snapshots.
+- Auto-attach decision tests proving suppressed terminal ids are skipped while
+  ordinary background sessions still attach.
+- Desktop Automation acceptance: create/open a terminal, close it once, wait
+  more than one polling interval, capture screenshot and renderer console logs.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+if (sessions.length > 0) return;
+```
+
+This disables remote terminal surfacing and regresses cross-device host sync.
+
+#### Correct
+
+```ts
+suppressTerminalAutoAttachAfterExplicitClose(workspaceId, terminalId);
+const terminalId = getAutoAttachBackgroundTerminalId({
+  sessions,
+  attachedTerminalIds,
+  suppressedTerminalIds,
+});
+```
+
+Keep auto-attach enabled, but make explicit user close a first-class exclusion.
+
 ## Scenario: Desktop Auth Token And Host Relay Runtime
 
 ### 1. Scope / Trigger

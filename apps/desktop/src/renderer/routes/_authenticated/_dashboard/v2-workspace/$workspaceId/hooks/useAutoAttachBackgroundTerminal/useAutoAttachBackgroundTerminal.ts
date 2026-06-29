@@ -8,7 +8,10 @@ import {
 	useSyncExternalStore,
 } from "react";
 import {
+	clearTerminalAutoAttachSuppression,
+	getTerminalAutoAttachSuppressionIdsKey,
 	getTerminalBackgroundMarkerIdsKey,
+	subscribeTerminalAutoAttachSuppressions,
 	subscribeTerminalBackgroundMarkers,
 } from "renderer/lib/terminal/terminal-background-intents";
 import { useStore } from "zustand";
@@ -62,6 +65,23 @@ export function useAutoAttachBackgroundTerminal({
 		() => parseAttachedTerminalIdsKey(backgroundMarkerIdsKey),
 		[backgroundMarkerIdsKey],
 	);
+	const getAutoAttachSuppressionSnapshot = useCallback(
+		() => getTerminalAutoAttachSuppressionIdsKey(workspaceId),
+		[workspaceId],
+	);
+	const autoAttachSuppressionIdsKey = useSyncExternalStore(
+		subscribeTerminalAutoAttachSuppressions,
+		getAutoAttachSuppressionSnapshot,
+		() => EMPTY_MARKERS_KEY,
+	);
+	const autoAttachSuppressionIds = useMemo(
+		() => parseAttachedTerminalIdsKey(autoAttachSuppressionIdsKey),
+		[autoAttachSuppressionIdsKey],
+	);
+	const suppressedTerminalIds = useMemo(
+		() => [...new Set([...backgroundMarkerIds, ...autoAttachSuppressionIds])],
+		[backgroundMarkerIds, autoAttachSuppressionIds],
+	);
 
 	const sessionsQuery = workspaceTrpc.terminal.listSessions.useQuery(
 		{ workspaceId },
@@ -84,7 +104,7 @@ export function useAutoAttachBackgroundTerminal({
 		const terminalId = getAutoAttachBackgroundTerminalId({
 			sessions: sessionsQuery.data.sessions,
 			attachedTerminalIds,
-			suppressedTerminalIds: backgroundMarkerIds,
+			suppressedTerminalIds,
 			preferTitledBackgroundOverUntitledAttached: true,
 		});
 		if (!terminalId) return;
@@ -94,10 +114,25 @@ export function useAutoAttachBackgroundTerminal({
 		focusOrAddTerminalPane(store, terminalId);
 	}, [
 		attachedTerminalIds,
-		backgroundMarkerIds,
 		paneLayoutReady,
 		sessionsQuery.data,
 		sessionsQuery.isSuccess,
 		store,
+		suppressedTerminalIds,
 	]);
+
+	useEffect(() => {
+		if (!sessionsQuery.data) return;
+		if (autoAttachSuppressionIds.length === 0) return;
+
+		const liveTerminalIds = new Set(
+			sessionsQuery.data.sessions
+				.filter((session) => !session.exited)
+				.map((session) => session.terminalId),
+		);
+		for (const terminalId of autoAttachSuppressionIds) {
+			if (liveTerminalIds.has(terminalId)) continue;
+			clearTerminalAutoAttachSuppression(workspaceId, terminalId);
+		}
+	}, [autoAttachSuppressionIds, sessionsQuery.data, workspaceId]);
 }

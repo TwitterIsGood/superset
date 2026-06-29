@@ -1,10 +1,11 @@
-import { Workspace } from "@superset/panes";
+import { type Tab, Workspace } from "@superset/panes";
 import { workspaceTrpc } from "@superset/workspace-client";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQuickOpenStore } from "renderer/commandPalette/ui/QuickOpen/quickOpenStore";
 import { useV2UserPreferences } from "renderer/hooks/useV2UserPreferences";
 import { useHotkey } from "renderer/hotkeys";
+import { suppressTerminalAutoAttachAfterExplicitClose } from "renderer/lib/terminal/terminal-background-intents";
 import { releaseTerminalRuntimeLazy } from "renderer/lib/terminal/terminal-runtime-registry-lazy";
 import { CommandPalette } from "renderer/screens/main/components/CommandPalette";
 import { ResizablePanel } from "renderer/screens/main/components/ResizablePanel";
@@ -53,6 +54,17 @@ export interface WorkspaceSearch {
 type V2WorkspacePageContentProps = {
 	search: WorkspaceSearch;
 };
+
+function suppressTerminalAutoAttachForClosedTab(
+	workspaceId: string,
+	tab: Tab<PaneViewerData>,
+): void {
+	for (const pane of Object.values(tab.panes)) {
+		if (pane.kind !== "terminal") continue;
+		const { terminalId } = pane.data as TerminalPaneData;
+		suppressTerminalAutoAttachAfterExplicitClose(workspaceId, terminalId);
+	}
+}
 
 export function V2WorkspacePageContent({
 	search,
@@ -221,7 +233,16 @@ function V2WorkspaceContent({ search }: V2WorkspacePageContentProps) {
 		[openFilePane, setRightSidebarOpen, setRightSidebarTab],
 	);
 	const defaultPaneActions = useDefaultPaneActions({ launcher });
-	const onBeforeCloseTab = useDirtyTabCloseGuard();
+	const dirtyTabCloseGuard = useDirtyTabCloseGuard();
+	const onBeforeCloseTab = useCallback(
+		async (tab: Tab<PaneViewerData>) => {
+			const allowed = await dirtyTabCloseGuard(tab);
+			if (!allowed) return false;
+			suppressTerminalAutoAttachForClosedTab(workspaceId, tab);
+			return true;
+		},
+		[dirtyTabCloseGuard, workspaceId],
+	);
 
 	// Fallback for rows persisted before the rightSidebarWidth field existed —
 	// the live collection skips zod defaults, so an older row reads undefined
@@ -272,6 +293,7 @@ function V2WorkspaceContent({ search }: V2WorkspacePageContentProps) {
 		addTerminalTab,
 		paneRegistry,
 		launcher,
+		onBeforeCloseTab,
 	});
 	useHotkey("QUICK_OPEN", handleQuickOpen);
 	useHotkey("RUN_WORKSPACE_COMMAND", () => {

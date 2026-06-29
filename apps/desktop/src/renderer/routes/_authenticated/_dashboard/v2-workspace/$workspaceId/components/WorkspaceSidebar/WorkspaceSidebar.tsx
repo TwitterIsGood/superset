@@ -44,6 +44,13 @@ const LazyReviewSidebarTab = lazy(async () => ({
 	default: (await import("./components/ReviewSidebarTab")).ReviewSidebarTab,
 }));
 
+const KEEP_WARM_SIDEBAR_TAB_IDS: readonly SidebarTabId[] = ["files", "changes"];
+const LARGE_CHANGESET_KEEP_WARM_THRESHOLD = 500;
+
+type WorkspaceSidebarTabDefinition = SidebarTabDefinition & {
+	id: SidebarTabId;
+};
+
 export interface PendingReveal {
 	path: string;
 	isDirectory: boolean;
@@ -102,6 +109,16 @@ function SidebarTabFallback() {
 	);
 }
 
+function shouldKeepSidebarTabWarm(
+	tabId: SidebarTabId,
+	gitChangeCount: number,
+): boolean {
+	return (
+		gitChangeCount >= LARGE_CHANGESET_KEEP_WARM_THRESHOLD &&
+		KEEP_WARM_SIDEBAR_TAB_IDS.includes(tabId)
+	);
+}
+
 export function WorkspaceSidebar({
 	onSelectFile,
 	onSelectDiffFile,
@@ -124,6 +141,43 @@ export function WorkspaceSidebar({
 	const activeTab: SidebarTabId = resolveWorkspaceSidebarActiveTab(
 		localState?.sidebarState.activeTab,
 	);
+	const gitChangeCount = gitStatus.data ? getGitChangeCount(gitStatus.data) : 0;
+	const [visitedWarmTabs, setVisitedWarmTabs] = useState<{
+		workspaceId: string;
+		ids: Set<SidebarTabId>;
+	}>(() => ({
+		workspaceId,
+		ids: shouldKeepSidebarTabWarm(activeTab, gitChangeCount)
+			? new Set([activeTab])
+			: new Set(),
+	}));
+	const visitedWarmTabIds =
+		visitedWarmTabs.workspaceId === workspaceId
+			? visitedWarmTabs.ids
+			: new Set<SidebarTabId>();
+
+	useEffect(() => {
+		setVisitedWarmTabs((prev) => {
+			const ids =
+				prev.workspaceId === workspaceId
+					? new Set<SidebarTabId>(prev.ids)
+					: new Set<SidebarTabId>();
+			for (const id of ids) {
+				if (!shouldKeepSidebarTabWarm(id, gitChangeCount)) ids.delete(id);
+			}
+			if (shouldKeepSidebarTabWarm(activeTab, gitChangeCount)) {
+				ids.add(activeTab);
+			}
+			if (
+				prev.workspaceId === workspaceId &&
+				ids.size === prev.ids.size &&
+				[...ids].every((id) => prev.ids.has(id))
+			) {
+				return prev;
+			}
+			return { workspaceId, ids };
+		});
+	}, [activeTab, gitChangeCount, workspaceId]);
 
 	function setActiveTab(tab: string) {
 		if (!isSidebarTabId(tab)) return;
@@ -149,8 +203,7 @@ export function WorkspaceSidebar({
 		return () => ro.disconnect();
 	}, []);
 
-	const gitChangeCount = gitStatus.data ? getGitChangeCount(gitStatus.data) : 0;
-	const changesTab: SidebarTabDefinition = {
+	const changesTab: WorkspaceSidebarTabDefinition = {
 		id: "changes",
 		label: "Changes",
 		icon: GitCompareArrows,
@@ -173,7 +226,7 @@ export function WorkspaceSidebar({
 		onOpenChat: onOpenChat ?? (() => {}),
 	});
 
-	const filesTab: SidebarTabDefinition = {
+	const filesTab: WorkspaceSidebarTabDefinition = {
 		id: "files",
 		label: "Files",
 		icon: File,
@@ -189,14 +242,14 @@ export function WorkspaceSidebar({
 		),
 	};
 
-	const modelsTab: SidebarTabDefinition = {
+	const modelsTab: WorkspaceSidebarTabDefinition = {
 		id: "models",
 		label: "Models",
 		icon: BotIcon,
 		content: <LazyModelsTab workspaceId={workspaceId} />,
 	};
 
-	const reviewTab: SidebarTabDefinition = {
+	const reviewTab: WorkspaceSidebarTabDefinition = {
 		id: "review",
 		label: "Review",
 		icon: MessageSquare,
@@ -217,13 +270,12 @@ export function WorkspaceSidebar({
 		),
 	};
 
-	const tabs: SidebarTabDefinition[] = [
+	const tabs: WorkspaceSidebarTabDefinition[] = [
 		filesTab,
 		changesTab,
 		reviewTab,
 		modelsTab,
 	];
-	const activeTabDef = tabs.find((t) => t.id === activeTab);
 
 	return (
 		<div
@@ -243,10 +295,32 @@ export function WorkspaceSidebar({
 				onTabChange={setActiveTab}
 				compact={compact}
 			/>
-			<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-				<Suspense fallback={<SidebarTabFallback />}>
-					{activeTabDef?.content}
-				</Suspense>
+			<div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+				{tabs.map((tab) => {
+					const isActive = tab.id === activeTab;
+					const shouldRender =
+						isActive ||
+						(shouldKeepSidebarTabWarm(tab.id, gitChangeCount) &&
+							visitedWarmTabIds.has(tab.id));
+					if (!shouldRender) return null;
+
+					return (
+						<div
+							key={`${workspaceId}:${tab.id}`}
+							aria-hidden={!isActive}
+							inert={isActive ? undefined : true}
+							className={
+								isActive
+									? "absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col overflow-hidden"
+									: "invisible pointer-events-none absolute inset-0 z-0 flex min-h-0 min-w-0 flex-col overflow-hidden"
+							}
+						>
+							<Suspense fallback={<SidebarTabFallback />}>
+								{tab.content}
+							</Suspense>
+						</div>
+					);
+				})}
 			</div>
 		</div>
 	);

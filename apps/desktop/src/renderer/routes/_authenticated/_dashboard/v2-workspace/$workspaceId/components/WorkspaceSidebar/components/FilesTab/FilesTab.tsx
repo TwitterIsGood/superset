@@ -19,7 +19,7 @@ import {
 	Loader2,
 	RefreshCw,
 } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import { useGitStatusMap } from "renderer/hooks/host-service/useGitStatusMap";
 import {
 	ShadowClickHint,
@@ -65,7 +65,7 @@ interface FilesTabProps {
 	gitStatus: GitStatusData | undefined;
 }
 
-export function FilesTab({
+export const FilesTab = memo(function FilesTab({
 	onSelectFile,
 	selectedFilePath,
 	pendingReveal,
@@ -316,4 +316,4 @@ export function FilesTab({
 			{drop.dropTarget && <FilesTabDropOverlay target={drop.dropTarget} />}
 		</div>
 	);
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useChangesTab } from "../../hooks/useChangesTab";
 
 interface ChangesSidebarTabProps {
@@ -8,7 +9,7 @@ interface ChangesSidebarTabProps {
 	onOpenFile?: (absolutePath: string, openInNewTab?: boolean) => void;
 }
 
-export function ChangesSidebarTab({
+export const ChangesSidebarTab = memo(function ChangesSidebarTab({
 	workspaceId,
 	selectedFilePath,
 	onSelectFile,
@@ -22,4 +23,4 @@ export function ChangesSidebarTab({
 	});
 
 	return <>{tab.content}</>;
-}
+});

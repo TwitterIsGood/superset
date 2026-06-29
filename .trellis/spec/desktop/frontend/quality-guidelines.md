@@ -8,6 +8,85 @@
 - Keep tests co-located with logic-heavy components, hooks, parsers, stores, and utilities.
 - For desktop-facing flows that cross auth, routing, Electron IPC, persisted state, host-service, terminal, or multi-pane runtime behavior, define and run Desktop Automation CLI acceptance per `.trellis/spec/guides/desktop-acceptance-tdd.md`, or record why lower-level tests are sufficient.
 
+## Large Sidebar And Pane Performance Contract
+
+### 1. Scope / Trigger
+
+- Applies when editing desktop workspace sidebars, pane tabs, file trees,
+  changes lists, or any route-local surface that can render hundreds of rows or
+  run expensive hooks on tab switches.
+
+### 2. Signatures
+
+- Lazy tab boundary: `React.lazy(() => import("./HeavyTab"))`.
+- Keep-warm trigger: large data threshold plus visited-tab state scoped by
+  `workspaceId`.
+- Virtualized list: a shared scroll container with a stable attribute such as
+  `data-changes-scroll-container` and row virtualization via
+  `@tanstack/react-virtual`.
+
+### 3. Contracts
+
+- Preserve first-load lazy imports unless a task explicitly accepts startup
+  regression with measurement.
+- Do not fix repeat tab switching by eagerly mounting every heavy tab at route
+  load.
+- Large lists must virtualize visible rows; memoizing grouped data is not enough
+  if thousands of DOM rows still mount.
+- If a virtualized warm tab must stay mounted, do not hide it with
+  `display:none` when return latency depends on retained row measurement. Use a
+  bounded hidden layer (`absolute`, `invisible`, `pointer-events-none`,
+  `aria-hidden`, `inert`) and prove the DOM/memory trade-off is acceptable.
+- Hidden warm content must not remain focusable or pointer-interactive.
+
+### 4. Validation & Error Matrix
+
+- Heavy tab imported by the sidebar shell before first use -> startup regression.
+- Repeated cached tab switch creates thousands of row nodes -> virtualization
+  failure.
+- Cached switch has a single long task above the accepted budget -> inspect
+  hidden-layer strategy, row component weight, and virtualizer measurement.
+- Hidden warm tab can receive focus/clicks -> accessibility and interaction
+  regression.
+
+### 5. Good/Base/Bad Cases
+
+- Good: first-load shell keeps heavy tabs lazy; large visited `Files` /
+  `Changes` tabs stay warm only above a threshold; repeated cached switches are
+  measured with RAF delay and long-task data.
+- Base: small repos keep the simpler active-only rendering path.
+- Bad: deleting lazy imports to fix a large repo, or using screenshots only to
+  claim a performance fix.
+
+### 6. Tests Required
+
+- Source/unit test that guards lazy imports and keep-warm thresholds.
+- Source/unit test that guards virtualization and the shared scroll container.
+- Desktop Automation measurement on a large workspace with recorded RAF delay,
+  long-task max, visible row count, DOM node count, screenshots, and renderer
+  console logs.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```tsx
+{activeTabDef?.content}
+```
+
+This can remount a heavy tab and recreate large row DOM on every switch.
+
+#### Correct
+
+```tsx
+<div aria-hidden={!isActive} inert={isActive ? undefined : true}>
+  <VirtualizedRows />
+</div>
+```
+
+Use this only for bounded, threshold-gated warm tabs; keep first-load lazy
+imports intact.
+
 ## Review Checklist
 
 - One component per file. For app-owned components, use `ComponentName/ComponentName.tsx` with an `index.ts` barrel.

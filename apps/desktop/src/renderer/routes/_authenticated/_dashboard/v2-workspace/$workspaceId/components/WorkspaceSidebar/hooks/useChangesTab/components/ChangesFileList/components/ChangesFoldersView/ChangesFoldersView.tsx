@@ -1,3 +1,4 @@
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangesetFile } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/hooks/useChangeset";
 import type { FoldSignal } from "../../ChangesFileList";
@@ -6,6 +7,8 @@ import { FolderHeader } from "./components/FolderHeader";
 
 const ROOT_FOLDER_KEY = "";
 const ROOT_FOLDER_LABEL = "Root Path";
+const ESTIMATED_ROW_HEIGHT = 24;
+const OVERSCAN = 12;
 
 interface ChangesFoldersViewProps {
 	files: ChangesetFile[];
@@ -22,6 +25,10 @@ interface FolderGroup {
 	folderPath: string;
 	files: ChangesetFile[];
 }
+
+type FolderVirtualRow =
+	| { kind: "folder"; key: string; group: FolderGroup; isRoot: boolean }
+	| { kind: "file"; key: string; file: ChangesetFile; group: FolderGroup };
 
 /**
  * Render a flat list of changed files grouped by their immediate parent
@@ -46,6 +53,7 @@ export const ChangesFoldersView = memo(function ChangesFoldersView({
 	onOpenInEditor,
 }: ChangesFoldersViewProps) {
 	const groups = useMemo(() => groupFilesByFolder(files), [files]);
+	const listRef = useRef<HTMLDivElement>(null);
 	const [closedFolders, setClosedFolders] = useState<Set<string>>(new Set());
 
 	const toggleFolder = useCallback((folderPath: string) => {
@@ -72,26 +80,73 @@ export const ChangesFoldersView = memo(function ChangesFoldersView({
 		);
 	}, [foldSignal, groups]);
 
+	const rows = useMemo<FolderVirtualRow[]>(() => {
+		const nextRows: FolderVirtualRow[] = [];
+		for (const group of groups) {
+			const isRoot = group.folderPath === ROOT_FOLDER_KEY;
+			nextRows.push({
+				kind: "folder",
+				key: `folder:${isRoot ? "__root__" : group.folderPath}`,
+				group,
+				isRoot,
+			});
+			if (closedFolders.has(group.folderPath)) continue;
+			for (const file of group.files) {
+				nextRows.push({
+					kind: "file",
+					key: `file:${file.source.kind}:${file.path}`,
+					file,
+					group,
+				});
+			}
+		}
+		return nextRows;
+	}, [closedFolders, groups]);
+
+	const virtualizer = useVirtualizer({
+		count: rows.length,
+		getItemKey: (index) => rows[index]?.key ?? `missing:${index}`,
+		getScrollElement: () =>
+			listRef.current?.closest(
+				"[data-changes-scroll-container]",
+			) as HTMLElement | null,
+		estimateSize: () => ESTIMATED_ROW_HEIGHT,
+		rangeExtractor: defaultRangeExtractor,
+		overscan: OVERSCAN,
+		scrollMargin: listRef.current?.offsetTop ?? 0,
+	});
+	const virtualItems = virtualizer.getVirtualItems();
+
 	return (
-		<div>
-			{groups.map((group) => {
-				const isRoot = group.folderPath === ROOT_FOLDER_KEY;
-				const isOpen = !closedFolders.has(group.folderPath);
-				// `folderPath` ("" for the root group) is already the unique
-				// per-group discriminator — `groupFilesByFolder` keys a Map by it.
-				return (
-					<div key={group.folderPath}>
-						<FolderHeader
-							label={isRoot ? ROOT_FOLDER_LABEL : group.folderPath}
-							fileCount={group.files.length}
-							isOpen={isOpen}
-							onToggle={() => toggleFolder(group.folderPath)}
-						/>
-						{isOpen &&
-							group.files.map((file) => (
+		<div ref={listRef}>
+			<div
+				className="relative w-full"
+				style={{ height: virtualizer.getTotalSize() }}
+			>
+				{virtualItems.map((virtualRow) => {
+					const row = rows[virtualRow.index];
+					if (!row) return null;
+
+					return (
+						<div
+							key={virtualRow.key}
+							data-index={virtualRow.index}
+							ref={virtualizer.measureElement}
+							className="absolute left-0 w-full"
+							style={{
+								top: virtualRow.start - (virtualizer.options.scrollMargin ?? 0),
+							}}
+						>
+							{row.kind === "folder" ? (
+								<FolderHeader
+									label={row.isRoot ? ROOT_FOLDER_LABEL : row.group.folderPath}
+									fileCount={row.group.files.length}
+									isOpen={!closedFolders.has(row.group.folderPath)}
+									onToggle={() => toggleFolder(row.group.folderPath)}
+								/>
+							) : (
 								<FileRow
-									key={`${file.source.kind}:${file.path}`}
-									file={file}
+									file={row.file}
 									workspaceId={workspaceId}
 									worktreePath={worktreePath}
 									hideDir
@@ -99,10 +154,11 @@ export const ChangesFoldersView = memo(function ChangesFoldersView({
 									onOpenFile={onOpenFile}
 									onOpenInEditor={onOpenInEditor}
 								/>
-							))}
-					</div>
-				);
-			})}
+							)}
+						</div>
+					);
+				})}
+			</div>
 		</div>
 	);
 });

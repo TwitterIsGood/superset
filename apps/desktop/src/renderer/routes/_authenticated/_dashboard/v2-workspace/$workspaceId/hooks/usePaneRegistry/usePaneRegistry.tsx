@@ -23,7 +23,10 @@ import { lazy, type ReactNode, Suspense, useCallback, useMemo } from "react";
 import { useHotkeyDisplay } from "renderer/hotkeys";
 import { FileIcon } from "renderer/lib/fileIcons";
 import { getBaseName } from "renderer/lib/pathBasename";
-import { consumeTerminalBackgroundIntent } from "renderer/lib/terminal/terminal-background-intents";
+import {
+	consumeTerminalBackgroundIntent,
+	suppressTerminalAutoAttachAfterExplicitClose,
+} from "renderer/lib/terminal/terminal-background-intents";
 import {
 	clearTerminalLazy,
 	disposeTerminalRuntimeLazy,
@@ -379,6 +382,11 @@ export function usePaneRegistry({
 			terminal: {
 				getIcon: () => <TerminalSquare className="size-3.5" />,
 				getTitle: () => "Terminal",
+				onBeforeClose: (pane) => {
+					const { terminalId } = pane.data as TerminalPaneData;
+					suppressTerminalAutoAttachAfterExplicitClose(workspaceId, terminalId);
+					return true;
+				},
 				titleSource: (pane) => {
 					const { terminalId } = pane.data as TerminalPaneData;
 					const instanceId = pane.id;

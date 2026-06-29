@@ -32,4 +32,21 @@ describe("WorkspaceSidebar lazy tabs", () => {
 		);
 		expect(workspaceSidebarSource).toContain('enabled: activeTab === "review"');
 	});
+
+	test("keeps visited heavy tabs warm without importing them eagerly", () => {
+		expect(workspaceSidebarSource).toContain("KEEP_WARM_SIDEBAR_TAB_IDS");
+		expect(workspaceSidebarSource).toContain(
+			"LARGE_CHANGESET_KEEP_WARM_THRESHOLD",
+		);
+		expect(workspaceSidebarSource).toContain('"files"');
+		expect(workspaceSidebarSource).toContain('"changes"');
+		expect(workspaceSidebarSource).toContain("visitedWarmTabs");
+		expect(workspaceSidebarSource).toContain("aria-hidden={!isActive}");
+		expect(workspaceSidebarSource).toContain(
+			"inert={isActive ? undefined : true}",
+		);
+		expect(workspaceSidebarSource).toContain(
+			"invisible pointer-events-none absolute inset-0 z-0 flex",
+		);
+	});
 });

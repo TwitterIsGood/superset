@@ -3,6 +3,7 @@ import {
 	getPaneParentDirection,
 	getSpatialNeighborPaneId,
 	type PaneRegistry,
+	type WorkspaceProps,
 	type WorkspaceStore,
 } from "@superset/panes";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -27,6 +28,7 @@ export function useWorkspaceHotkeys({
 	addTerminalTab,
 	paneRegistry,
 	launcher,
+	onBeforeCloseTab,
 }: {
 	store: StoreApi<WorkspaceStore<PaneViewerData>>;
 	matchedPresets: V2TerminalPresetRow[];
@@ -34,6 +36,7 @@ export function useWorkspaceHotkeys({
 	addTerminalTab: () => Promise<void>;
 	paneRegistry: PaneRegistry<PaneViewerData>;
 	launcher: TerminalLauncher;
+	onBeforeCloseTab?: WorkspaceProps<PaneViewerData>["onBeforeCloseTab"];
 }) {
 	const { setRightSidebarOpen, setRightSidebarTab } = useV2UserPreferences();
 	const visiblePresets = useMemo(
@@ -122,10 +125,24 @@ export function useWorkspaceHotkeys({
 		}
 	});
 
-	useHotkey("CLOSE_TAB", () => {
+	const isClosingTabRef = useRef(false);
+	useHotkey("CLOSE_TAB", async () => {
+		if (isClosingTabRef.current) return;
+		isClosingTabRef.current = true;
 		const state = store.getState();
-		if (state.activeTabId) {
-			state.removeTab(state.activeTabId);
+		try {
+			if (!state.activeTabId) return;
+			const tab = state.getTab(state.activeTabId);
+			if (!tab) return;
+			if (onBeforeCloseTab) {
+				const allowed = await onBeforeCloseTab(tab);
+				if (!allowed) return;
+			}
+			if (store.getState().getTab(tab.id)) {
+				store.getState().removeTab(tab.id);
+			}
+		} finally {
+			isClosingTabRef.current = false;
 		}
 	});
 
