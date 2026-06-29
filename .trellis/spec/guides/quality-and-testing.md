@@ -51,6 +51,115 @@ fingerprint. If the current code would emit additional fields or a different
 error shape but the packaged app still emits the old text, treat that as
 evidence of stale code adoption before writing another behavioral patch.
 
+## Size And Performance Optimization Safety
+
+Treat package-size, startup-time, dependency-pruning, lazy-loading, and runtime
+pack changes as high-risk production changes. These optimizations often remove
+or defer code that the type checker cannot see and that source-tree tests do not
+execute. The default posture is: preserve product capability first, then keep
+the optimization only after a packaged artifact proves the runtime contract.
+
+### Scenario: Desktop Runtime Optimization Gate
+
+#### 1. Scope / Trigger
+
+- Applies when editing desktop packaging, `apps/desktop/runtime-dependencies.ts`,
+  `apps/desktop/scripts/*pack*`, `electron-builder.ts`, resource-pack builders,
+  native-module pruning, `asarUnpack`, optional dependency materialization,
+  route/component lazy-loading, or startup-performance budget code.
+- Trigger: a change removes files, moves dependencies out of the base app,
+  changes file permissions, changes runtime lookup paths, defers module loading,
+  or changes process startup order.
+
+#### 2. Signatures
+
+- Runtime dependency contract:
+  `getRequiredPackagedRuntimeFiles({ targetPlatform, targetArch })`.
+- Packaged artifact gate:
+  `apps/desktop/scripts/validate-packaged-native-runtime.ts`.
+- Package pruning hook:
+  `afterPack` in `apps/desktop/electron-builder.ts`.
+- Native payload pruning:
+  `apps/desktop/scripts/prune-packaged-native-payloads.ts`.
+- Canary workflow proof:
+  `Release Desktop Canary -> build / Build - macOS (arm64) -> Build Electron app (DMG+ZIP)`.
+
+#### 3. Contracts
+
+- Do not merge a size/performance optimization solely because source tests,
+  typecheck, or compile succeeded. The optimized packaged artifact must prove
+  the runtime still starts the affected feature.
+- For every removed, externalized, lazy-loaded, or resource-packed dependency,
+  name the capability it serves and the packaged validation that exercises it.
+- File-existence checks are not enough for executable helpers or native
+  subprocesses. Validate permissions, architecture, platform directory,
+  `app.asar.unpacked` location, and the actual command path used by runtime code.
+- If a runtime dependency is moved to a resource pack, the base app must fail
+  gracefully while the pack is unavailable and must verify pack download/install
+  before invoking the capability.
+- If an optimization changes a long-lived process such as host-service or
+  pty-daemon, include the stale-process convergence strategy: version gate,
+  manifest/socket inspection, fd-handoff, or explicit restart.
+- If an optimization changes renderer lazy-loading, run an acceptance path that
+  navigates to the affected feature and performs the primary user action, not
+  just a route-load or screenshot check.
+
+#### 4. Validation & Error Matrix
+
+- Missing packaged file -> release-blocking validation failure.
+- Packaged executable helper exists but has no executable bit -> release-blocking
+  validation failure.
+- Native binding exists for the wrong platform/arch -> release-blocking
+  validation failure.
+- Source tree can execute a CLI, but `app.asar.unpacked` cannot -> packaging
+  failure, not user project failure.
+- Compile/build succeeds, but packaged app cannot open terminal, run a bundled
+  plugin, or start an agent -> optimization regression; revert or expand the
+  packaged runtime contract before publishing.
+- Canary build succeeds but installed app emits an old diagnostic shape -> first
+  inspect stale local process adoption before changing behavior again.
+
+#### 5. Good/Base/Bad Cases
+
+- Good: prune unused native payloads, keep the target `node-pty` prebuild helper
+  executable, validate the packaged app directory, and run a terminal-open smoke
+  path before release.
+- Good: move a heavy agent SDK into a resource pack, verify object-storage
+  upload/download, install the pack, and run the agent preset once.
+- Base: lazy-load a low-frequency renderer dialog and run Desktop Automation to
+  open that dialog and complete its primary action.
+- Bad: remove `node_modules/**` broadly, re-include a hand-written allowlist,
+  pass `bun run typecheck`, and publish without executing the packaged feature.
+- Bad: use package-size budget success as proof of runtime safety. Budget gates
+  only prove size; they do not prove the app can use what remains.
+
+#### 6. Tests Required
+
+- Focused unit/source tests for dependency lists and pruning behavior.
+- Packaged artifact validation for every native/runtime dependency moved or
+  pruned. Assertions must include permission bits for executable helpers.
+- At least one runtime smoke for the affected product capability:
+  terminal open, automation run, agent preset open, bundled plugin init, or
+  route primary action, depending on the touched area.
+- Canary/release notes must mention the exact workflow run or local packaged
+  artifact command that exercised `afterPack`.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```text
+The bundle is smaller and typecheck passes, so the optimization is safe.
+```
+
+Correct:
+
+```text
+The optimized packaged artifact includes the target runtime files with correct
+permissions, `afterPack` validation passed, and the affected product capability
+was exercised through the packaged/runtime path.
+```
+
 ## Background Services
 
 Long-lived services must clean up best-effort and independently. `packages/host-service/src/app.ts` isolates cleanup steps so one failed stop does not leak the rest. `apps/relay/src/index.ts` drains tunnels on SIGINT and SIGTERM before process exit.
