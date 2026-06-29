@@ -11,8 +11,14 @@ if echo "$output" | grep -qE "Found [0-9]+ (error|info|warning)"; then
   exit 1
 fi
 
-./scripts/check-desktop-git-env.sh
-./scripts/check-git-ref-strings.sh
-bash ./scripts/check-simple-git-usage.sh
+checks_exit_code=0
+./scripts/check-desktop-git-env.sh || checks_exit_code=$?
+./scripts/check-git-ref-strings.sh || checks_exit_code=$?
+bash ./scripts/check-simple-git-usage.sh || checks_exit_code=$?
+bun run scripts/check-pty-daemon-version-bump.ts || checks_exit_code=$?
 
-exit $exit_code
+if [ $exit_code -ne 0 ]; then
+  exit $exit_code
+fi
+
+exit $checks_exit_code
