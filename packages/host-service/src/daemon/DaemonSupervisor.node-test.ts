@@ -646,12 +646,12 @@ describe("DaemonSupervisor.update (Phase 2 fd-handoff)", () => {
 		}
 	});
 
-	test("auto-update defers when live sessions exist", async () => {
+	test("auto-update with live sessions hands off without killing the shell", async () => {
 		// Heavy path: auto-update fires on every adopt with version drift.
-		// If the stale daemon owns live shells, the background path should
-		// not silently handoff/restart under the user's typing. The visible
-		// Settings action remains available for a user-approved update.
-		const orgId = "org-autoupdate-live-defer";
+		// Live shells are exactly why the daemon has fd-handoff; leaving a stale
+		// daemon in place keeps old resource limits/native code active and can
+		// make new PTY opens fail after a Canary upgrade.
+		const orgId = "org-autoupdate-live-handoff";
 		const socketPath = path.join(
 			os.tmpdir(),
 			`superset-ptyd-${crypto
@@ -710,37 +710,36 @@ describe("DaemonSupervisor.update (Phase 2 fd-handoff)", () => {
 
 			const sup = new DaemonSupervisor({ scriptPath: DAEMON_BUNDLE });
 			supervisorsToCleanup.push({ sup, orgId });
-			let runUpdateCalled = false;
-			(
-				sup as unknown as {
-					runUpdate: () => Promise<{ ok: false; reason: string }>;
-				}
-			).runUpdate = async () => {
-				runUpdateCalled = true;
-				return {
-					ok: false as const,
-					reason: "auto-update should have deferred before runUpdate",
-				};
-			};
 
 			const adopted = await sup.ensure(orgId);
 			assert.equal(adopted.updatePending, true);
 			const predecessorPid = adopted.pid;
 
-			await new Promise((r) => setTimeout(r, 500));
-			const inst = (
-				sup as unknown as { instances: Map<string, { pid: number }> }
-			).instances.get(orgId);
-			assert.equal(inst?.pid, predecessorPid);
-			assert.equal(isAlive(predecessorPid), true);
-			assert.equal(runUpdateCalled, false);
+			const deadline = Date.now() + 8000;
+			let successorPid = predecessorPid;
+			while (Date.now() < deadline) {
+				const inst = (
+					sup as unknown as { instances: Map<string, { pid: number }> }
+				).instances.get(orgId);
+				if (inst && inst.pid !== predecessorPid) {
+					successorPid = inst.pid;
+					break;
+				}
+				await new Promise((r) => setTimeout(r, 100));
+			}
+			assert.notEqual(
+				successorPid,
+				predecessorPid,
+				`auto-update did not handoff live session within 8s (still ${predecessorPid})`,
+			);
+			assert.equal(isAlive(successorPid), true, "successor should be alive");
 
 			const status = sup.getUpdateStatus(orgId);
 			assert.ok(status);
 			assert.equal(
 				status.pending,
-				true,
-				`pending should remain visible for manual update (running=${status.running})`,
+				false,
+				`pending should clear after live-session handoff (running=${status.running})`,
 			);
 
 			const verifyClient = new DaemonClient({ socketPath });
@@ -749,9 +748,10 @@ describe("DaemonSupervisor.update (Phase 2 fd-handoff)", () => {
 			const survivor = sessions.find((s) => s.id === "survivor");
 			assert.ok(
 				survivor,
-				`live session should remain on predecessor: ${JSON.stringify(sessions)}`,
+				`live session should survive handoff: ${JSON.stringify(sessions)}`,
 			);
 			assert.equal(survivor.pid, shellPid);
+			await verifyClient.close("survivor", "SIGKILL").catch(() => {});
 			await verifyClient.dispose();
 		} catch (err) {
 			try {

@@ -142,10 +142,78 @@ function validateDims(cols: number, rows: number): void {
 	}
 }
 
+interface EnvSummary {
+	count: number;
+	bytes: number;
+	largestKey: string | null;
+	largestBytes: number;
+}
+
+function validateEnv(env: SessionMeta["env"]): void {
+	if (!env) return;
+	for (const [key, value] of Object.entries(env as Record<string, unknown>)) {
+		if (key.length === 0) {
+			throw new Error("spawn: invalid env key: empty");
+		}
+		if (key.includes("=")) {
+			throw new Error(`spawn: invalid env key contains '=': ${key}`);
+		}
+		if (key.includes("\0")) {
+			throw new Error(`spawn: invalid env key contains null byte: ${key}`);
+		}
+		if (typeof value !== "string") {
+			throw new Error(
+				`spawn: invalid env value for ${key}: expected string, got ${typeof value}`,
+			);
+		}
+		if (value.includes("\0")) {
+			throw new Error(
+				`spawn: invalid env value for ${key}: contains null byte`,
+			);
+		}
+	}
+}
+
+export function summarizeEnv(env: SessionMeta["env"]): EnvSummary {
+	const summary: EnvSummary = {
+		count: 0,
+		bytes: 0,
+		largestKey: null,
+		largestBytes: 0,
+	};
+	if (!env) return summary;
+
+	for (const [key, value] of Object.entries(env)) {
+		const entryBytes = Buffer.byteLength(key) + 1 + Buffer.byteLength(value);
+		summary.count += 1;
+		summary.bytes += entryBytes + 1;
+		if (entryBytes > summary.largestBytes) {
+			summary.largestBytes = entryBytes;
+			summary.largestKey = key;
+		}
+	}
+
+	return summary;
+}
+
+function describeSpawnContext(meta: SessionMeta): string {
+	const env = summarizeEnv(meta.env);
+	return [
+		`shell=${meta.shell}`,
+		`cwd=${meta.cwd ?? "(none)"}`,
+		`argvCount=${meta.argv.length}`,
+		`envCount=${env.count}`,
+		`envBytes=${env.bytes}`,
+		`largestEnvKey=${env.largestKey ?? "(none)"}`,
+		`largestEnvBytes=${env.largestBytes}`,
+	].join(" ");
+}
+
 function reprobeErrno(meta: SessionMeta): string {
 	try {
 		const probe = childProcess.spawnSync(meta.shell, ["-c", ":"], {
 			cwd: meta.cwd,
+			env: meta.env,
 			timeout: 1000,
 			stdio: "ignore",
 		});
@@ -159,6 +227,7 @@ function reprobeErrno(meta: SessionMeta): string {
 
 export function spawn({ meta }: SpawnOptions): Pty {
 	validateDims(meta.cols, meta.rows);
+	validateEnv(meta.env);
 	// Pre-flight: node-pty's "posix_spawnp failed" message swallows errno
 	// and leaves no clue what went wrong. Surface the most common cause
 	// ahead of the native call so the caller (and the user) can see it.
@@ -197,7 +266,7 @@ export function spawn({ meta }: SpawnOptions): Pty {
 		// the same shell+cwd with spawnSync to surface the real code (e.g.
 		// EMFILE/EAGAIN/ENOENT).
 		throw new Error(
-			`spawn failed (shell=${meta.shell} cwd=${meta.cwd ?? "(none)"} errno=${reprobeErrno(meta)}): ${(err as Error).message}`,
+			`spawn failed (${describeSpawnContext(meta)} errno=${reprobeErrno(meta)}): ${(err as Error).message}`,
 		);
 	}
 	const adapter = new NodePtyAdapter(term, meta);

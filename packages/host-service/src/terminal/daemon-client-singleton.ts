@@ -101,6 +101,32 @@ export async function getDaemonClient(): Promise<DaemonClient> {
 	return connecting;
 }
 
+/**
+ * New PTY opens should not target an adopted daemon that is known to be older
+ * than the bundled host-service runtime. Smooth handoff preserves live shells;
+ * if it succeeds, drop the cached transport so the next client connects to the
+ * successor on the same socket path.
+ */
+export async function ensureDaemonCurrentBeforeTerminalOpen(): Promise<void> {
+	// Tests that set an explicit daemon socket own the daemon lifecycle
+	// themselves and often do not set ORGANIZATION_ID.
+	if (process.env.SUPERSET_PTY_DAEMON_SOCKET) return;
+
+	const organizationId = getOrganizationId();
+	await waitForDaemonReady(organizationId);
+	const result =
+		await getSupervisor().ensureCurrentBeforeOpeningSession(organizationId);
+	if (result.updated) {
+		await disposeDaemonClient();
+		return;
+	}
+	if (result.failure) {
+		console.warn(
+			`[host-service] pty-daemon update before terminal open failed; opening on existing daemon: ${result.failure}`,
+		);
+	}
+}
+
 /** For tests / shutdown only. */
 export async function disposeDaemonClient(): Promise<void> {
 	const c = cached;

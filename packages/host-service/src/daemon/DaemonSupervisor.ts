@@ -70,6 +70,11 @@ export interface DaemonUpdateStatus {
 	autoUpdateFailure: DaemonAutoUpdateFailure | null;
 }
 
+export interface DaemonPreOpenUpdateResult {
+	updated: boolean;
+	failure: string | null;
+}
+
 const SOCKET_READY_TIMEOUT_MS = 5_000;
 const VERSION_PROBE_TIMEOUT_MS = 1_500;
 const HANDOFF_PREDECESSOR_EXIT_TIMEOUT_MS = 3_000;
@@ -230,6 +235,63 @@ export class DaemonSupervisor {
 		{ ok: true; successorPid: number } | { ok: false; reason: string }
 	> {
 		return this.startUpdate(organizationId).promise;
+	}
+
+	/**
+	 * Before opening a new PTY, make sure a stale adopted daemon has had a
+	 * chance to hand off to the bundled binary. Otherwise a newly-installed
+	 * app can keep sending fresh session opens to an old daemon that still has
+	 * the previous resource limits/native runtime.
+	 */
+	async ensureCurrentBeforeOpeningSession(
+		organizationId: string,
+	): Promise<DaemonPreOpenUpdateResult> {
+		const instance = await this.ensure(organizationId);
+		if (!instance.updatePending) {
+			return { updated: false, failure: null };
+		}
+
+		logEvent("pty_daemon_preopen_update_attempt", {
+			organizationId,
+			pid: instance.pid,
+			runningVersion: instance.runningVersion,
+			expectedVersion: instance.expectedVersion,
+		});
+
+		try {
+			const result = await this.update(organizationId);
+			if (result.ok) {
+				logEvent("pty_daemon_preopen_update_ok", {
+					organizationId,
+					previousPid: instance.pid,
+					successorPid: result.successorPid,
+					runningVersion: instance.runningVersion,
+					expectedVersion: instance.expectedVersion,
+				});
+				return { updated: true, failure: null };
+			}
+
+			this.recordAutoUpdateFailure(organizationId, instance, result.reason);
+			logEvent("pty_daemon_preopen_update_failed", {
+				organizationId,
+				pid: instance.pid,
+				runningVersion: instance.runningVersion,
+				expectedVersion: instance.expectedVersion,
+				reason: result.reason,
+			});
+			return { updated: false, failure: result.reason };
+		} catch (err) {
+			const reason = `threw: ${(err as Error).message}`;
+			this.recordAutoUpdateFailure(organizationId, instance, reason);
+			logEvent("pty_daemon_preopen_update_failed", {
+				organizationId,
+				pid: instance.pid,
+				runningVersion: instance.runningVersion,
+				expectedVersion: instance.expectedVersion,
+				reason,
+			});
+			return { updated: false, failure: reason };
+		}
 	}
 
 	private startUpdate(organizationId: string): {
@@ -568,12 +630,6 @@ export class DaemonSupervisor {
 			return;
 		}
 		const aliveSessionCount = countAliveSessions(sessions);
-		if (aliveSessionCount > 0) {
-			this.deferAutoUpdate(organizationId, instance, "live_sessions_present", {
-				aliveSessionCount,
-			});
-			return;
-		}
 
 		const update = this.startUpdate(organizationId);
 		try {
@@ -584,6 +640,7 @@ export class DaemonSupervisor {
 					previousPid: instance.pid,
 					successorPid: result.successorPid,
 					previousVersion: instance.runningVersion,
+					aliveSessionCount,
 				});
 				return;
 			}

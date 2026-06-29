@@ -25,6 +25,7 @@ import {
 	type Signal as DaemonSignal,
 } from "./DaemonClient/index.ts";
 import {
+	ensureDaemonCurrentBeforeTerminalOpen,
 	getDaemonClient,
 	onDaemonDisconnect,
 } from "./daemon-client-singleton.ts";
@@ -1137,6 +1138,9 @@ export async function createTerminalSessionInternal({
 	let openResult: { pid: number };
 	let isAdopted = false;
 	try {
+		if (!adoptOnly) {
+			await ensureDaemonCurrentBeforeTerminalOpen();
+		}
 		daemon = await getDaemonClient();
 		if (adoptOnly) {
 			const found = (await daemon.list()).find(

@@ -668,6 +668,84 @@ describe("DaemonSupervisor.update failure mode", () => {
 	});
 });
 
+describe("DaemonSupervisor.ensureCurrentBeforeOpeningSession", () => {
+	let sup: DaemonSupervisor;
+
+	beforeEach(() => {
+		sup = new DaemonSupervisor({ scriptPath: "/nonexistent" });
+	});
+
+	test("does nothing for a current daemon", async () => {
+		seedDaemonInstance(sup, "org-current", freshInstance());
+		const runUpdateMock = mock(async () => ({
+			ok: true as const,
+			successorPid: 9001,
+		}));
+		(sup as unknown as { runUpdate: typeof runUpdateMock }).runUpdate =
+			runUpdateMock;
+
+		await expect(
+			sup.ensureCurrentBeforeOpeningSession("org-current"),
+		).resolves.toEqual({ updated: false, failure: null });
+		expect(runUpdateMock).not.toHaveBeenCalled();
+	});
+
+	test("smooth-updates a stale daemon before opening a new session", async () => {
+		const instance = staleInstance("0.0.5");
+		seedDaemonInstance(sup, "org-stale-preopen", instance);
+		const runUpdateMock = mock(async () => ({
+			ok: true as const,
+			successorPid: 9002,
+		}));
+		(sup as unknown as { runUpdate: typeof runUpdateMock }).runUpdate =
+			runUpdateMock;
+
+		await expect(
+			sup.ensureCurrentBeforeOpeningSession("org-stale-preopen"),
+		).resolves.toEqual({ updated: true, failure: null });
+		expect(runUpdateMock).toHaveBeenCalledTimes(1);
+		expect(
+			loggedEvents.some(
+				(e) =>
+					e.event === "pty_daemon_preopen_update_ok" &&
+					e.props.organizationId === "org-stale-preopen" &&
+					e.props.previousPid === instance.pid &&
+					e.props.successorPid === 9002,
+			),
+		).toBe(true);
+	});
+
+	test("records the failure and lets the caller decide whether to continue", async () => {
+		const instance = staleInstance("0.0.4");
+		seedDaemonInstance(sup, "org-stale-fail", instance);
+		const runUpdateMock = mock(async () => ({
+			ok: false as const,
+			reason: "successor ack timed out",
+		}));
+		(sup as unknown as { runUpdate: typeof runUpdateMock }).runUpdate =
+			runUpdateMock;
+
+		await expect(
+			sup.ensureCurrentBeforeOpeningSession("org-stale-fail"),
+		).resolves.toEqual({
+			updated: false,
+			failure: "successor ack timed out",
+		});
+		expect(
+			sup.getUpdateStatus("org-stale-fail")?.autoUpdateFailure,
+		).toMatchObject({
+			reason: "successor ack timed out",
+		});
+		expect(
+			loggedEvents.some(
+				(e) =>
+					e.event === "pty_daemon_preopen_update_failed" &&
+					e.props.reason === "successor ack timed out",
+			),
+		).toBe(true);
+	});
+});
+
 describe("DaemonSupervisor auto-update best effort", () => {
 	let sup: DaemonSupervisor;
 
@@ -792,7 +870,7 @@ describe("DaemonSupervisor auto-update best effort", () => {
 		).toBe(true);
 	});
 
-	test("defers the background update when live sessions are present", async () => {
+	test("runs the background smooth update when live sessions are present", async () => {
 		const instance = staleInstance("0.0.6");
 		seedDaemonInstance(sup, "org-auto-live", instance);
 		mockListSessions(sup, [aliveSession()]);
@@ -806,14 +884,13 @@ describe("DaemonSupervisor auto-update best effort", () => {
 		invokeKickoffAutoUpdate(sup, "org-auto-live", instance);
 		await flushAutoUpdate();
 
-		expect(runUpdateMock).not.toHaveBeenCalled();
+		expect(runUpdateMock).toHaveBeenCalledWith("org-auto-live");
 		expect(
 			loggedEvents.some(
 				(e) =>
-					e.event === "pty_daemon_auto_update_deferred" &&
-					e.props.reason === "live_sessions_present" &&
+					e.event === "pty_daemon_auto_update_ok" &&
 					e.props.aliveSessionCount === 1 &&
-					e.props.pid === instance.pid,
+					e.props.previousPid === instance.pid,
 			),
 		).toBe(true);
 	});
