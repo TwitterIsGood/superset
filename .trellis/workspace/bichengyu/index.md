@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 34
+- **Total Sessions**: 35
 - **Last Active**: 2026-06-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1213 | Active |
+| `journal-1.md` | ~1247 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 35 | 2026-06-29 | Fix Changes tree switching memory regression | `c31c7182c` | `main` |
 | 34 | 2026-06-29 | Optimize large workspace sidebar switching | `fa448de69` | `main` |
 | 33 | 2026-06-29 | Desktop optimization runtime safety retrospective | `835436d6c`, `5b414b83d` | `main` |
 | 32 | 2026-06-28 | Desktop visual stability gate | `24d066ec0` | `main` |

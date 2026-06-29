@@ -1211,3 +1211,37 @@ Optimized sailor/main Files and Changes switching by preserving lazy imports, th
 ### Next Steps
 
 - None - task complete
+
+
+## Session 35: Fix Changes tree switching memory regression
+
+**Date**: 2026-06-29
+**Task**: Fix Changes tree switching memory regression
+**Package**: desktop
+**Branch**: `main`
+
+### Summary
+
+Preserved the garbled renderer incident, rejected the custom FileRow-based Tree rewrite after real measurement showed worse long tasks and memory, kept Pierre Tree mode, and collapsed large changesets by default to keep Folders-to-Tree switching under budget.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c31c7182c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
