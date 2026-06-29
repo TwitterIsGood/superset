@@ -1142,3 +1142,38 @@ Added the desktop visual-stability automation gate, tests, docs, runtime packagi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 33: Desktop optimization runtime safety retrospective
+
+**Date**: 2026-06-29
+**Task**: Desktop optimization runtime safety retrospective
+**Package**: desktop
+**Branch**: `main`
+
+### Summary
+
+Captured the package-size/startup-performance optimization failure mode: source checks and package-size budgets do not prove packaged runtime safety. Recorded node-pty spawn-helper executable-bit lesson and added a general desktop runtime optimization gate requiring packaged artifact validation, executable permission checks, stale-process strategy, and capability smoke tests before publishing.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `835436d6c` | (see git log) |
+| `5b414b83d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
