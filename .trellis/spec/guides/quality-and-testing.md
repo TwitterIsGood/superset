@@ -38,6 +38,19 @@ Source-level regression tests are accepted when the bug was missing wiring that 
 
 Desktop Automation CLI real app checks are required when the risk lives across Electron main/preload/renderer, persisted desktop state, route guards, host-service, or native process boundaries. They should combine deterministic assertions with screenshot/report artifacts; do not rely on visual-only checks as the gate.
 
+For packaged runtime changes, separate artifact validation from runtime
+convergence validation. A green canary/release workflow proves the app was
+built and published, but it does not prove a user's installed desktop stopped
+adopting an older local helper process. If the change affects host-service,
+pty-daemon, automation runners, terminal spawn/open, or bundled runtime path
+resolution, the validation notes must name the stale-process strategy: version
+gate, manifest/socket inspection, fd-handoff test, or explicit process restart.
+
+When a bug report contains a diagnostic string, use that string as a runtime
+fingerprint. If the current code would emit additional fields or a different
+error shape but the packaged app still emits the old text, treat that as
+evidence of stale code adoption before writing another behavioral patch.
+
 ## Background Services
 
 Long-lived services must clean up best-effort and independently. `packages/host-service/src/app.ts` isolates cleanup steps so one failed stop does not leak the rest. `apps/relay/src/index.ts` drains tunnels on SIGINT and SIGTERM before process exit.

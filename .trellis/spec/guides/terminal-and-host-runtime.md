@@ -134,6 +134,91 @@ terminalInputQueueRef.current = terminalInputQueueRef.current
 - Protocol version negotiation happens with `hello` and `hello-ack` in `packages/pty-daemon/src/protocol/messages.ts`.
 - Upgrade handoff preserves live sessions by passing PTY master fds to a successor process. Preserve tests in `packages/pty-daemon/test/handoff.node-test.ts` and `packages/host-service/src/terminal/terminal.adoption.node-test.ts` when changing adoption.
 - In desktop development, Electron spawns host-service children per organization and terminates them on app quit. PTY survival across host-service restarts comes from `packages/pty-daemon` adoption and replay, not from host-service itself. Treat "Electron closed but background work continues indefinitely" as a separate product/runtime requirement unless a task explicitly implements durable background supervision.
+- Any production-affecting change under `packages/pty-daemon/src/` must bump
+  `packages/pty-daemon/package.json#version`. Host-service derives
+  `EXPECTED_DAEMON_VERSION` from that package version; without a bump, packaged
+  desktop apps can adopt an already-running old daemon and never execute the
+  new code. `bun run lint` includes `scripts/check-pty-daemon-version-bump.ts`
+  to guard this, but reviewers should still treat the version bump as part of
+  the runtime contract, not as release bookkeeping.
+- When investigating a packaged terminal failure, compare the observed error
+  text/log schema with the new code path. If the installed app still emits an
+  old diagnostic shape after a canary update, assume a stale host-service or
+  stale pty-daemon process is being adopted until logs prove otherwise.
+
+### Scenario: Packaged Daemon Code Change And Version Handoff
+
+#### 1. Scope / Trigger
+- Applies when editing `packages/pty-daemon/src/**`,
+  `packages/host-service/src/daemon/**`,
+  `packages/host-service/src/terminal/**`, or desktop packaging that affects
+  the daemon bundle.
+
+#### 2. Signatures
+- Version source:
+  `packages/pty-daemon/package.json#version`.
+- Host-service expectation:
+  `EXPECTED_DAEMON_VERSION` from
+  `packages/host-service/src/daemon/expected-version.ts`.
+- Daemon runtime report:
+  `hello-ack.daemonVersion` from the socket handshake.
+- Packaged bundle:
+  `apps/desktop/dist/main/pty-daemon.js`.
+
+#### 3. Contracts
+- Runtime daemon implementation changes require a daemon package version bump.
+- Old daemons must be marked `updatePending=true` and either auto-updated or
+  updated before opening a new session, using fd-handoff rather than killing
+  live shells.
+- Handoff validation must prove a stale daemon reports an old version before
+  update and a successor reports the newly bundled version after update.
+- A successful GitHub canary build only proves artifact production. It does not
+  prove an installed desktop is no longer attached to a stale local daemon.
+
+#### 4. Validation & Error Matrix
+- `EXPECTED_DAEMON_VERSION` still equals the old package version after a code
+  change -> release blocker.
+- Packaged app emits the old error/diagnostic shape after installing a new
+  canary -> inspect host-service logs, daemon manifest, and running daemon
+  version before changing spawn logic again.
+- `update()` fails during fd-handoff -> predecessor daemon must keep serving
+  existing sessions; surface update failure and keep `updatePending=true`.
+- `ensureCurrentBeforeOpeningSession()` skips a stale daemon -> terminal open
+  can continue to fail with old runtime behavior.
+
+#### 5. Good/Base/Bad Cases
+- Good: edit `Pty.ts`, bump daemon version, focused tests show
+  `EXPECTED_DAEMON_VERSION` is the new version, Node handoff tests show
+  `0.0.1 -> newVersion`, and canary publishes from that commit.
+- Base: docs/tests-only changes under `packages/pty-daemon` do not require a
+  daemon version bump.
+- Bad: edit daemon spawn behavior, publish canary, see GitHub green, but leave
+  package version unchanged so users keep adopting the old daemon.
+
+#### 6. Tests Required
+- `bun --eval 'import { EXPECTED_DAEMON_VERSION } from "./packages/host-service/src/daemon/expected-version.ts"; console.log(EXPECTED_DAEMON_VERSION)'`
+  or an equivalent assertion in the task notes.
+- `bun test packages/host-service/src/daemon/DaemonSupervisor.test.ts packages/pty-daemon/src/Pty/Pty.test.ts`
+- `bun run build:daemon` from `packages/pty-daemon` before real Node daemon
+  tests.
+- `bunx tsx --test packages/host-service/src/daemon/DaemonSupervisor.node-test.ts`
+- `bun test packages/host-service/test/integration/terminal.integration.test.ts`
+- `bunx tsx --test packages/host-service/src/terminal/terminal.adoption.node-test.ts`
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```text
+The canary build passed, so users must be running the fixed daemon code.
+```
+
+Correct:
+
+```text
+The canary build passed, the daemon version changed, host-service expects the
+new version, and handoff tests prove stale daemons converge before new PTYs open.
+```
 
 ### Scenario: Workspace Terminal Session Discovery
 
