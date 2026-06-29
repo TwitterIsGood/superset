@@ -1177,3 +1177,37 @@ Captured the package-size/startup-performance optimization failure mode: source 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 34: Optimize large workspace sidebar switching
+
+**Date**: 2026-06-29
+**Task**: Optimize large workspace sidebar switching
+**Package**: desktop
+**Branch**: `main`
+
+### Summary
+
+Optimized sailor/main Files and Changes switching by preserving lazy imports, threshold-gated warm tabs, virtualizing Changes folder rows, and suppressing terminal auto-attach after explicit close. Recorded performance and terminal-close desktop automation artifacts plus specs for future guardrails.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fa448de69` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
