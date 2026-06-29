@@ -9,6 +9,7 @@ const ROOT_FOLDER_KEY = "";
 const ROOT_FOLDER_LABEL = "Root Path";
 const ESTIMATED_ROW_HEIGHT = 24;
 const OVERSCAN = 12;
+const LARGE_FOLDER_DERIVATION_THRESHOLD = 500;
 
 interface ChangesFoldersViewProps {
 	files: ChangesetFile[];
@@ -29,6 +30,13 @@ interface FolderGroup {
 type FolderVirtualRow =
 	| { kind: "folder"; key: string; group: FolderGroup; isRoot: boolean }
 	| { kind: "file"; key: string; file: ChangesetFile; group: FolderGroup };
+
+interface FolderViewModel {
+	groups: FolderGroup[];
+	rowsByClosedKey: Map<string, FolderVirtualRow[]>;
+}
+
+const folderViewModelCache = new WeakMap<ChangesetFile[], FolderViewModel>();
 
 /**
  * Render a flat list of changed files grouped by their immediate parent
@@ -52,9 +60,68 @@ export const ChangesFoldersView = memo(function ChangesFoldersView({
 	onOpenFile,
 	onOpenInEditor,
 }: ChangesFoldersViewProps) {
-	const groups = useMemo(() => groupFilesByFolder(files), [files]);
+	const shouldDeferDerivation =
+		files.length >= LARGE_FOLDER_DERIVATION_THRESHOLD &&
+		!folderViewModelCache.has(files);
+	const [deferredViewModel, setDeferredViewModel] =
+		useState<FolderViewModel | null>(
+			() => folderViewModelCache.get(files) ?? null,
+		);
+
+	useEffect(() => {
+		const cached = folderViewModelCache.get(files);
+		if (cached || files.length < LARGE_FOLDER_DERIVATION_THRESHOLD) {
+			setDeferredViewModel(cached ?? null);
+			return;
+		}
+
+		let cancelled = false;
+		const schedule =
+			typeof window.requestIdleCallback === "function"
+				? window.requestIdleCallback
+				: (callback: IdleRequestCallback) =>
+						window.setTimeout(
+							() =>
+								callback({
+									didTimeout: true,
+									timeRemaining: () => 0,
+								} as IdleDeadline),
+							0,
+						);
+		const cancel =
+			typeof window.cancelIdleCallback === "function"
+				? window.cancelIdleCallback
+				: window.clearTimeout;
+
+		const handle = schedule(
+			() => {
+				if (cancelled) return;
+				const next = getFolderViewModel(files);
+				if (!cancelled) setDeferredViewModel(next);
+			},
+			{ timeout: 250 },
+		);
+
+		return () => {
+			cancelled = true;
+			cancel(handle);
+		};
+	}, [files]);
+
+	const immediateViewModel = useMemo(
+		() =>
+			shouldDeferDerivation || deferredViewModel
+				? null
+				: getFolderViewModel(files),
+		[deferredViewModel, files, shouldDeferDerivation],
+	);
+	const viewModel = deferredViewModel ?? immediateViewModel;
 	const listRef = useRef<HTMLDivElement>(null);
 	const [closedFolders, setClosedFolders] = useState<Set<string>>(new Set());
+	const closedFoldersKey = useMemo(
+		() => serializeClosedFolders(closedFolders),
+		[closedFolders],
+	);
 
 	const toggleFolder = useCallback((folderPath: string) => {
 		setClosedFolders((prev) => {
@@ -72,36 +139,23 @@ export const ChangesFoldersView = memo(function ChangesFoldersView({
 	useEffect(() => {
 		if (foldSignal.epoch === 0 || foldSignal.epoch === lastFoldEpochRef.current)
 			return;
+		if (!viewModel) return;
 		lastFoldEpochRef.current = foldSignal.epoch;
 		setClosedFolders(
 			foldSignal.action === "collapse"
-				? new Set(groups.map((g) => g.folderPath))
+				? new Set(viewModel.groups.map((g) => g.folderPath))
 				: new Set(),
 		);
-	}, [foldSignal, groups]);
+	}, [foldSignal, viewModel]);
 
 	const rows = useMemo<FolderVirtualRow[]>(() => {
-		const nextRows: FolderVirtualRow[] = [];
-		for (const group of groups) {
-			const isRoot = group.folderPath === ROOT_FOLDER_KEY;
-			nextRows.push({
-				kind: "folder",
-				key: `folder:${isRoot ? "__root__" : group.folderPath}`,
-				group,
-				isRoot,
-			});
-			if (closedFolders.has(group.folderPath)) continue;
-			for (const file of group.files) {
-				nextRows.push({
-					kind: "file",
-					key: `file:${file.source.kind}:${file.path}`,
-					file,
-					group,
-				});
-			}
-		}
+		if (!viewModel) return [];
+		const cached = viewModel.rowsByClosedKey.get(closedFoldersKey);
+		if (cached) return cached;
+		const nextRows = buildFolderRows(viewModel.groups, closedFolders);
+		viewModel.rowsByClosedKey.set(closedFoldersKey, nextRows);
 		return nextRows;
-	}, [closedFolders, groups]);
+	}, [closedFolders, closedFoldersKey, viewModel]);
 
 	const virtualizer = useVirtualizer({
 		count: rows.length,
@@ -116,6 +170,14 @@ export const ChangesFoldersView = memo(function ChangesFoldersView({
 		scrollMargin: listRef.current?.offsetTop ?? 0,
 	});
 	const virtualItems = virtualizer.getVirtualItems();
+
+	if (!viewModel) {
+		return (
+			<div className="px-3 py-6 text-center text-sm text-muted-foreground">
+				Preparing folders...
+			</div>
+		);
+	}
 
 	return (
 		<div ref={listRef}>
@@ -162,6 +224,52 @@ export const ChangesFoldersView = memo(function ChangesFoldersView({
 		</div>
 	);
 });
+
+function getFolderViewModel(files: ChangesetFile[]): FolderViewModel {
+	const cached = folderViewModelCache.get(files);
+	if (cached) return cached;
+
+	const groups = groupFilesByFolder(files);
+	const viewModel: FolderViewModel = {
+		groups,
+		rowsByClosedKey: new Map([
+			[serializeClosedFolders(new Set()), buildFolderRows(groups, new Set())],
+		]),
+	};
+	folderViewModelCache.set(files, viewModel);
+	return viewModel;
+}
+
+function buildFolderRows(
+	groups: FolderGroup[],
+	closedFolders: ReadonlySet<string>,
+): FolderVirtualRow[] {
+	const nextRows: FolderVirtualRow[] = [];
+	for (const group of groups) {
+		const isRoot = group.folderPath === ROOT_FOLDER_KEY;
+		nextRows.push({
+			kind: "folder",
+			key: `folder:${isRoot ? "__root__" : group.folderPath}`,
+			group,
+			isRoot,
+		});
+		if (closedFolders.has(group.folderPath)) continue;
+		for (const file of group.files) {
+			nextRows.push({
+				kind: "file",
+				key: `file:${file.source.kind}:${file.path}`,
+				file,
+				group,
+			});
+		}
+	}
+	return nextRows;
+}
+
+function serializeClosedFolders(closedFolders: ReadonlySet<string>): string {
+	if (closedFolders.size === 0) return "";
+	return Array.from(closedFolders).sort().join("\n");
+}
 
 function groupFilesByFolder(files: ChangesetFile[]): FolderGroup[] {
 	const map = new Map<string, ChangesetFile[]>();

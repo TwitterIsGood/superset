@@ -45,7 +45,6 @@ const LazyReviewSidebarTab = lazy(async () => ({
 }));
 
 const KEEP_WARM_SIDEBAR_TAB_IDS: readonly SidebarTabId[] = ["files", "changes"];
-const LARGE_CHANGESET_KEEP_WARM_THRESHOLD = 500;
 
 type WorkspaceSidebarTabDefinition = SidebarTabDefinition & {
 	id: SidebarTabId;
@@ -109,14 +108,8 @@ function SidebarTabFallback() {
 	);
 }
 
-function shouldKeepSidebarTabWarm(
-	tabId: SidebarTabId,
-	gitChangeCount: number,
-): boolean {
-	return (
-		gitChangeCount >= LARGE_CHANGESET_KEEP_WARM_THRESHOLD &&
-		KEEP_WARM_SIDEBAR_TAB_IDS.includes(tabId)
-	);
+function shouldKeepSidebarTabWarm(tabId: SidebarTabId): boolean {
+	return KEEP_WARM_SIDEBAR_TAB_IDS.includes(tabId);
 }
 
 export function WorkspaceSidebar({
@@ -147,9 +140,7 @@ export function WorkspaceSidebar({
 		ids: Set<SidebarTabId>;
 	}>(() => ({
 		workspaceId,
-		ids: shouldKeepSidebarTabWarm(activeTab, gitChangeCount)
-			? new Set([activeTab])
-			: new Set(),
+		ids: shouldKeepSidebarTabWarm(activeTab) ? new Set([activeTab]) : new Set(),
 	}));
 	const visitedWarmTabIds =
 		visitedWarmTabs.workspaceId === workspaceId
@@ -163,9 +154,9 @@ export function WorkspaceSidebar({
 					? new Set<SidebarTabId>(prev.ids)
 					: new Set<SidebarTabId>();
 			for (const id of ids) {
-				if (!shouldKeepSidebarTabWarm(id, gitChangeCount)) ids.delete(id);
+				if (!shouldKeepSidebarTabWarm(id)) ids.delete(id);
 			}
-			if (shouldKeepSidebarTabWarm(activeTab, gitChangeCount)) {
+			if (shouldKeepSidebarTabWarm(activeTab)) {
 				ids.add(activeTab);
 			}
 			if (
@@ -177,7 +168,7 @@ export function WorkspaceSidebar({
 			}
 			return { workspaceId, ids };
 		});
-	}, [activeTab, gitChangeCount, workspaceId]);
+	}, [activeTab, workspaceId]);
 
 	function setActiveTab(tab: string) {
 		if (!isSidebarTabId(tab)) return;
@@ -300,8 +291,7 @@ export function WorkspaceSidebar({
 					const isActive = tab.id === activeTab;
 					const shouldRender =
 						isActive ||
-						(shouldKeepSidebarTabWarm(tab.id, gitChangeCount) &&
-							visitedWarmTabIds.has(tab.id));
+						(shouldKeepSidebarTabWarm(tab.id) && visitedWarmTabIds.has(tab.id));
 					if (!shouldRender) return null;
 
 					return (

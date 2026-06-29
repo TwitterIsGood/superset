@@ -22,6 +22,9 @@ describe("ChangesFileList virtualization", () => {
 			"[data-changes-scroll-container]",
 		);
 		expect(changesFoldersViewSource).toContain("virtualizer.getVirtualItems()");
+		expect(changesFoldersViewSource).toContain("folderViewModelCache");
+		expect(changesFoldersViewSource).toContain("requestIdleCallback");
+		expect(changesFoldersViewSource).toContain("Preparing folders...");
 		expect(changesFoldersViewSource).not.toContain("groups.map((group)");
 	});
 
